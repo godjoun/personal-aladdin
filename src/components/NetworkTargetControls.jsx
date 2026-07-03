@@ -5,13 +5,14 @@
 import '../styles/Dashboard.css'
 
 function NetworkTargetControls({
+  compact = false,
   targetMode = 'latest',
   windowDays = 30,
   onTargetModeChange,
   onWindowDaysChange,
 }) {
   return (
-    <div className="dashboard__network-target">
+    <div className={`dashboard__network-target${compact ? ' dashboard__network-target--compact' : ''}`}>
       <div
         className="dashboard__network-target-mode"
         role="group"

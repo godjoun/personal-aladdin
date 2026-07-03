@@ -272,10 +272,8 @@ function App() {
             <LampIcon />
           </div>
           <div className="aladdin-header__titles">
-            <h1 className="aladdin-header__title">ALADDIN 1988 PERSONAL v1.88</h1>
-            <p className="aladdin-header__subtitle">
-              CLOSED LOCAL RISK SYSTEM / HOST: SECURE_STATION
-            </p>
+            <h1 className="aladdin-header__title">ALADDIN</h1>
+            <p className="aladdin-header__subtitle">개인 포트폴리오 · 리스크 관리</p>
           </div>
         </div>
 
@@ -293,6 +291,8 @@ function App() {
             </button>
           ))}
         </nav>
+
+        <StationPanel />
 
         <div className="aladdin-header__controls">
           <label className="aladdin-control">
@@ -319,7 +319,6 @@ function App() {
       </header>
 
       <main className="app-main">
-        <StationPanel />
         {activeView === APP_VIEWS.dashboard && (
           <Dashboard
             prices={marketPrices}

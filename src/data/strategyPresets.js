@@ -99,3 +99,18 @@ export function applyStrategyPreset(presetId) {
   setNetworkParticipationEnabled(false)
   return true
 }
+
+/**
+ * 임의 목표 비중을 고정 전략으로 적용합니다.
+ *
+ * @param {Record<string, number>} targets
+ */
+export function applyCustomTargets(targets) {
+  if (!targets || typeof targets !== 'object') {
+    return false
+  }
+
+  localStorage.setItem(TARGETS_KEY, JSON.stringify(targets))
+  setNetworkParticipationEnabled(false)
+  return true
+}

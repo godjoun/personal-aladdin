@@ -12,7 +12,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 0.75rem;
-  margin: 1rem 0;
+  margin: 0 0 1rem;
 }
 
 .dashboard__metric-card {
@@ -529,6 +529,38 @@
   font-size: 0.68rem;
   color: var(--color-text-muted);
   line-height: 1.45;
+}
+
+.dashboard__network-target--compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.dashboard__network-target--compact .dashboard__network-target-mode {
+  gap: 0.2rem;
+}
+
+.dashboard__network-target--compact .dashboard__network-target-btn {
+  padding: 0.2rem 0.4rem;
+  font-size: 0.58rem;
+}
+
+.dashboard__network-target--compact .dashboard__network-window {
+  gap: 0.25rem;
+}
+
+.dashboard__network-target--compact .dashboard__network-window-label {
+  font-size: 0.58rem;
+}
+
+.dashboard__network-target--compact .dashboard__network-window-select {
+  padding: 0.15rem 0.3rem;
+  font-size: 0.58rem;
 }
 
 .dashboard__network-target {

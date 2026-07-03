@@ -1,0 +1,385 @@
+/**
+ * AllocationAdvisor.css — 분배 추천 시뮬
+ */
+
+.allocation-advisor {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid rgba(243, 156, 18, 0.35);
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(243, 156, 18, 0.06) 0%, var(--color-surface-panel) 100%);
+}
+
+.allocation-advisor__header {
+  margin-bottom: 0.85rem;
+}
+
+.allocation-advisor__title {
+  margin: 0 0 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.allocation-advisor__desc {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.allocation-advisor__candidate-picker {
+  margin-bottom: 0.85rem;
+}
+
+.allocation-advisor__picker-label,
+.scenario-picker__label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.allocation-advisor__candidate-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.allocation-advisor__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.allocation-advisor__chip--active {
+  color: var(--color-bg);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.allocation-advisor__chip-badge {
+  font-size: 0.58rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.scenario-picker {
+  margin: 0.75rem 0;
+}
+
+.scenario-picker__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.scenario-picker__btn {
+  padding: 0.28rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.scenario-picker__btn--active {
+  color: var(--color-bg);
+  background: var(--color-accent-blue);
+  border-color: var(--color-accent-blue);
+}
+
+.allocation-advisor__scenario-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.allocation-advisor__scenario-card {
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  background: var(--color-surface-panel);
+}
+
+.allocation-advisor__scenario-card--worst {
+  border-color: rgba(255, 77, 77, 0.35);
+}
+
+.allocation-advisor__scenario-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  margin-bottom: 0.25rem;
+}
+
+.allocation-advisor__scenario-badge {
+  font-size: 0.58rem;
+  color: var(--color-loss);
+}
+
+.allocation-advisor__scenario-metrics {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.allocation-advisor__compare--primary {
+  margin-bottom: 1rem;
+}
+
+.allocation-advisor__rank-badge {
+  display: inline-block;
+  margin-left: 0.25rem;
+  padding: 0.05rem 0.25rem;
+  font-size: 0.55rem;
+  color: var(--color-profit);
+  border: 1px solid rgba(0, 255, 65, 0.35);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+
+.allocation-advisor__best--compact {
+  margin-bottom: 0;
+}
+
+.allocation-advisor__table th {
+  white-space: nowrap;
+}
+
+.allocation-advisor__table-row {
+  cursor: pointer;
+}
+
+.allocation-advisor__table-row:hover {
+  background: rgba(243, 156, 18, 0.04);
+}
+
+.allocation-advisor__table-row--selected {
+  background: rgba(243, 156, 18, 0.1);
+  outline: 1px solid rgba(243, 156, 18, 0.35);
+}
+
+.allocation-advisor__input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.allocation-advisor__label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.allocation-advisor__input {
+  width: 9rem;
+  padding: 0.45rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+}
+
+.allocation-advisor__input-hint {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-primary-light);
+}
+
+.allocation-advisor__best {
+  padding: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  margin-bottom: 1rem;
+}
+
+.allocation-advisor__best-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.allocation-advisor__best-label {
+  margin: 0 0 0.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.allocation-advisor__best-name {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.allocation-advisor__best-desc {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.allocation-advisor__score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.allocation-advisor__score-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--color-text-muted);
+}
+
+.allocation-advisor__score-value {
+  font-family: var(--font-mono);
+  font-size: 1.5rem;
+  color: var(--color-profit);
+  line-height: 1.1;
+}
+
+.allocation-advisor__score-sub {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+}
+
+.allocation-advisor__amount-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.allocation-advisor__amount-item {
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  background: var(--color-surface-panel);
+}
+
+.allocation-advisor__amount-class {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.allocation-advisor__amount-weight {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+}
+
+.allocation-advisor__amount-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-primary-light);
+  margin-top: 0.15rem;
+}
+
+.allocation-advisor__worst {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.allocation-advisor__apply-btn {
+  padding: 0.45rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-bg);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.allocation-advisor__message {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: var(--color-profit);
+}
+
+.allocation-advisor__compare-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.allocation-advisor__table-wrap {
+  overflow-x: auto;
+}
+
+.allocation-advisor__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+}
+
+.allocation-advisor__table th,
+.allocation-advisor__table td {
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid var(--color-border-light);
+  text-align: left;
+  vertical-align: top;
+}
+
+.allocation-advisor__table th {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.allocation-advisor__table-row--best {
+  background: rgba(0, 255, 65, 0.04);
+}
+
+.allocation-advisor__table-desc {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+}
+
+.crisis-current {
+  margin-top: 0.5rem;
+}
+
+.workspace-page__empty--inline {
+  margin-top: 0;
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  font-size: 0.75rem;
+}

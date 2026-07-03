@@ -21,6 +21,16 @@ export {
 } from './riskEngine.js'
 
 export {
+  getAllocationCandidates,
+  allocationFromTargets,
+  amountsFromTargets,
+  evaluateAllocationCandidate,
+  recommendAllocations,
+  getCandidateScenarioResult,
+  rankRecommendationsForView,
+} from './allocationOptimizer.js'
+
+export {
   DEFAULT_TARGET_ALLOCATION,
   REBALANCE_THRESHOLD,
   calculateWeightDifference,
