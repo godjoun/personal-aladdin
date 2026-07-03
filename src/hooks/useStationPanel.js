@@ -8,6 +8,9 @@ import {
   pushVaultToCentral,
   getStationCredentials,
   checkCentralHealth,
+  verifyStationCredentials,
+  STALE_STATION_MESSAGE,
+  STATION_CREDENTIALS_INVALIDATED,
 } from '../services/stationClient.js'
 import {
   getNetworkParticipationEnabled,
@@ -24,7 +27,9 @@ import {
 export function useStationPanel() {
   const [online, setOnline] = useState(false)
   const [credentials, setCredentials] = useState(getStationCredentials)
-  const [stationName, setStationName] = useState('SECURE_STATION')
+  const [stationName, setStationName] = useState(
+    () => getStationCredentials()?.name || 'SECURE_STATION',
+  )
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -32,20 +37,47 @@ export function useStationPanel() {
   const [networkTargetMode, setNetworkTargetModeState] = useState(getNetworkTargetMode)
   const [networkWindowDays, setNetworkWindowDaysState] = useState(getNetworkWindowDays)
 
-  useEffect(() => {
-    checkCentralHealth().then(setOnline)
+  const handleStaleCredentials = useCallback(() => {
+    setCredentials(null)
+    setParticipating(false)
+    setNetworkParticipationEnabled(false)
+    setError(STALE_STATION_MESSAGE)
   }, [])
+
+  useEffect(() => {
+    async function bootstrap() {
+      const health = await checkCentralHealth()
+      setOnline(health)
+
+      if (!getStationCredentials()?.stationKey) {
+        return
+      }
+
+      const verification = await verifyStationCredentials()
+      if (!verification.valid && verification.reason === 'invalid_key') {
+        handleStaleCredentials()
+      }
+    }
+
+    bootstrap()
+  }, [handleStaleCredentials])
 
   useEffect(() => {
     function handleParticipationChange() {
       setParticipating(getNetworkParticipationEnabled())
     }
 
+    function handleCredentialsInvalidated() {
+      handleStaleCredentials()
+    }
+
     window.addEventListener(NETWORK_PARTICIPATION_CHANGED, handleParticipationChange)
+    window.addEventListener(STATION_CREDENTIALS_INVALIDATED, handleCredentialsInvalidated)
     return () => {
       window.removeEventListener(NETWORK_PARTICIPATION_CHANGED, handleParticipationChange)
+      window.removeEventListener(STATION_CREDENTIALS_INVALIDATED, handleCredentialsInvalidated)
     }
-  }, [])
+  }, [handleStaleCredentials])
 
   const uploadToCentral = useCallback(async () => {
     const result = await pushVaultToCentral({ consentHostMonitoring: true })
@@ -65,6 +97,7 @@ export function useStationPanel() {
     try {
       const result = await registerStation(stationName.trim() || 'SECURE_STATION')
       setCredentials(result)
+      setStationName(result.name)
       setStatus('스테이션 등록 완료')
       checkCentralHealth().then(setOnline)
     } catch (err) {
@@ -98,6 +131,15 @@ export function useStationPanel() {
     setLoading(true)
 
     try {
+      const verification = await verifyStationCredentials()
+      if (!verification.valid) {
+        if (verification.reason === 'invalid_key') {
+          handleStaleCredentials()
+          return
+        }
+        throw new Error(verification.message || '스테이션 확인에 실패했습니다.')
+      }
+
       const message = await uploadToCentral()
       setParticipating(true)
       setNetworkParticipationEnabled(true)
@@ -106,6 +148,9 @@ export function useStationPanel() {
       setParticipating(false)
       setNetworkParticipationEnabled(false)
       setError(err.message)
+      if (!getStationCredentials()) {
+        setCredentials(null)
+      }
     } finally {
       setLoading(false)
     }
@@ -122,6 +167,11 @@ export function useStationPanel() {
       setStatus(await uploadToCentral())
     } catch (err) {
       setError(err.message)
+      if (!getStationCredentials()) {
+        setCredentials(null)
+        setParticipating(false)
+        setNetworkParticipationEnabled(false)
+      }
     } finally {
       setLoading(false)
     }

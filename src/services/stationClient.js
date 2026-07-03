@@ -8,6 +8,11 @@ import { getHostConsentSaved } from './rebalanceSettings.js'
 const CREDENTIALS_KEY = 'aladdin_station_credentials'
 const DEFAULT_API_BASE = 'http://localhost:3001'
 
+export const STALE_STATION_MESSAGE =
+  '서버에 스테이션 정보가 없습니다. 배포·재시작 후에는 다시 등록해 주세요.'
+
+export const STATION_CREDENTIALS_INVALIDATED = 'aladdin:station-credentials-invalidated'
+
 function getApiBase() {
   const configured = import.meta.env.VITE_CENTRAL_API_URL?.trim()
 
@@ -39,6 +44,61 @@ export function saveStationCredentials(credentials) {
 
 export function clearStationCredentials() {
   localStorage.removeItem(CREDENTIALS_KEY)
+}
+
+export function invalidateStationCredentials() {
+  clearStationCredentials()
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(STATION_CREDENTIALS_INVALIDATED))
+  }
+}
+
+/**
+ * 스테이션 API 응답 검사 — 401이면 로컬 키를 비우고 재등록 안내
+ */
+export function assertStationResponseOk(response, data) {
+  if (response.status === 401) {
+    invalidateStationCredentials()
+    throw new Error(STALE_STATION_MESSAGE)
+  }
+
+  if (!response.ok) {
+    throw new Error(data.error || `요청 실패 (${response.status})`)
+  }
+}
+
+/**
+ * 저장된 스테이션 키가 서버에 아직 유효한지 확인
+ */
+export async function verifyStationCredentials() {
+  const credentials = getStationCredentials()
+
+  if (!credentials?.stationKey) {
+    return { valid: false, reason: 'missing' }
+  }
+
+  try {
+    const response = await fetch(`${getApiBase()}/api/sync/latest`, {
+      headers: {
+        Authorization: `Bearer ${credentials.stationKey}`,
+      },
+    })
+    const data = await response.json().catch(() => ({}))
+
+    if (response.status === 401) {
+      invalidateStationCredentials()
+      return { valid: false, reason: 'invalid_key' }
+    }
+
+    if (!response.ok) {
+      return { valid: false, reason: 'error', message: data.error }
+    }
+
+    return { valid: true }
+  } catch {
+    return { valid: false, reason: 'network' }
+  }
 }
 
 /**
@@ -103,9 +163,7 @@ export async function pushVaultToCentral({ consentHostMonitoring = false } = {})
 
   const data = await response.json()
 
-  if (!response.ok) {
-    throw new Error(data.error || `업로드 실패 (${response.status})`)
-  }
+  assertStationResponseOk(response, data)
 
   return data
 }

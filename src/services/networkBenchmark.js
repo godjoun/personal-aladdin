@@ -2,7 +2,7 @@
  * networkBenchmark.js — 중앙 서버 네트워크 벤치마크 (리밸런싱 목표용)
  */
 
-import { getStationCredentials } from './stationClient.js'
+import { assertStationResponseOk, getStationCredentials } from './stationClient.js'
 
 const CACHE_KEY = 'aladdin_network_benchmark'
 
@@ -66,9 +66,7 @@ export async function fetchNetworkBenchmark(options = {}) {
 
   const data = await response.json()
 
-  if (!response.ok) {
-    throw new Error(data.error || `네트워크 벤치마크 조회 실패 (${response.status})`)
-  }
+  assertStationResponseOk(response, data)
 
   saveCachedNetworkBenchmark(data)
   return data
