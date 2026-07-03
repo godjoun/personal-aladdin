@@ -1,0 +1,340 @@
+/**
+ * WorkspacePages.css — 위기 / 리밸런싱 / 리포트 전용 화면
+ */
+
+.workspace-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.workspace-page__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.workspace-page__header--row {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.workspace-page__title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.04em;
+}
+
+.workspace-page__desc {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+  max-width: 52rem;
+}
+
+.workspace-page__empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+}
+
+.workspace-page__warn {
+  font-size: 0.72rem;
+  color: var(--color-loss);
+  margin-bottom: 0.5rem;
+}
+
+.workspace-page__message {
+  font-size: 0.72rem;
+  color: var(--color-profit);
+  margin-top: 0.5rem;
+}
+
+.workspace-page__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.workspace-page__summary--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.workspace-page__summary--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workspace-page__summary-card {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+}
+
+.workspace-page__summary-card--alert {
+  border-color: rgba(255, 77, 77, 0.35);
+}
+
+.workspace-page__summary-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.35rem;
+}
+
+.workspace-page__summary-value {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.workspace-page__summary-sub {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-top: 0.25rem;
+}
+
+.workspace-page__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.workspace-page__toolbar-meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.workspace-page__export-btn {
+  padding: 0.45rem 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-bg);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.workspace-page__export-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.workspace-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.workspace-card {
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+}
+
+.workspace-card--worst {
+  border-color: rgba(255, 77, 77, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 77, 77, 0.12);
+}
+
+.workspace-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.workspace-card__title {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.workspace-card__badge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.15rem 0.4rem;
+  color: var(--color-loss);
+  border: 1px solid rgba(255, 77, 77, 0.4);
+  border-radius: 3px;
+}
+
+.workspace-card__desc {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+
+.workspace-card__metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.workspace-card__metric-label {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.workspace-card__metric-value {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.workspace-card__table {
+  width: 100%;
+  font-size: 0.68rem;
+  border-collapse: collapse;
+}
+
+.workspace-card__table th,
+.workspace-card__table td {
+  padding: 0.35rem 0.25rem;
+  text-align: left;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.workspace-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.workspace-section__title {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-accent-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.workspace-section__desc {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.workspace-preset__load-btn {
+  margin-top: 0.35rem;
+  padding: 0.25rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border-light);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.workspace-preset__load-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary-dim);
+}
+
+.workspace-target-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.workspace-target-item {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+.workspace-target-item__label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.15rem;
+}
+
+.workspace-target-item__value {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.workspace-rebalance-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.workspace-rebalance-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.72rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+.workspace-rebalance-row--alert {
+  border-color: rgba(255, 77, 77, 0.35);
+}
+
+.workspace-rebalance-row__class {
+  font-weight: 600;
+}
+
+.workspace-rebalance-row__weights {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.workspace-rebalance-row__diff {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .workspace-page__summary--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-rebalance-row {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .workspace-page__summary,
+  .workspace-page__summary--4,
+  .workspace-page__summary--2 {
+    grid-template-columns: 1fr;
+  }
+}

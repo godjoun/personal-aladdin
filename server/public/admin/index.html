@@ -219,6 +219,57 @@
         border-color: var(--gold);
         background: rgba(243, 156, 18, 0.08);
       }
+      .chart-wrap {
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: #0a0a0a;
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .chart-title {
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: 0 0 0.5rem;
+      }
+      .chart-meta {
+        font-size: 0.68rem;
+        color: var(--muted);
+        margin-bottom: 0.5rem;
+      }
+      .chart-svg {
+        width: 100%;
+        height: 160px;
+        display: block;
+      }
+      .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 0.85rem;
+        margin: 0.5rem 0 0;
+        padding: 0;
+        list-style: none;
+        font-size: 0.72rem;
+      }
+      .chart-legend li {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+      .chart-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .chart-range {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.65rem;
+        color: var(--muted);
+        margin-top: 0.35rem;
+      }
     </style>
   </head>
   <body>
@@ -235,6 +286,7 @@
       <ol class="guide">
         <li><strong>ADMIN_KEY</strong> 입력 후 <strong>데이터 불러오기</strong> 클릭</li>
         <li>위 <strong>Host Intelligence Report</strong>에서 전체 네트워크 집계 확인</li>
+        <li><strong>Network Intelligence</strong>에서 네트워크 AUM·비중 추이(30일) 확인</li>
         <li>아래 <strong>Stations</strong> 표에서 <strong>포트폴리오 보기</strong> 클릭 → 종목·거래·비중을 표로 확인</li>
       </ol>
     </div>
@@ -266,6 +318,15 @@
           <tbody id="compareRows"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="panel" id="networkIntelPanel" hidden>
+      <h2>Network Intelligence — 비중·AUM 추이 (Phase 2)</h2>
+      <p class="sub" id="networkIntelMeta"></p>
+      <div id="networkAumChart"></div>
+      <div id="networkWeightChart"></div>
+      <h3>최근 vs N일 평균 (주식 비중)</h3>
+      <div class="metrics" id="networkCompareMetrics"></div>
     </div>
 
     <div class="panel">
@@ -374,6 +435,21 @@
       const reportPanel = document.getElementById('reportPanel')
       const metrics = document.getElementById('metrics')
       const allocationBars = document.getElementById('allocationBars')
+      const networkIntelPanel = document.getElementById('networkIntelPanel')
+      const networkIntelMeta = document.getElementById('networkIntelMeta')
+      const networkAumChart = document.getElementById('networkAumChart')
+      const networkWeightChart = document.getElementById('networkWeightChart')
+      const networkCompareMetrics = document.getElementById('networkCompareMetrics')
+
+      const SERIES_COLORS = [
+        '#3498db',
+        '#9b59b6',
+        '#f39c12',
+        '#2ecc71',
+        '#e74c3c',
+        '#1abc9c',
+        '#95a5a6',
+      ]
 
       adminKeyInput.value = localStorage.getItem('aladdin_admin_key') || ''
 
@@ -434,6 +510,154 @@
           .join('')
       }
 
+      function formatDateKey(dateKey) {
+        if (!dateKey || String(dateKey).length !== 8) return dateKey || '—'
+        const value = String(dateKey)
+        return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`
+      }
+
+      function renderLineChart(container, { title, meta, dates, series, yMax = 100, ySuffix = '%' }) {
+        if (!dates?.length) {
+          container.innerHTML = `<div class="chart-wrap"><p class="empty">${title}: 데이터 없음 (스테이션 업로드·스냅샷 필요)</p></div>`
+          return
+        }
+
+        if (dates.length === 1) {
+          const labels = series
+            .map(
+              (item, index) =>
+                `<li><span class="chart-dot" style="background:${SERIES_COLORS[index % SERIES_COLORS.length]}"></span>${item.label}: ${item.values[0].toFixed(1)}${ySuffix}</li>`,
+            )
+            .join('')
+          container.innerHTML = `
+            <div class="chart-wrap">
+              <div class="chart-title">${title}</div>
+              <p class="empty">서로 다른 날짜 2일 이상이면 추이 선이 표시됩니다.</p>
+              <ul class="chart-legend">${labels}</ul>
+            </div>`
+          return
+        }
+
+        const width = 640
+        const height = 160
+        const padX = 28
+        const padY = 16
+        const chartWidth = width - padX * 2
+        const chartHeight = height - padY * 2
+
+        const ticks = yMax === 100 ? [0, 25, 50, 75, 100] : null
+        const maxValue =
+          yMax === 100
+            ? 100
+            : Math.max(...series.flatMap((item) => item.values), 1)
+
+        const grid = (ticks || [0, maxValue * 0.5, maxValue])
+          .map((tick) => {
+            const y = padY + (1 - tick / maxValue) * chartHeight
+            return `
+              <line x1="${padX}" y1="${y}" x2="${width - padX}" y2="${y}" stroke="#2a2a2a" />
+              <text x="4" y="${y + 3}" fill="#7a7f8c" font-size="9">${ySuffix === '%' ? tick : formatWon(tick).replace('원', '')}</text>`
+          })
+          .join('')
+
+        const polylines = series
+          .map((item, index) => {
+            const color = SERIES_COLORS[index % SERIES_COLORS.length]
+            const points = item.values
+              .map((value, pointIndex) => {
+                const x = padX + (pointIndex / (dates.length - 1)) * chartWidth
+                const y = padY + (1 - value / maxValue) * chartHeight
+                return `${x},${y}`
+              })
+              .join(' ')
+            return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" />`
+          })
+          .join('')
+
+        const legend = series
+          .map((item, index) => {
+            const latest = item.values[item.values.length - 1]
+            return `<li><span class="chart-dot" style="background:${SERIES_COLORS[index % SERIES_COLORS.length]}"></span>${item.label} <span class="mono">${latest.toFixed(1)}${ySuffix}</span></li>`
+          })
+          .join('')
+
+        container.innerHTML = `
+          <div class="chart-wrap">
+            <div class="chart-title">${title}</div>
+            ${meta ? `<div class="chart-meta">${meta}</div>` : ''}
+            <svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+              ${grid}
+              ${polylines}
+            </svg>
+            <ul class="chart-legend">${legend}</ul>
+            <div class="chart-range">
+              <span>${formatDateKey(dates[0])}</span>
+              <span>${formatDateKey(dates[dates.length - 1])}</span>
+            </div>
+          </div>`
+      }
+
+      function renderNetworkIntelligence(intelligence) {
+        if (!intelligence) {
+          networkIntelPanel.hidden = true
+          return
+        }
+
+        networkIntelPanel.hidden = false
+
+        const archiveCount = intelligence.archivePointCount ?? 0
+        const liveCount = intelligence.pointCount ?? 0
+        networkIntelMeta.textContent =
+          `최근 ${intelligence.windowDays}일 · 실시간 집계 ${liveCount}일 · 아카이브 ${archiveCount}일` +
+          (intelligence.periodLabel ? ` · ${intelligence.periodLabel}` : '')
+
+        const aumSource =
+          intelligence.archiveAumSeries?.length > 1
+            ? intelligence.archiveAumSeries
+            : intelligence.aumSeries
+
+        renderLineChart(networkAumChart, {
+          title: 'Network AUM Trend',
+          meta: '참여 스테이션 합산 평가액',
+          dates: aumSource.map((row) => row.date),
+          series: [
+            {
+              label: '총 평가액',
+              values: aumSource.map((row) => row.totalNetworkAum),
+            },
+          ],
+          yMax: 0,
+          ySuffix: '원',
+        })
+
+        const weightSource =
+          intelligence.archiveSeries?.snapshotCount > 1
+            ? intelligence.archiveSeries
+            : intelligence.allocationSeries
+
+        renderLineChart(networkWeightChart, {
+          title: 'Network Allocation Weight Trend',
+          meta: '자산군별 네트워크 합산 비중',
+          dates: weightSource.dates ?? [],
+          series: (weightSource.series ?? []).map((row) => ({
+            label: row.assetClass,
+            values: row.weights,
+          })),
+        })
+
+        const latestEquity = intelligence.latest?.avgEquityWeight ?? null
+        const avgEquity =
+          intelligence.average?.networkAllocation?.find((row) => row.assetClass === '주식')
+            ?.weight ?? null
+
+        networkCompareMetrics.innerHTML = `
+          <div class="metric"><div class="metric__label">최신 주식 비중</div><div class="metric__value">${latestEquity != null ? latestEquity.toFixed(1) + '%' : '—'}</div></div>
+          <div class="metric"><div class="metric__label">${intelligence.windowDays}일 평균 주식</div><div class="metric__value">${avgEquity != null ? avgEquity.toFixed(1) + '%' : '—'}</div></div>
+          <div class="metric"><div class="metric__label">최신 참여 스테이션</div><div class="metric__value">${intelligence.latest?.activeStationCount ?? '—'}</div></div>
+          <div class="metric"><div class="metric__label">평균 표본 일수</div><div class="metric__value">${intelligence.average?.sampleDays ?? '—'}</div></div>
+        `
+      }
+
       function renderReport(report) {
         reportPanel.hidden = false
 
@@ -463,6 +687,8 @@
               )
               .join('')
           : '<tr><td colspan="6" class="empty">비교할 스테이션 없음</td></tr>'
+
+        renderNetworkIntelligence(report.networkIntelligence)
       }
 
       function renderDetail(data) {
@@ -547,6 +773,7 @@
           const err = await stationsRes.json().catch(() => ({}))
           stationRows.innerHTML = `<tr><td colspan="8" class="warn">${err.error || stationsRes.status}</td></tr>`
           reportPanel.hidden = true
+          networkIntelPanel.hidden = true
           return
         }
 
@@ -557,6 +784,7 @@
           renderReport(reportData)
         } else {
           reportPanel.hidden = true
+          networkIntelPanel.hidden = true
         }
 
         if (stations.length === 0) {

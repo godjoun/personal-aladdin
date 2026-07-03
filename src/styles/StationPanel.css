@@ -44,11 +44,19 @@
 }
 
 .station-panel__desc,
+.station-panel__purpose,
 .station-panel__warn {
   font-size: 0.72rem;
   color: var(--color-text-muted);
   line-height: 1.55;
   margin-bottom: 0.65rem;
+}
+
+.station-panel__purpose {
+  padding: 0.5rem 0.65rem;
+  border-left: 2px solid var(--color-accent-blue);
+  background: rgba(52, 152, 219, 0.06);
+  border-radius: 0 4px 4px 0;
 }
 
 .station-panel__warn {
@@ -158,6 +166,23 @@
 
 .station-panel__link:hover {
   text-decoration: underline;
+}
+
+.station-panel__link-btn {
+  align-self: flex-start;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--color-accent-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.station-panel__link-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .station-panel__message {

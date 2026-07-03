@@ -38,4 +38,12 @@ export {
   enrichSnapshotsWithDailyChange,
 } from './snapshotAnalytics.js'
 
+export {
+  buildAllocationTimeSeries,
+  calculateProfitContributions,
+  calculatePeriodValueContributions,
+  calculateRollingVolatility,
+  calculateSharpeRatio,
+} from './portfolioAnalytics.js'
+
 export { computePositionFromTrades } from './positionEngine.js'

@@ -11,7 +11,6 @@ import {
   getCentralAdminUrl,
 } from '../services/stationClient.js'
 import {
-  getAutoUploadEnabled,
   getHostConsentSaved,
   setAutoUploadEnabled,
   setHostConsentSaved,
@@ -26,7 +25,6 @@ function StationPanel() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [consentChecked, setConsentChecked] = useState(getHostConsentSaved)
-  const [autoUpload, setAutoUpload] = useState(getAutoUploadEnabled)
 
   useEffect(() => {
     checkCentralHealth().then(setOnline)
@@ -49,25 +47,67 @@ function StationPanel() {
     }
   }
 
-  async function handlePush() {
-    if (!consentChecked) {
-      setError('업로드 전 동의 체크박스를 선택해 주세요.')
+  async function uploadToCentral() {
+    const result = await pushVaultToCentral({ consentHostMonitoring: true })
+    return (
+      `집계 서버 업로드 완료 · 대조: ${result.reconciliation?.status ?? '—'}` +
+      (result.reconciliation?.mismatchCount
+        ? ` (불일치 ${result.reconciliation.mismatchCount}건)`
+        : '')
+    )
+  }
+
+  async function handleConsentChange(checked) {
+    setConsentChecked(checked)
+    setHostConsentSaved(checked)
+    setAutoUploadEnabled(checked)
+    setError('')
+    setStatus('')
+
+    if (!checked) {
       return
     }
+
+    if (!credentials?.stationKey) {
+      setError('먼저 스테이션을 등록해 주세요.')
+      setConsentChecked(false)
+      setHostConsentSaved(false)
+      setAutoUploadEnabled(false)
+      return
+    }
+
+    if (!online) {
+      setError('집계 서버가 꺼져 있어 업로드할 수 없습니다.')
+      setConsentChecked(false)
+      setHostConsentSaved(false)
+      setAutoUploadEnabled(false)
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const message = await uploadToCentral()
+      setStatus(`${message} · 이후 시세 갱신 시에도 자동 업로드됩니다.`)
+    } catch (err) {
+      setConsentChecked(false)
+      setHostConsentSaved(false)
+      setAutoUploadEnabled(false)
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleRetryPush() {
+    if (!consentChecked) return
 
     setLoading(true)
     setError('')
     setStatus('')
 
     try {
-      const result = await pushVaultToCentral({ consentHostMonitoring: true })
-      setHostConsentSaved(true)
-      setStatus(
-        `중앙 업로드 완료 · 대조: ${result.reconciliation?.status ?? '—'}` +
-          (result.reconciliation?.mismatchCount
-            ? ` (불일치 ${result.reconciliation.mismatchCount}건)`
-            : ''),
-      )
+      setStatus(await uploadToCentral())
     } catch (err) {
       setError(err.message)
     } finally {
@@ -78,7 +118,7 @@ function StationPanel() {
   return (
     <section className="station-panel" aria-label="중앙 서버 연동">
       <div className="station-panel__header">
-        <h2 className="station-panel__title">Central Host Link</h2>
+        <h2 className="station-panel__title">Network Data Pool</h2>
         <span
           className={`station-panel__status${online ? ' station-panel__status--on' : ''}`}
         >
@@ -87,8 +127,15 @@ function StationPanel() {
       </div>
 
       <p className="station-panel__desc">
-        <strong>쉽게 말하면:</strong> 내 자산 정보를 인터넷 서버에 보내 두는 버튼입니다.
-        친구도 같은 사이트에서 등록·업로드하면, 관리자 화면에서 모아 볼 수 있어요.
+        <strong>쉽게 말하면:</strong> 참여자들의 포트폴리오 데이터를 모아{' '}
+        <strong>네트워크 평균 비중</strong>을 만들고, 그걸 바탕으로 각자 더 나은
+        포트폴리오를 점검하는 공간입니다.
+      </p>
+
+      <p className="station-panel__purpose">
+        데이터를 모으는 이유 — 참여자 전체의 비중·스냅샷을 익명 집계해{' '}
+        <strong>더 나은 포트폴리오 전략</strong>(네트워크 리밸런싱 목표 등)을
+        만듭니다. 개인 식별·투자 권유·수익 보장 목적이 아닙니다.
       </p>
 
       {!online && (
@@ -138,47 +185,27 @@ function StationPanel() {
               <input
                 type="checkbox"
                 checked={consentChecked}
-                onChange={(e) => {
-                  const checked = e.target.checked
-                  setConsentChecked(checked)
-                  setHostConsentSaved(checked)
-                  if (!checked) {
-                    setAutoUpload(false)
-                    setAutoUploadEnabled(false)
-                  }
-                  setError('')
-                }}
+                disabled={loading}
+                onChange={(e) => handleConsentChange(e.target.checked)}
               />
               <span>
-                호스트가 내 <strong>포트폴리오·거래·스냅샷</strong>을 관리자 화면에서
-                조회·분석하는 것에 동의합니다. (투자 권유·수익 보장 아님)
+                내 <strong>포트폴리오·거래·스냅샷</strong> 데이터의{' '}
+                <strong>수집·익명 집계</strong>에 동의합니다. 동의 시{' '}
+                <strong>즉시 집계 서버에 업로드</strong>되며, 이후{' '}
+                <strong>시세 갱신할 때마다 자동</strong>으로 반영됩니다. 수집
+                데이터는 네트워크 벤치마크·리밸런싱 목표에 사용됩니다.
               </span>
             </label>
-            <label className="station-panel__consent">
-              <input
-                type="checkbox"
-                checked={autoUpload}
-                disabled={!consentChecked}
-                onChange={(e) => {
-                  const checked = e.target.checked
-                  setAutoUpload(checked)
-                  setAutoUploadEnabled(checked)
-                  setError('')
-                }}
-              />
-              <span>
-                <strong>가격 갱신 후 자동 업로드</strong> — 시세 새로고침할 때마다
-                중앙 서버·네트워크 리밸런싱 목표가 함께 갱신됩니다.
-              </span>
-            </label>
-            <button
-              type="button"
-              className="station-panel__btn station-panel__btn--primary"
-              onClick={handlePush}
-              disabled={loading || !online || !consentChecked}
-            >
-              {loading ? '처리 중...' : '중앙 서버에 업로드'}
-            </button>
+            {consentChecked && (
+              <button
+                type="button"
+                className="station-panel__link-btn"
+                onClick={handleRetryPush}
+                disabled={loading || !online}
+              >
+                지금 다시 업로드
+              </button>
+            )}
           </>
         )}
         <a
@@ -187,7 +214,7 @@ function StationPanel() {
           target="_blank"
           rel="noreferrer"
         >
-          호스트 콘솔 열기 →
+          집계 현황 콘솔 (관리자) →
         </a>
       </div>
 

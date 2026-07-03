@@ -5,6 +5,9 @@
 import { useEffect, useState } from 'react'
 import AssetForm from './components/AssetForm.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import CrisisSimulator from './pages/CrisisSimulator.jsx'
+import Rebalancing from './pages/Rebalancing.jsx'
+import Report from './pages/Report.jsx'
 import StationPanel from './components/StationPanel.jsx'
 import { getAssets } from './services/assetStorage.js'
 import { fetchPricesForAssets } from './services/marketSync.js'
@@ -30,6 +33,20 @@ import {
   getPriceHistoryBySymbol,
 } from './utils/calculator.js'
 import './styles/App.css'
+
+const APP_VIEWS = {
+  dashboard: 'dashboard',
+  crisis: 'crisis',
+  rebalance: 'rebalance',
+  report: 'report',
+}
+
+const NAV_TABS = [
+  { id: APP_VIEWS.dashboard, label: '자산배분 엔진' },
+  { id: APP_VIEWS.crisis, label: '위기 시뮬레이터' },
+  { id: APP_VIEWS.rebalance, label: '리밸런싱' },
+  { id: APP_VIEWS.report, label: '리포트' },
+]
 
 function runCalculatorTests(prices) {
   if (prices.length === 0) {
@@ -89,6 +106,7 @@ function App() {
   const [autoMarketRefresh, setAutoMarketRefresh] = useState(
     getAutoMarketRefreshEnabled,
   )
+  const [activeView, setActiveView] = useState(APP_VIEWS.dashboard)
 
   function reloadSnapshots() {
     setSnapshots(getPortfolioSnapshots())
@@ -262,10 +280,18 @@ function App() {
         </div>
 
         <nav className="aladdin-nav" aria-label="메인 메뉴">
-          <span className="aladdin-nav__tab aladdin-nav__tab--active">자산배분 엔진</span>
-          <span className="aladdin-nav__tab aladdin-nav__tab--disabled">위기 시뮬레이터</span>
-          <span className="aladdin-nav__tab aladdin-nav__tab--disabled">리밸런싱</span>
-          <span className="aladdin-nav__tab aladdin-nav__tab--disabled">리포트</span>
+          {NAV_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`aladdin-nav__tab${
+                activeView === tab.id ? ' aladdin-nav__tab--active' : ''
+              }`}
+              onClick={() => setActiveView(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </nav>
 
         <div className="aladdin-header__controls">
@@ -294,24 +320,40 @@ function App() {
 
       <main className="app-main">
         <StationPanel />
-        <Dashboard
-          prices={marketPrices}
-          assets={assets}
-          snapshots={snapshots}
-          trades={trades}
-          onRefreshPrices={refreshMarketPrices}
-          autoMarketRefresh={autoMarketRefresh}
-          onAutoMarketRefreshChange={setAutoMarketRefresh}
-          onAssetsChange={handleAssetsChange}
-          onTradesChange={refreshData}
-          assetFormSlot={
-            <AssetForm
-              assets={assets}
-              onAssetsChange={handleAssetsChange}
-              hideList
-            />
-          }
-        />
+        {activeView === APP_VIEWS.dashboard && (
+          <Dashboard
+            prices={marketPrices}
+            assets={assets}
+            snapshots={snapshots}
+            trades={trades}
+            onRefreshPrices={refreshMarketPrices}
+            autoMarketRefresh={autoMarketRefresh}
+            onAutoMarketRefreshChange={setAutoMarketRefresh}
+            onAssetsChange={handleAssetsChange}
+            onTradesChange={refreshData}
+            onNavigate={setActiveView}
+            assetFormSlot={
+              <AssetForm
+                assets={assets}
+                onAssetsChange={handleAssetsChange}
+                hideList
+              />
+            }
+          />
+        )}
+        {activeView === APP_VIEWS.crisis && (
+          <CrisisSimulator assets={assets} prices={marketPrices} />
+        )}
+        {activeView === APP_VIEWS.rebalance && (
+          <Rebalancing assets={assets} prices={marketPrices} />
+        )}
+        {activeView === APP_VIEWS.report && (
+          <Report
+            assets={assets}
+            prices={marketPrices}
+            snapshots={snapshots}
+          />
+        )}
       </main>
     </div>
   )

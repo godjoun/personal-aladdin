@@ -3,6 +3,12 @@
  * 업로드된 스테이션 데이터만 사용 (2층 인사이트)
  */
 
+import {
+  buildNetworkIntelligence,
+  buildNetworkAllocationTimeSeries,
+} from './networkAnalytics.js'
+import { getNetworkHistoryWindow, loadNetworkHistory } from './networkHistoryStorage.js'
+
 function getLatestSnapshot(payload) {
   const snapshots = payload?.snapshots
 
@@ -15,8 +21,9 @@ function getLatestSnapshot(payload) {
 
 /**
  * @param {Array<Object>} stations - storage 에서 읽은 스테이션 전체
+ * @param {{ intelligenceDays?: number }} [options]
  */
-export function buildHostReport(stations) {
+export function buildHostReport(stations, { intelligenceDays = 30 } = {}) {
   const synced = stations.filter((station) => station.latestPayload && station.lastSyncAt)
 
   const stationSummaries = synced.map((station) => {
@@ -74,6 +81,13 @@ export function buildHostReport(stations) {
       ? equityWeights.reduce((sum, weight) => sum + weight, 0) / equityWeights.length
       : 0
 
+  const networkIntelligence = buildNetworkIntelligence(stations, intelligenceDays)
+  const archivedMarks = getNetworkHistoryWindow(intelligenceDays)
+  const archiveSeries =
+    archivedMarks.length > 0
+      ? buildNetworkAllocationTimeSeries(archivedMarks)
+      : networkIntelligence.allocationSeries
+
   return {
     generatedAt: new Date().toISOString(),
     stationCount: stations.length,
@@ -85,6 +99,17 @@ export function buildHostReport(stations) {
       avgEquityWeight,
       avgValuedAmount:
         activeStations.length > 0 ? totalNetworkAum / activeStations.length : 0,
+    },
+    networkIntelligence: {
+      ...networkIntelligence,
+      archivePointCount: archivedMarks.length,
+      archiveSeries,
+      archiveAumSeries: archivedMarks.map((mark) => ({
+        date: mark.date,
+        totalNetworkAum: mark.totalNetworkAum,
+        activeStationCount: mark.activeStationCount,
+      })),
+      historyUpdatedAt: loadNetworkHistory().updatedAt,
     },
     stations: stationSummaries
       .map((station) => ({

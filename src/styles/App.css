@@ -87,8 +87,14 @@
   background: transparent;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  cursor: default;
+  cursor: pointer;
   white-space: nowrap;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.aladdin-nav__tab:hover:not(.aladdin-nav__tab--active) {
+  color: var(--color-text);
+  border-color: var(--color-primary-dim);
 }
 
 .aladdin-nav__tab--active {
@@ -96,10 +102,6 @@
   background: var(--color-primary);
   border-color: var(--color-primary);
   font-weight: 600;
-}
-
-.aladdin-nav__tab--disabled {
-  opacity: 0.45;
 }
 
 /* 헤더 우측 컨트롤 */

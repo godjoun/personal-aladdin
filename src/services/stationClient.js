@@ -3,12 +3,7 @@
  */
 
 import { exportLocalVault } from './dataExport.js'
-import {
-  getAutoUploadEnabled,
-  getHostConsentSaved,
-  setAutoUploadEnabled,
-  setHostConsentSaved,
-} from './rebalanceSettings.js'
+import { getHostConsentSaved } from './rebalanceSettings.js'
 
 const CREDENTIALS_KEY = 'aladdin_station_credentials'
 const DEFAULT_API_BASE = 'http://localhost:3001'
@@ -85,7 +80,7 @@ export async function pushVaultToCentral({ consentHostMonitoring = false } = {})
   }
 
   if (!consentHostMonitoring) {
-    throw new Error('호스트 모니터링 동의가 필요합니다.')
+    throw new Error('데이터 수집·집계 동의가 필요합니다.')
   }
 
   const payload = {
@@ -119,7 +114,7 @@ export async function pushVaultToCentral({ consentHostMonitoring = false } = {})
  * 가격 갱신 후 자동 업로드 (설정·동의·등록이 모두 있을 때만)
  */
 export async function maybeAutoPushToCentral() {
-  if (!getAutoUploadEnabled() || !getHostConsentSaved()) {
+  if (!getHostConsentSaved()) {
     return null
   }
 

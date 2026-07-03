@@ -9,18 +9,18 @@ import {
   buildAssetRows,
   calculatePortfolioSummary,
 } from '../utils/portfolioRows.js'
-import {
-  calculateMaxDrawdown,
-  enrichSnapshotsWithDailyChange,
-  formatSnapshotDate,
-} from '../utils/snapshotAnalytics.js'
 import { simulateCrisisScenarios } from '../utils/riskEngine.js'
 import {
   analyzeRebalancing,
-  DEFAULT_TARGET_ALLOCATION,
   getTargetWeightSum,
   networkAllocationToTargets,
 } from '../utils/rebalanceEngine.js'
+import {
+  applyStrategyPreset,
+  getActivePresetId,
+  getFixedTargetAllocation,
+  STRATEGY_PRESETS,
+} from '../data/strategyPresets.js'
 import {
   fetchNetworkBenchmark,
   getCachedNetworkBenchmark,
@@ -28,9 +28,15 @@ import {
 import {
   getRebalanceMode,
   setRebalanceMode,
+  getNetworkTargetMode,
+  setNetworkTargetMode,
+  getNetworkWindowDays,
+  setNetworkWindowDays,
 } from '../services/rebalanceSettings.js'
+import NetworkTargetControls from '../components/NetworkTargetControls.jsx'
 import { setAutoMarketRefreshEnabled } from '../services/marketScheduleSettings.js'
 import PortfolioChart from '../components/PortfolioChart.jsx'
+import PortfolioLedger from '../components/PortfolioLedger.jsx'
 import TradeForm from '../components/TradeForm.jsx'
 import TradeLog from '../components/TradeLog.jsx'
 import '../styles/Dashboard.css'
@@ -59,28 +65,6 @@ const ASSET_TYPE_LABELS = {
 }
 
 const LAYER_COLORS = ['#3498db', '#9b59b6', '#f39c12', '#2ecc71', '#e74c3c', '#1abc9c', '#95a5a6']
-
-const STRATEGY_PRESETS = [
-  {
-    id: 'dalio',
-    name: 'Ray Dalio Classic',
-    desc: 'All-Weather · 4자산 방어형',
-    accent: 'gold',
-  },
-  {
-    id: 'defense',
-    name: '3-Asset Defense',
-    desc: '주식·채권·현금 3축 방어',
-    accent: 'orange',
-  },
-  {
-    id: 'classic',
-    name: 'Classic 60/40',
-    desc: '주식 60% · 채권 40%',
-    accent: 'gray',
-    active: true,
-  },
-]
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('ko-KR', {
@@ -115,98 +99,6 @@ function getCardPnlClass(value) {
 function getMaxWeightDeviation(rebalance) {
   if (!rebalance.items.length) return 0
   return Math.max(...rebalance.items.map((item) => Math.abs(item.difference)))
-}
-
-/**
- * Daily Ledger — 블랙록식 일별 포트폴리오 원장
- */
-function PortfolioLedger({ snapshots }) {
-  const enriched = enrichSnapshotsWithDailyChange(snapshots)
-  const mdd = calculateMaxDrawdown(snapshots)
-
-  if (snapshots.length === 0) {
-    return (
-      <section className="dashboard__ledger">
-        <h3 className="dashboard__ledger-title">Daily Portfolio Ledger</h3>
-        <p className="dashboard__ledger-empty">
-          매매와 무관하게 <strong>시세 갱신</strong> 시 오늘 평가액이 기록됩니다.
-          일주일에 한 번만 갱신해도 추이가 쌓입니다.
-        </p>
-      </section>
-    )
-  }
-
-  return (
-    <section className="dashboard__ledger">
-      <div className="dashboard__ledger-header">
-        <h3 className="dashboard__ledger-title">Daily Portfolio Ledger</h3>
-        <div className="dashboard__ledger-stats">
-          <span className="dashboard__ledger-stat">
-            기록 {snapshots.length}일
-          </span>
-          {mdd.mddPercent < 0 && (
-            <span className="dashboard__ledger-stat dashboard__ledger-stat--danger">
-              MDD {mdd.mddPercent.toFixed(1)}%
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="dashboard__table-wrap">
-        <table className="dashboard__table dashboard__table--ledger">
-          <thead>
-            <tr>
-              <th>기준일</th>
-              <th>총 평가액</th>
-              <th>전일 대비</th>
-              <th>평가손익</th>
-              <th>위기 예상 손실</th>
-              <th>기록 시각</th>
-            </tr>
-          </thead>
-          <tbody>
-            {enriched.map((row) => (
-              <tr key={row.date}>
-                <td data-label="기준일" className="dashboard__cell--mono">
-                  {formatSnapshotDate(row.date)}
-                </td>
-                <td data-label="총 평가액" className="dashboard__cell--value">
-                  {formatCurrency(row.totalValuedAmount)}
-                </td>
-                <td
-                  data-label="전일 대비"
-                  className={getCellPnlClass(row.dailyChangePercent)}
-                >
-                  {row.dailyChangePercent !== null
-                    ? formatPercent(row.dailyChangePercent)
-                    : '—'}
-                </td>
-                <td
-                  data-label="평가손익"
-                  className={getCellPnlClass(row.totalProfitLoss)}
-                >
-                  {formatProfitLoss(row.totalProfitLoss)}
-                </td>
-                <td data-label="위기 예상 손실" className="dashboard__cell--loss">
-                  {row.risk?.expectedLossAmount != null
-                    ? formatProfitLoss(row.risk.expectedLossAmount)
-                    : '—'}
-                </td>
-                <td data-label="기록 시각" className="dashboard__cell--mono">
-                  {new Date(row.recordedAt).toLocaleString('ko-KR', {
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
 }
 
 function PortfolioLayers({ allocation }) {
@@ -269,13 +161,17 @@ function Dashboard({
   onAutoMarketRefreshChange,
   onAssetsChange,
   onTradesChange,
+  onNavigate,
   assetFormSlot,
 }) {
   const [refreshStatus, setRefreshStatus] = useState(REFRESH_STATUS.IDLE)
   const [rebalanceMode, setRebalanceModeState] = useState(getRebalanceMode)
+  const [activePresetId, setActivePresetId] = useState(getActivePresetId)
   const [networkBenchmark, setNetworkBenchmark] = useState(getCachedNetworkBenchmark)
   const [networkLoading, setNetworkLoading] = useState(false)
   const [networkError, setNetworkError] = useState('')
+  const [networkTargetMode, setNetworkTargetModeState] = useState(getNetworkTargetMode)
+  const [networkWindowDays, setNetworkWindowDaysState] = useState(getNetworkWindowDays)
 
   useEffect(() => {
     if (
@@ -294,7 +190,10 @@ function Dashboard({
     setNetworkError('')
 
     try {
-      const data = await fetchNetworkBenchmark()
+      const data = await fetchNetworkBenchmark({
+        targetMode: networkTargetMode,
+        windowDays: networkWindowDays,
+      })
       setNetworkBenchmark(data)
     } catch (error) {
       setNetworkError(error.message)
@@ -305,7 +204,30 @@ function Dashboard({
 
   useEffect(() => {
     refreshNetworkBenchmark()
-  }, [rebalanceMode])
+  }, [rebalanceMode, networkTargetMode, networkWindowDays])
+
+  function handleNetworkTargetModeChange(mode) {
+    setNetworkTargetMode(mode)
+    setNetworkTargetModeState(mode)
+  }
+
+  function handleNetworkWindowDaysChange(days) {
+    setNetworkWindowDays(days)
+    setNetworkWindowDaysState(days)
+  }
+
+  function formatNetworkBenchmarkHint() {
+    if (!networkBenchmark) {
+      return '스테이션 등록·업로드 후 네트워크 비중이 목표로 적용됩니다.'
+    }
+
+    const modeLabel =
+      networkBenchmark.targetMode === 'average'
+        ? `최근 ${networkBenchmark.windowDays}일 평균 (${networkBenchmark.sampleDays ?? 0}일 표본)`
+        : '최신 업로드 기준'
+
+    return `목표 = ${networkBenchmark.syncedStationCount}개 스테이션 합산 · ${modeLabel} · ${new Date(networkBenchmark.generatedAt).toLocaleString('ko-KR')}`
+  }
 
   function handleRebalanceModeChange(mode) {
     setRebalanceMode(mode)
@@ -327,6 +249,14 @@ function Dashboard({
     }
   }
 
+  function handleLoadPreset(presetId) {
+    if (applyStrategyPreset(presetId)) {
+      setActivePresetId(presetId)
+      setRebalanceModeState('fixed')
+      setRebalanceMode('fixed')
+    }
+  }
+
   function handleDeleteAsset(id) {
     removeAssetWithTrades(id)
     onAssetsChange?.()
@@ -341,7 +271,7 @@ function Dashboard({
   const activeTargets =
     rebalanceMode === 'network' && networkBenchmark?.networkAllocation?.length
       ? networkAllocationToTargets(networkBenchmark.networkAllocation)
-      : DEFAULT_TARGET_ALLOCATION
+      : getFixedTargetAllocation()
 
   const rebalanceCheck = analyzeRebalancing(allocation, activeTargets)
 
@@ -500,17 +430,21 @@ function Dashboard({
                 <article
                   key={preset.id}
                   className={`dashboard__preset dashboard__preset--${preset.accent}${
-                    preset.active ? ' dashboard__preset--active' : ''
+                    activePresetId === preset.id ? ' dashboard__preset--active' : ''
                   }`}
                 >
                   <h3 className="dashboard__preset-name">{preset.name}</h3>
                   <p className="dashboard__preset-desc">{preset.desc}</p>
-                  {preset.active ? (
+                  {activePresetId === preset.id ? (
                     <span className="dashboard__preset-badge">In Use</span>
                   ) : (
-                    <span className="dashboard__preset-badge dashboard__preset-badge--muted">
+                    <button
+                      type="button"
+                      className="dashboard__preset-load"
+                      onClick={() => handleLoadPreset(preset.id)}
+                    >
                       Load
-                    </span>
+                    </button>
                   )}
                 </article>
               ))}
@@ -626,30 +560,39 @@ function Dashboard({
             <section className="dashboard__sidebar-panel">
               <h3 className="dashboard__sidebar-title">위기 시뮬레이션</h3>
               {allocation.totalValuedAmount > 0 ? (
-                <div className="dashboard__crisis-list">
-                  {crisisSimulation.scenarios.map((scenario) => {
-                    const isWorst = scenario.id === crisisSimulation.worstScenarioId
-                    return (
-                      <div
-                        key={scenario.id}
-                        className={`dashboard__crisis-item${
-                          isWorst ? ' dashboard__crisis-item--worst' : ''
-                        }`}
-                      >
-                        <span className="dashboard__crisis-name">{scenario.name}</span>
-                        <span
-                          className={`dashboard__crisis-rate ${
-                            scenario.expectedLossRate < 0
-                              ? 'dashboard__cell--loss'
-                              : ''
+                <>
+                  <div className="dashboard__crisis-list">
+                    {crisisSimulation.scenarios.map((scenario) => {
+                      const isWorst = scenario.id === crisisSimulation.worstScenarioId
+                      return (
+                        <div
+                          key={scenario.id}
+                          className={`dashboard__crisis-item${
+                            isWorst ? ' dashboard__crisis-item--worst' : ''
                           }`}
                         >
-                          {formatPercent(scenario.expectedLossRate)}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
+                          <span className="dashboard__crisis-name">{scenario.name}</span>
+                          <span
+                            className={`dashboard__crisis-rate ${
+                              scenario.expectedLossRate < 0
+                                ? 'dashboard__cell--loss'
+                                : ''
+                            }`}
+                          >
+                            {formatPercent(scenario.expectedLossRate)}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    className="dashboard__sidebar-link"
+                    onClick={() => onNavigate?.('crisis')}
+                  >
+                    전체 시뮬레이터 보기 →
+                  </button>
+                </>
               ) : (
                 <p className="dashboard__sidebar-empty">시세 데이터 필요</p>
               )}
@@ -680,42 +623,57 @@ function Dashboard({
               </div>
 
               {rebalanceMode === 'network' && (
-                <p className="dashboard__rebalance-hint">
-                  {networkLoading
-                    ? '네트워크 비중 불러오는 중…'
-                    : networkError
-                      ? networkError
-                      : networkBenchmark
-                        ? `목표 = 업로드된 ${networkBenchmark.syncedStationCount}개 스테이션 합산 비중 · ${new Date(networkBenchmark.generatedAt).toLocaleString('ko-KR')}`
-                        : '스테이션 등록·업로드 후 네트워크 비중이 목표로 적용됩니다.'}
-                </p>
+                <>
+                  <NetworkTargetControls
+                    targetMode={networkTargetMode}
+                    windowDays={networkWindowDays}
+                    onTargetModeChange={handleNetworkTargetModeChange}
+                    onWindowDaysChange={handleNetworkWindowDaysChange}
+                  />
+                  <p className="dashboard__rebalance-hint">
+                    {networkLoading
+                      ? '네트워크 비중 불러오는 중…'
+                      : networkError
+                        ? networkError
+                        : formatNetworkBenchmarkHint()}
+                  </p>
+                </>
               )}
 
               {allocation.totalValuedAmount > 0 ? (
-                <div className="dashboard__rebalance-list">
-                  {rebalanceCheck.items.map((item) => (
-                    <div
-                      key={item.assetClass}
-                      className={`dashboard__rebalance-item${
-                        item.needsReview ? ' dashboard__rebalance-item--alert' : ''
-                      }`}
-                    >
-                      <span className="dashboard__rebalance-class">{item.assetClass}</span>
-                      <span className="dashboard__rebalance-weights">
-                        {item.currentWeight.toFixed(0)}% / {item.targetWeight.toFixed(0)}%
-                      </span>
-                      <span
-                        className={
-                          item.needsReview
-                            ? 'dashboard__cell--loss'
-                            : 'dashboard__cell--profit'
-                        }
+                <>
+                  <div className="dashboard__rebalance-list">
+                    {rebalanceCheck.items.map((item) => (
+                      <div
+                        key={item.assetClass}
+                        className={`dashboard__rebalance-item${
+                          item.needsReview ? ' dashboard__rebalance-item--alert' : ''
+                        }`}
                       >
-                        {item.needsReview ? '점검' : '적정'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                        <span className="dashboard__rebalance-class">{item.assetClass}</span>
+                        <span className="dashboard__rebalance-weights">
+                          {item.currentWeight.toFixed(0)}% / {item.targetWeight.toFixed(0)}%
+                        </span>
+                        <span
+                          className={
+                            item.needsReview
+                              ? 'dashboard__cell--loss'
+                              : 'dashboard__cell--profit'
+                          }
+                        >
+                          {item.needsReview ? '점검' : '적정'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="dashboard__sidebar-link"
+                    onClick={() => onNavigate?.('rebalance')}
+                  >
+                    리밸런싱 상세 보기 →
+                  </button>
+                </>
               ) : (
                 <p className="dashboard__sidebar-empty">시세 데이터 필요</p>
               )}

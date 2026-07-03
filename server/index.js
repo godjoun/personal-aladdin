@@ -18,6 +18,8 @@ import { config } from 'dotenv'
 import { requireAdminAuth, requireStationAuth, generateStationKey, hashStationKey } from './middleware.js'
 import { reconcilePayload } from './reconcile.js'
 import { buildHostReport } from './hostAnalytics.js'
+import { mergeNetworkHistoryFromStations } from './networkHistoryStorage.js'
+import { resolveNetworkAllocation } from './networkAnalytics.js'
 import { loadStation, listStations, saveStation } from './storage.js'
 import { proxyPublicData } from './marketProxy.js'
 
@@ -96,7 +98,7 @@ app.post('/api/sync/push', requireStationAuth, async (req, res) => {
 
   if (!payload.consent?.hostMonitoring) {
     res.status(400).json({
-      error: '호스트 모니터링 동의가 필요합니다. 업로드 전 동의 체크박스를 선택해 주세요.',
+      error: '데이터 수집·집계 동의가 필요합니다. 업로드 전 동의 체크박스를 선택해 주세요.',
     })
     return
   }
@@ -111,6 +113,7 @@ app.post('/api/sync/push', requireStationAuth, async (req, res) => {
   }
 
   saveStation(record)
+  mergeNetworkHistoryFromStations(listStations())
 
   res.json({
     ok: true,
@@ -134,15 +137,26 @@ app.get('/api/sync/latest', requireStationAuth, (req, res) => {
 })
 
 /** 스테이션 — 네트워크 합산 비중 (리밸런싱 목표용) */
-app.get('/api/network/benchmark', requireStationAuth, (_req, res) => {
-  const report = buildHostReport(listStations())
+app.get('/api/network/benchmark', requireStationAuth, (req, res) => {
+  const targetMode = req.query.targetMode === 'average' ? 'average' : 'latest'
+  const windowDays = Math.min(
+    90,
+    Math.max(1, Number.parseInt(String(req.query.windowDays ?? '30'), 10) || 30),
+  )
+  const stations = listStations()
+  const report = buildHostReport(stations)
+  const resolved = resolveNetworkAllocation(stations, { targetMode, windowDays })
 
   res.json({
     generatedAt: report.generatedAt,
     syncedStationCount: report.syncedStationCount,
-    activeStationCount: report.activeStationCount,
-    totalNetworkAum: report.totalNetworkAum,
-    networkAllocation: report.networkAllocation,
+    activeStationCount: resolved.activeStationCount,
+    totalNetworkAum: resolved.totalNetworkAum,
+    networkAllocation: resolved.networkAllocation,
+    targetMode: resolved.targetMode,
+    windowDays: resolved.windowDays,
+    sampleDays: resolved.sampleDays,
+    periodLabel: resolved.periodLabel,
   })
 })
 
