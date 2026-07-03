@@ -27,7 +27,7 @@ function DashboardSidebar({
             ? networkLoading
               ? '그룹 목표 불러오는 중…'
               : networkError || formatNetworkHint()
-            : '개인 고정 전략 · 우측 상단에서 네트워크 참여 가능'}
+            : '개인 고정 전략 · 헤더 네트워크 패널에서 참여하기를 켤 수 있습니다.'}
         </p>
 
         {hasValuation ? (

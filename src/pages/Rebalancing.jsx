@@ -90,7 +90,7 @@ function Rebalancing({ assets = [], prices = [] }) {
         <section className="workspace-section">
           <h3 className="workspace-section__title">그룹 목표</h3>
           <p className="workspace-section__desc">
-            Network Data Pool에서 <strong>네트워크 참여</strong>를 켜면 비중이 자동 업로드되고,
+            Network 패널에서 <strong>참여하기</strong>를 켜면 비중이 자동 업로드되고,
             아래 그룹 평균이 목표로 적용됩니다. 목표 방식(최신 / N일 평균)은 Data Pool 패널에서
             변경할 수 있습니다.
           </p>

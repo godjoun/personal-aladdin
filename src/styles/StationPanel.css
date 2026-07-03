@@ -1,97 +1,119 @@
 /**
- * StationPanel.css — 헤더 우측 컴팩트 네트워크 패널
+ * StationPanel.css — 네트워크 통합 패널
  */
 
-.station-panel--compact {
+.station-panel--unified {
   margin: 0;
-  padding: 0.55rem 0.75rem;
+  padding: 0.5rem 0.7rem;
   border: 1px solid rgba(52, 152, 219, 0.3);
   border-radius: 6px;
   background: rgba(52, 152, 219, 0.05);
   min-width: 0;
 }
 
-.station-panel__row {
+.station-panel--active {
+  border-color: rgba(0, 255, 65, 0.35);
+  background: rgba(0, 255, 65, 0.05);
+}
+
+.station-panel--offline {
+  border-color: rgba(255, 77, 77, 0.35);
+  background: rgba(255, 77, 77, 0.04);
+}
+
+.station-panel__main {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.55rem;
   min-width: 0;
 }
 
-.station-panel__brand {
+.station-panel__identity {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
   flex-shrink: 0;
 }
 
 .station-panel__title {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--color-accent-blue);
   white-space: nowrap;
 }
 
-.station-panel__status {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
+.station-panel__state {
+  font-size: 0.68rem;
   font-weight: 600;
-  padding: 0.12rem 0.35rem;
-  color: var(--color-loss);
-  border: 1px solid rgba(255, 77, 77, 0.35);
-  border-radius: 3px;
+  color: var(--color-text-muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 11rem;
 }
 
-.station-panel__status--on {
+.station-panel__state--setup {
+  color: var(--color-primary-light);
+}
+
+.station-panel__state--ready {
+  color: var(--color-text);
+}
+
+.station-panel__state--active {
   color: var(--color-profit);
-  border-color: rgba(0, 255, 65, 0.3);
 }
 
-.station-panel__controls {
+.station-panel__state--offline {
+  color: var(--color-loss);
+}
+
+.station-panel__actions {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.4rem;
   flex-wrap: wrap;
   min-width: 0;
   flex: 1;
+  justify-content: flex-end;
 }
 
-.station-panel__station {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--color-text);
-  max-width: 7rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.station-panel__toggle {
+.station-panel__participation {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.68rem;
+  gap: 0.35rem;
+  padding: 0.28rem 0.55rem;
+  font-size: 0.66rem;
+  font-weight: 600;
   color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
 }
 
-.station-panel__toggle input {
+.station-panel__participation--on {
+  color: var(--color-profit);
+  border-color: rgba(0, 255, 65, 0.35);
+  background: rgba(0, 255, 65, 0.08);
+}
+
+.station-panel__participation input {
   accent-color: var(--color-accent-blue);
 }
 
-.station-panel__input--inline {
-  width: 7.5rem;
+.station-panel__input {
+  width: 7rem;
   min-width: 0;
-  padding: 0.3rem 0.45rem;
-  margin: 0;
+  padding: 0.28rem 0.45rem;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   color: var(--color-text);
   background: #0a0a0a;
   border: 1px solid var(--color-border);
@@ -117,9 +139,46 @@
   border-color: var(--color-accent-blue);
 }
 
-.station-panel__btn:disabled {
+.station-panel__btn:disabled,
+.station-panel__input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.station-panel__details {
+  position: relative;
+}
+
+.station-panel__details-summary {
+  list-style: none;
+  padding: 0.28rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.station-panel__details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.station-panel__details-body {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 10002;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-width: 12rem;
+  padding: 0.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .station-panel__link {
@@ -149,16 +208,25 @@
 }
 
 @media (max-width: 1100px) {
-  .station-panel--compact {
+  .station-panel--unified {
     width: 100%;
   }
 
-  .station-panel__row {
+  .station-panel__main {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
   }
 
-  .station-panel__controls {
-    width: 100%;
+  .station-panel__actions {
+    justify-content: flex-start;
+  }
+
+  .station-panel__state {
+    max-width: none;
+  }
+
+  .station-panel__details-body {
+    position: static;
+    box-shadow: none;
   }
 }

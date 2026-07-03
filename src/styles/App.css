@@ -121,7 +121,7 @@
   align-self: start;
 }
 
-.aladdin-header .station-panel--compact {
+.aladdin-header .station-panel--unified {
   grid-column: 3;
   grid-row: 1 / 3;
   align-self: center;
@@ -251,7 +251,7 @@
   .aladdin-header__brand,
   .aladdin-nav,
   .aladdin-header__controls,
-  .aladdin-header .station-panel--compact {
+  .aladdin-header .station-panel--unified {
     grid-column: 1;
     grid-row: auto;
   }
