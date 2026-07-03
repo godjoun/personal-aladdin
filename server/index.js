@@ -19,6 +19,7 @@ import { requireAdminAuth, requireStationAuth, generateStationKey, hashStationKe
 import { reconcilePayload } from './reconcile.js'
 import { buildHostReport } from './hostAnalytics.js'
 import { loadStation, listStations, saveStation } from './storage.js'
+import { proxyPublicData } from './marketProxy.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 config({ path: path.join(__dirname, '..', '.env') })
@@ -31,6 +32,20 @@ const distPath = path.join(__dirname, '..', 'dist')
 app.use(cors())
 app.use(express.json({ limit: '5mb' }))
 app.use('/admin', express.static(path.join(__dirname, 'public', 'admin')))
+
+/** 공공데이터 API 프록시 — 배포 환경에서 브라우저가 API_KEY 없이 시세·종목 검색 */
+app.get('/api/public-data', async (req, res) => {
+  const service = req.query.service === 'stock' ? 'stock' : 'etf'
+  const { service: _service, ...queryParams } = req.query
+
+  try {
+    const data = await proxyPublicData(service, queryParams)
+    res.json(data)
+  } catch (error) {
+    console.error('[Central] public-data proxy 실패:', error.message)
+    res.status(500).json({ error: error.message })
+  }
+})
 
 /** 헬스 체크 */
 app.get('/api/health', (_req, res) => {

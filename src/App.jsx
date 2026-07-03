@@ -103,6 +103,23 @@ function App() {
     reloadTrades()
   }
 
+  /** 자산 저장·삭제 후 시세 갱신 → 총 평가 자산 반영 */
+  async function handleAssetsChange() {
+    refreshAssets()
+    reloadTrades()
+
+    const currentAssets = getAssets()
+    if (currentAssets.length === 0) {
+      return
+    }
+
+    try {
+      await refreshMarketPrices()
+    } catch (error) {
+      console.warn('[App] 자산 변경 후 시세 갱신 실패:', error.message)
+    }
+  }
+
   /**
    * 블랙록 Daily Marking — 오늘 포트폴리오 상태를 원장에 기록
    */
@@ -285,12 +302,12 @@ function App() {
           onRefreshPrices={refreshMarketPrices}
           autoMarketRefresh={autoMarketRefresh}
           onAutoMarketRefreshChange={setAutoMarketRefresh}
-          onAssetsChange={refreshData}
+          onAssetsChange={handleAssetsChange}
           onTradesChange={refreshData}
           assetFormSlot={
             <AssetForm
               assets={assets}
-              onAssetsChange={refreshData}
+              onAssetsChange={handleAssetsChange}
               hideList
             />
           }
