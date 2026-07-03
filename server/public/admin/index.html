@@ -287,7 +287,8 @@
         <li><strong>ADMIN_KEY</strong> 입력 후 <strong>데이터 불러오기</strong> 클릭</li>
         <li>위 <strong>Host Intelligence Report</strong>에서 전체 네트워크 집계 확인</li>
         <li><strong>Network Intelligence</strong>에서 네트워크 AUM·비중 추이(30일) 확인</li>
-        <li>아래 <strong>Stations</strong> 표에서 <strong>포트폴리오 보기</strong> 클릭 → 종목·거래·비중을 표로 확인</li>
+        <li><strong>Station Risk &amp; Accounting</strong>에서 기관별 MDD·변동성·샤프·집중도 확인</li>
+        <li>아래 <strong>Stations</strong> 표에서 <strong>포트폴리오 보기</strong> → 종목·리스크·추이 차트 확인</li>
       </ol>
     </div>
 
@@ -311,11 +312,39 @@
               <th class="num">평가액</th>
               <th class="num">수익률</th>
               <th class="num">주식 비중</th>
+              <th class="num">MDD</th>
+              <th class="num">변동성</th>
+              <th class="num">위기손실</th>
               <th>주력 자산군</th>
               <th>대조</th>
             </tr>
           </thead>
           <tbody id="compareRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" id="riskPanel" hidden>
+      <h2>Station Risk &amp; Accounting — 기관별 리스크·회계</h2>
+      <p class="sub">업로드된 스냅샷 기준 · 최근 30일 · 블랙록식 축소 분석 (참고용, 투자 권유 아님)</p>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>스테이션</th>
+              <th class="num">투자원금</th>
+              <th class="num">평가액</th>
+              <th class="num">손익</th>
+              <th class="num">30일 수익</th>
+              <th class="num">MDD</th>
+              <th class="num">연율 변동성</th>
+              <th class="num">샤프</th>
+              <th class="num">Top1 비중</th>
+              <th class="num">위기 예상</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="riskRows"></tbody>
         </table>
       </div>
     </div>
@@ -358,6 +387,26 @@
         <button type="button" class="btn-link" id="closeDetailBtn">닫기</button>
       </div>
       <div class="metrics" id="detailMetrics"></div>
+
+      <h3>리스크 · 회계 · 성과 (30일)</h3>
+      <div class="metrics" id="detailRiskMetrics"></div>
+      <div id="detailAumChart"></div>
+      <div id="detailWeightChart"></div>
+
+      <h3>손익 기여 Top 종목</h3>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>종목</th>
+              <th class="num">비중</th>
+              <th class="num">손익</th>
+              <th class="num">기여</th>
+            </tr>
+          </thead>
+          <tbody id="detailProfitLeaders"></tbody>
+        </table>
+      </div>
 
       <h3>자산군 비중</h3>
       <div id="detailAllocation"></div>
@@ -440,6 +489,12 @@
       const networkAumChart = document.getElementById('networkAumChart')
       const networkWeightChart = document.getElementById('networkWeightChart')
       const networkCompareMetrics = document.getElementById('networkCompareMetrics')
+      const riskPanel = document.getElementById('riskPanel')
+      const riskRows = document.getElementById('riskRows')
+      const detailRiskMetrics = document.getElementById('detailRiskMetrics')
+      const detailAumChart = document.getElementById('detailAumChart')
+      const detailWeightChart = document.getElementById('detailWeightChart')
+      const detailProfitLeaders = document.getElementById('detailProfitLeaders')
 
       const SERIES_COLORS = [
         '#3498db',
@@ -681,17 +736,111 @@
               <td class="num">${formatWon(s.totalValuedAmount)}</td>
               <td class="num ${pnlClass(s.totalReturnRate)}">${formatPct(s.totalReturnRate)}</td>
               <td class="num">${s.equityWeight.toFixed(1)}%</td>
+              <td class="num loss">${s.riskSummary?.mddPercent != null ? s.riskSummary.mddPercent.toFixed(1) + '%' : '—'}</td>
+              <td class="num">${s.riskSummary?.annualizedVolPercent != null ? s.riskSummary.annualizedVolPercent.toFixed(1) + '%' : '—'}</td>
+              <td class="num loss">${s.riskSummary?.expectedLossRate != null ? s.riskSummary.expectedLossRate.toFixed(1) + '%' : '—'}</td>
               <td>${s.dominantClass}</td>
               <td>${reconcileLabel(s.reconciliationStatus)}</td>
             </tr>`,
               )
               .join('')
-          : '<tr><td colspan="6" class="empty">비교할 스테이션 없음</td></tr>'
+          : '<tr><td colspan="9" class="empty">비교할 스테이션 없음</td></tr>'
 
+        renderRiskTable(report.stations ?? [])
         renderNetworkIntelligence(report.networkIntelligence)
       }
 
-      function renderDetail(data) {
+      function renderRiskTable(stations) {
+        if (!stations.length) {
+          riskPanel.hidden = true
+          return
+        }
+
+        riskPanel.hidden = false
+        riskRows.innerHTML = stations
+          .map((station) => {
+            const risk = station.riskSummary
+
+            return `
+            <tr>
+              <td><strong>${station.name}</strong></td>
+              <td class="num">${formatWon(station.totalInvested)}</td>
+              <td class="num">${formatWon(station.totalValuedAmount)}</td>
+              <td class="num ${pnlClass(station.totalProfitLoss)}">${formatWon(station.totalProfitLoss)}</td>
+              <td class="num ${pnlClass(risk?.periodReturnPercent)}">${risk?.periodReturnPercent != null ? formatPct(risk.periodReturnPercent) : '—'}</td>
+              <td class="num loss">${risk?.mddPercent != null ? risk.mddPercent.toFixed(1) + '%' : '—'}</td>
+              <td class="num">${risk?.annualizedVolPercent != null ? risk.annualizedVolPercent.toFixed(1) + '%' : '—'}</td>
+              <td class="num">${risk?.sharpeRatio != null ? risk.sharpeRatio.toFixed(2) : '—'}</td>
+              <td class="num">${risk?.top1Weight != null ? risk.top1Weight.toFixed(1) + '%' : '—'}</td>
+              <td class="num loss">${risk?.expectedLossRate != null ? risk.expectedLossRate.toFixed(1) + '%' : '—'}</td>
+              <td><button type="button" class="detail-btn" data-id="${station.stationId}">상세 분석</button></td>
+            </tr>`
+          })
+          .join('')
+
+        riskRows.querySelectorAll('.detail-btn').forEach((btn) => {
+          btn.addEventListener('click', () => loadDetail(btn.dataset.id))
+        })
+      }
+
+      function renderStationAnalytics(analytics) {
+        if (!analytics) return
+
+        const { accounting, performance, risk, profitLeaders, charts, trades } = analytics
+
+        detailRiskMetrics.innerHTML = `
+          <div class="metric"><div class="metric__label">30일 수익</div><div class="metric__value ${pnlClass(performance.periodReturn?.periodReturnPercent)}">${performance.periodReturn ? formatPct(performance.periodReturn.periodReturnPercent) : '—'}</div></div>
+          <div class="metric"><div class="metric__label">MDD</div><div class="metric__value loss">${performance.mdd?.mddPercent != null ? performance.mdd.mddPercent.toFixed(1) + '%' : '—'}</div></div>
+          <div class="metric"><div class="metric__label">연율 변동성</div><div class="metric__value">${risk.annualizedVolPercent != null ? risk.annualizedVolPercent.toFixed(1) + '%' : '—'}</div></div>
+          <div class="metric"><div class="metric__label">샤프</div><div class="metric__value">${risk.sharpeRatio != null ? risk.sharpeRatio.toFixed(2) : '—'}</div></div>
+          <div class="metric"><div class="metric__label">Top1 집중</div><div class="metric__value">${risk.concentration.top1Weight.toFixed(1)}%</div></div>
+          <div class="metric"><div class="metric__label">Top3 집중</div><div class="metric__value">${risk.concentration.top3Weight.toFixed(1)}%</div></div>
+          <div class="metric"><div class="metric__label">위기 시나리오</div><div class="metric__value metric__value--sm">${risk.worstScenarioName ?? '—'}</div></div>
+          <div class="metric"><div class="metric__label">위기 예상 손실</div><div class="metric__value loss">${risk.expectedLossRate != null ? formatPct(risk.expectedLossRate) : '—'}</div></div>
+          <div class="metric"><div class="metric__label">스냅샷 일수</div><div class="metric__value">${analytics.uniqueSnapshotDays ?? analytics.snapshotCount}</div></div>
+          <div class="metric"><div class="metric__label">거래 건수</div><div class="metric__value">${trades.totalTrades}</div></div>
+        `
+
+        renderLineChart(detailAumChart, {
+          title: 'AUM Trend',
+          meta: '총 평가액 추이',
+          dates: (charts.aumSeries ?? []).map((row) => row.date),
+          series: [
+            {
+              label: '평가액',
+              values: (charts.aumSeries ?? []).map((row) => row.totalValuedAmount),
+            },
+          ],
+          yMax: 0,
+          ySuffix: '원',
+        })
+
+        renderLineChart(detailWeightChart, {
+          title: 'Allocation Weight Trend',
+          meta: '자산군 비중 추이',
+          dates: charts.allocationSeries?.dates ?? [],
+          series: (charts.allocationSeries?.series ?? []).map((row) => ({
+            label: row.assetClass,
+            values: row.weights,
+          })),
+        })
+
+        detailProfitLeaders.innerHTML = (profitLeaders ?? []).length
+          ? profitLeaders
+              .map(
+                (row) => `
+            <tr>
+              <td><strong>${row.name || row.symbol}</strong><br><span class="mono muted">${row.symbol}</span></td>
+              <td class="num">${row.weight.toFixed(1)}%</td>
+              <td class="num ${pnlClass(row.profitLoss)}">${formatWon(row.profitLoss)}</td>
+              <td class="num">${row.contributionPercent.toFixed(1)}%</td>
+            </tr>`,
+              )
+              .join('')
+          : '<tr><td colspan="4" class="empty">손익 데이터 없음</td></tr>'
+      }
+
+      function renderDetail(data, analytics) {
         const snapshot = getLatestSnapshot(data.payload)
         const reconciliation = data.reconciliation
 
@@ -718,6 +867,7 @@
         `
 
         renderAllocationBars(detailAllocation, snapshot?.allocation)
+        renderStationAnalytics(analytics)
 
         const positions = snapshot?.positions ?? []
         detailPositions.innerHTML = positions.length
@@ -774,6 +924,7 @@
           stationRows.innerHTML = `<tr><td colspan="8" class="warn">${err.error || stationsRes.status}</td></tr>`
           reportPanel.hidden = true
           networkIntelPanel.hidden = true
+          riskPanel.hidden = true
           return
         }
 
@@ -785,6 +936,7 @@
         } else {
           reportPanel.hidden = true
           networkIntelPanel.hidden = true
+          riskPanel.hidden = true
         }
 
         if (stations.length === 0) {
@@ -817,17 +969,19 @@
       }
 
       async function loadDetail(id) {
-        const res = await fetch(`${apiBase}/api/admin/stations/${id}`, {
-          headers: headers(),
-        })
+        const [detailRes, analyticsRes] = await Promise.all([
+          fetch(`${apiBase}/api/admin/stations/${id}`, { headers: headers() }),
+          fetch(`${apiBase}/api/admin/stations/${id}/analytics`, { headers: headers() }),
+        ])
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}))
+        if (!detailRes.ok) {
+          const err = await detailRes.json().catch(() => ({}))
           alert(err.error || '스테이션을 불러오지 못했습니다.')
           return
         }
 
-        renderDetail(await res.json())
+        const analyticsData = analyticsRes.ok ? await analyticsRes.json() : null
+        renderDetail(await detailRes.json(), analyticsData?.analytics ?? null)
       }
 
       loadBtn.addEventListener('click', loadAll)

@@ -8,6 +8,7 @@ import {
   buildNetworkAllocationTimeSeries,
 } from './networkAnalytics.js'
 import { getNetworkHistoryWindow, loadNetworkHistory } from './networkHistoryStorage.js'
+import { buildStationRiskSummary } from './stationAnalytics.js'
 
 function getLatestSnapshot(payload) {
   const snapshots = payload?.snapshots
@@ -28,16 +29,22 @@ export function buildHostReport(stations, { intelligenceDays = 30 } = {}) {
 
   const stationSummaries = synced.map((station) => {
     const snapshot = getLatestSnapshot(station.latestPayload)
+    const riskSummary = station.latestPayload
+      ? buildStationRiskSummary(station.latestPayload, intelligenceDays)
+      : null
 
     return {
       stationId: station.id,
       name: station.name,
       totalValuedAmount: snapshot?.totalValuedAmount ?? 0,
+      totalInvested: snapshot?.totalInvested ?? null,
+      totalProfitLoss: snapshot?.totalProfitLoss ?? null,
       allocation: snapshot?.allocation ?? [],
       totalReturnRate: snapshot?.totalReturnRate ?? null,
       lastSyncAt: station.lastSyncAt,
       reconciliationStatus: station.reconciliation?.status ?? null,
       consentAt: station.latestPayload?.consent?.agreedAt ?? null,
+      riskSummary,
     }
   })
 
@@ -113,8 +120,11 @@ export function buildHostReport(stations, { intelligenceDays = 30 } = {}) {
     },
     stations: stationSummaries
       .map((station) => ({
+        stationId: station.stationId,
         name: station.name,
         totalValuedAmount: station.totalValuedAmount,
+        totalInvested: station.totalInvested,
+        totalProfitLoss: station.totalProfitLoss,
         equityWeight:
           station.allocation.find((group) => group.assetClass === '주식')?.weight ?? 0,
         dominantClass: station.allocation[0]?.assetClass ?? '—',
@@ -122,6 +132,7 @@ export function buildHostReport(stations, { intelligenceDays = 30 } = {}) {
         reconciliationStatus: station.reconciliationStatus,
         lastSyncAt: station.lastSyncAt,
         consentAt: station.consentAt,
+        riskSummary: station.riskSummary,
       }))
       .sort((a, b) => b.totalValuedAmount - a.totalValuedAmount),
     reconciliationSummary: {

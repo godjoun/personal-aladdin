@@ -1,5 +1,5 @@
 /**
- * StationPanel.jsx — 중앙 서버 연동 UI
+ * StationPanel.jsx — 중앙 서버 연동 · 네트워크 참여
  */
 
 import { useEffect, useState } from 'react'
@@ -11,9 +11,16 @@ import {
   getCentralAdminUrl,
 } from '../services/stationClient.js'
 import {
-  getHostConsentSaved,
-  setAutoUploadEnabled,
-  setHostConsentSaved,
+  getNetworkParticipationEnabled,
+  NETWORK_PARTICIPATION_CHANGED,
+  setNetworkParticipationEnabled,
+} from '../services/networkParticipation.js'
+import NetworkTargetControls from './NetworkTargetControls.jsx'
+import {
+  getNetworkTargetMode,
+  getNetworkWindowDays,
+  setNetworkTargetMode,
+  setNetworkWindowDays,
 } from '../services/rebalanceSettings.js'
 import '../styles/StationPanel.css'
 
@@ -24,10 +31,23 @@ function StationPanel() {
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [consentChecked, setConsentChecked] = useState(getHostConsentSaved)
+  const [participating, setParticipating] = useState(getNetworkParticipationEnabled)
+  const [networkTargetMode, setNetworkTargetModeState] = useState(getNetworkTargetMode)
+  const [networkWindowDays, setNetworkWindowDaysState] = useState(getNetworkWindowDays)
 
   useEffect(() => {
     checkCentralHealth().then(setOnline)
+  }, [])
+
+  useEffect(() => {
+    function handleParticipationChange() {
+      setParticipating(getNetworkParticipationEnabled())
+    }
+
+    window.addEventListener(NETWORK_PARTICIPATION_CHANGED, handleParticipationChange)
+    return () => {
+      window.removeEventListener(NETWORK_PARTICIPATION_CHANGED, handleParticipationChange)
+    }
   }, [])
 
   async function handleRegister() {
@@ -38,7 +58,7 @@ function StationPanel() {
     try {
       const result = await registerStation(stationName.trim() || 'SECURE_STATION')
       setCredentials(result)
-      setStatus('스테이션 등록 완료 — 키가 이 기기에 저장되었습니다.')
+      setStatus('스테이션 등록 완료 — 이제 네트워크 참여를 켤 수 있습니다.')
       checkCentralHealth().then(setOnline)
     } catch (err) {
       setError(err.message)
@@ -50,37 +70,31 @@ function StationPanel() {
   async function uploadToCentral() {
     const result = await pushVaultToCentral({ consentHostMonitoring: true })
     return (
-      `집계 서버 업로드 완료 · 대조: ${result.reconciliation?.status ?? '—'}` +
+      `업로드 완료 · 대조: ${result.reconciliation?.status ?? '—'}` +
       (result.reconciliation?.mismatchCount
         ? ` (불일치 ${result.reconciliation.mismatchCount}건)`
         : '')
     )
   }
 
-  async function handleConsentChange(checked) {
-    setConsentChecked(checked)
-    setHostConsentSaved(checked)
-    setAutoUploadEnabled(checked)
+  async function handleParticipationChange(checked) {
     setError('')
     setStatus('')
 
     if (!checked) {
+      setParticipating(false)
+      setNetworkParticipationEnabled(false)
+      setStatus('네트워크 참여를 끔 — 개인 고정 전략 목표로 돌아갑니다.')
       return
     }
 
     if (!credentials?.stationKey) {
       setError('먼저 스테이션을 등록해 주세요.')
-      setConsentChecked(false)
-      setHostConsentSaved(false)
-      setAutoUploadEnabled(false)
       return
     }
 
     if (!online) {
-      setError('집계 서버가 꺼져 있어 업로드할 수 없습니다.')
-      setConsentChecked(false)
-      setHostConsentSaved(false)
-      setAutoUploadEnabled(false)
+      setError('집계 서버가 꺼져 있어 참여할 수 없습니다.')
       return
     }
 
@@ -88,11 +102,14 @@ function StationPanel() {
 
     try {
       const message = await uploadToCentral()
-      setStatus(`${message} · 이후 시세 갱신 시에도 자동 업로드됩니다.`)
+      setParticipating(true)
+      setNetworkParticipationEnabled(true)
+      setStatus(
+        `${message} · 그룹 목표 비중이 대시보드·리밸런싱에 자동 반영됩니다.`,
+      )
     } catch (err) {
-      setConsentChecked(false)
-      setHostConsentSaved(false)
-      setAutoUploadEnabled(false)
+      setParticipating(false)
+      setNetworkParticipationEnabled(false)
       setError(err.message)
     } finally {
       setLoading(false)
@@ -100,7 +117,7 @@ function StationPanel() {
   }
 
   async function handleRetryPush() {
-    if (!consentChecked) return
+    if (!participating) return
 
     setLoading(true)
     setError('')
@@ -115,8 +132,18 @@ function StationPanel() {
     }
   }
 
+  function handleNetworkTargetModeChange(mode) {
+    setNetworkTargetMode(mode)
+    setNetworkTargetModeState(mode)
+  }
+
+  function handleNetworkWindowDaysChange(days) {
+    setNetworkWindowDays(days)
+    setNetworkWindowDaysState(days)
+  }
+
   return (
-    <section className="station-panel" aria-label="중앙 서버 연동">
+    <section className="station-panel" aria-label="네트워크 참여">
       <div className="station-panel__header">
         <h2 className="station-panel__title">Network Data Pool</h2>
         <span
@@ -127,21 +154,14 @@ function StationPanel() {
       </div>
 
       <p className="station-panel__desc">
-        <strong>쉽게 말하면:</strong> 참여자들의 포트폴리오 데이터를 모아{' '}
-        <strong>네트워크 평균 비중</strong>을 만들고, 그걸 바탕으로 각자 더 나은
-        포트폴리오를 점검하는 공간입니다.
-      </p>
-
-      <p className="station-panel__purpose">
-        데이터를 모으는 이유 — 참여자 전체의 비중·스냅샷을 익명 집계해{' '}
-        <strong>더 나은 포트폴리오 전략</strong>(네트워크 리밸런싱 목표 등)을
-        만듭니다. 개인 식별·투자 권유·수익 보장 목적이 아닙니다.
+        <strong>네트워크 참여</strong>를 켜면 비중 데이터가 그룹에 모이고,{' '}
+        <strong>그룹 평균이 리밸런싱 목표로 자동 적용</strong>됩니다. (매매 실행
+        없음 · 투자 권유 아님)
       </p>
 
       {!online && (
         <p className="station-panel__warn">
-          서버가 꺼져 있어요. 로컬: <code>npm run central</code> · 배포 후에는 이 메시지가 안 나와야
-          정상입니다.
+          서버가 꺼져 있어요. 배포 사이트에서는 보통 이 메시지가 없어야 정상입니다.
         </p>
       )}
 
@@ -151,9 +171,7 @@ function StationPanel() {
             <span className="station-panel__label">스테이션</span>
             {credentials.name}
           </p>
-          <p className="station-panel__mono">
-            ID: {credentials.stationId}
-          </p>
+          <p className="station-panel__mono">ID: {credentials.stationId}</p>
         </div>
       ) : (
         <div className="station-panel__register">
@@ -181,30 +199,37 @@ function StationPanel() {
       <div className="station-panel__actions">
         {credentials && (
           <>
-            <label className="station-panel__consent">
+            <label className="station-panel__consent station-panel__consent--primary">
               <input
                 type="checkbox"
-                checked={consentChecked}
+                checked={participating}
                 disabled={loading}
-                onChange={(e) => handleConsentChange(e.target.checked)}
+                onChange={(e) => handleParticipationChange(e.target.checked)}
               />
               <span>
-                내 <strong>포트폴리오·거래·스냅샷</strong> 데이터의{' '}
-                <strong>수집·익명 집계</strong>에 동의합니다. 동의 시{' '}
-                <strong>즉시 집계 서버에 업로드</strong>되며, 이후{' '}
-                <strong>시세 갱신할 때마다 자동</strong>으로 반영됩니다. 수집
-                데이터는 네트워크 벤치마크·리밸런싱 목표에 사용됩니다.
+                <strong>네트워크 참여</strong> — 비중·스냅샷을 익명 집계하고,{' '}
+                <strong>그룹 평균 비중을 내 목표로 자동 적용</strong>합니다. 켜면
+                즉시 업로드되며 시세 갱신마다 자동 반영됩니다.
               </span>
             </label>
-            {consentChecked && (
-              <button
-                type="button"
-                className="station-panel__link-btn"
-                onClick={handleRetryPush}
-                disabled={loading || !online}
-              >
-                지금 다시 업로드
-              </button>
+
+            {participating && (
+              <>
+                <NetworkTargetControls
+                  targetMode={networkTargetMode}
+                  windowDays={networkWindowDays}
+                  onTargetModeChange={handleNetworkTargetModeChange}
+                  onWindowDaysChange={handleNetworkWindowDaysChange}
+                />
+                <button
+                  type="button"
+                  className="station-panel__link-btn"
+                  onClick={handleRetryPush}
+                  disabled={loading || !online}
+                >
+                  지금 다시 업로드
+                </button>
+              </>
             )}
           </>
         )}

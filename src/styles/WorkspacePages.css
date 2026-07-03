@@ -119,6 +119,26 @@
   color: var(--color-text-muted);
 }
 
+.workspace-page__status-badge {
+  display: inline-block;
+  padding: 0.35rem 0.65rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  background: var(--color-surface-panel);
+}
+
+.workspace-page__status-badge--network {
+  color: var(--color-accent-blue);
+  border-color: rgba(52, 152, 219, 0.35);
+  background: rgba(52, 152, 219, 0.08);
+}
+
 .workspace-page__export-btn {
   padding: 0.45rem 0.85rem;
   font-family: var(--font-mono);

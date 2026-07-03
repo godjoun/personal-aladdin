@@ -13,27 +13,13 @@ import { simulateCrisisScenarios } from '../utils/riskEngine.js'
 import {
   analyzeRebalancing,
   getTargetWeightSum,
-  networkAllocationToTargets,
 } from '../utils/rebalanceEngine.js'
 import {
   applyStrategyPreset,
   getActivePresetId,
-  getFixedTargetAllocation,
   STRATEGY_PRESETS,
 } from '../data/strategyPresets.js'
-import {
-  fetchNetworkBenchmark,
-  getCachedNetworkBenchmark,
-} from '../services/networkBenchmark.js'
-import {
-  getRebalanceMode,
-  setRebalanceMode,
-  getNetworkTargetMode,
-  setNetworkTargetMode,
-  getNetworkWindowDays,
-  setNetworkWindowDays,
-} from '../services/rebalanceSettings.js'
-import NetworkTargetControls from '../components/NetworkTargetControls.jsx'
+import { useNetworkRebalance } from '../hooks/useNetworkRebalance.js'
 import { setAutoMarketRefreshEnabled } from '../services/marketScheduleSettings.js'
 import PortfolioChart from '../components/PortfolioChart.jsx'
 import PortfolioLedger from '../components/PortfolioLedger.jsx'
@@ -165,13 +151,16 @@ function Dashboard({
   assetFormSlot,
 }) {
   const [refreshStatus, setRefreshStatus] = useState(REFRESH_STATUS.IDLE)
-  const [rebalanceMode, setRebalanceModeState] = useState(getRebalanceMode)
   const [activePresetId, setActivePresetId] = useState(getActivePresetId)
-  const [networkBenchmark, setNetworkBenchmark] = useState(getCachedNetworkBenchmark)
-  const [networkLoading, setNetworkLoading] = useState(false)
-  const [networkError, setNetworkError] = useState('')
-  const [networkTargetMode, setNetworkTargetModeState] = useState(getNetworkTargetMode)
-  const [networkWindowDays, setNetworkWindowDaysState] = useState(getNetworkWindowDays)
+  const {
+    participating,
+    networkLoading,
+    networkError,
+    refreshNetworkBenchmark,
+    getActiveTargets,
+    formatNetworkHint,
+    targetSource,
+  } = useNetworkRebalance()
 
   useEffect(() => {
     if (
@@ -182,57 +171,6 @@ function Dashboard({
       return () => clearTimeout(timer)
     }
   }, [refreshStatus])
-
-  async function refreshNetworkBenchmark() {
-    if (rebalanceMode !== 'network') return
-
-    setNetworkLoading(true)
-    setNetworkError('')
-
-    try {
-      const data = await fetchNetworkBenchmark({
-        targetMode: networkTargetMode,
-        windowDays: networkWindowDays,
-      })
-      setNetworkBenchmark(data)
-    } catch (error) {
-      setNetworkError(error.message)
-    } finally {
-      setNetworkLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    refreshNetworkBenchmark()
-  }, [rebalanceMode, networkTargetMode, networkWindowDays])
-
-  function handleNetworkTargetModeChange(mode) {
-    setNetworkTargetMode(mode)
-    setNetworkTargetModeState(mode)
-  }
-
-  function handleNetworkWindowDaysChange(days) {
-    setNetworkWindowDays(days)
-    setNetworkWindowDaysState(days)
-  }
-
-  function formatNetworkBenchmarkHint() {
-    if (!networkBenchmark) {
-      return '스테이션 등록·업로드 후 네트워크 비중이 목표로 적용됩니다.'
-    }
-
-    const modeLabel =
-      networkBenchmark.targetMode === 'average'
-        ? `최근 ${networkBenchmark.windowDays}일 평균 (${networkBenchmark.sampleDays ?? 0}일 표본)`
-        : '최신 업로드 기준'
-
-    return `목표 = ${networkBenchmark.syncedStationCount}개 스테이션 합산 · ${modeLabel} · ${new Date(networkBenchmark.generatedAt).toLocaleString('ko-KR')}`
-  }
-
-  function handleRebalanceModeChange(mode) {
-    setRebalanceMode(mode)
-    setRebalanceModeState(mode)
-  }
 
   async function handleRefreshPrices() {
     if (refreshStatus === REFRESH_STATUS.LOADING) return
@@ -252,8 +190,6 @@ function Dashboard({
   function handleLoadPreset(presetId) {
     if (applyStrategyPreset(presetId)) {
       setActivePresetId(presetId)
-      setRebalanceModeState('fixed')
-      setRebalanceMode('fixed')
     }
   }
 
@@ -268,16 +204,13 @@ function Dashboard({
   const allocation = calculateAssetClassAllocation(assetRows)
   const crisisSimulation = simulateCrisisScenarios(allocation)
 
-  const activeTargets =
-    rebalanceMode === 'network' && networkBenchmark?.networkAllocation?.length
-      ? networkAllocationToTargets(networkBenchmark.networkAllocation)
-      : getFixedTargetAllocation()
+  const activeTargets = getActiveTargets()
 
   const rebalanceCheck = analyzeRebalancing(allocation, activeTargets)
 
   const targetSum = getTargetWeightSum(activeTargets)
   const targetSumValid =
-    rebalanceMode === 'fixed' ? Math.abs(targetSum - 100) < 0.01 : targetSum > 0
+    targetSource === 'fixed' ? Math.abs(targetSum - 100) < 0.01 : targetSum > 0
   const maxDeviation = getMaxWeightDeviation(rebalanceCheck)
   const worstScenario = crisisSimulation.scenarios.find(
     (s) => s.id === crisisSimulation.worstScenarioId,
@@ -375,6 +308,44 @@ function Dashboard({
           )}
         </article>
       </div>
+
+      {participating && allocation.totalValuedAmount > 0 && (
+        <section className="dashboard__network-compare" aria-label="그룹 목표 대비">
+          <h3 className="dashboard__network-compare-title">그룹 목표 대비</h3>
+          <p className="dashboard__network-compare-hint">
+            {networkLoading
+              ? '그룹 비중 불러오는 중…'
+              : networkError
+                ? networkError
+                : formatNetworkHint()}
+          </p>
+          <div className="dashboard__network-compare-grid">
+            {rebalanceCheck.items.map((item) => (
+              <div
+                key={item.assetClass}
+                className={`dashboard__network-compare-row${
+                  item.needsReview ? ' dashboard__network-compare-row--alert' : ''
+                }`}
+              >
+                <span className="dashboard__network-compare-class">{item.assetClass}</span>
+                <span className="dashboard__network-compare-meta">
+                  현재 {item.currentWeight.toFixed(1)}%
+                </span>
+                <span className="dashboard__network-compare-target">
+                  그룹 목표 {item.targetWeight.toFixed(1)}%
+                </span>
+                <span
+                  className={
+                    item.needsReview ? 'dashboard__cell--loss' : 'dashboard__cell--profit'
+                  }
+                >
+                  {item.needsReview ? '점검' : '적정'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── 갱신 버튼 ── */}
       <div className="dashboard__toolbar">
@@ -601,44 +572,13 @@ function Dashboard({
             <section className="dashboard__sidebar-panel">
               <h3 className="dashboard__sidebar-title">리밸런싱 점검</h3>
 
-              <div className="dashboard__rebalance-mode" role="group" aria-label="리밸런싱 목표">
-                <button
-                  type="button"
-                  className={`dashboard__rebalance-mode-btn${
-                    rebalanceMode === 'fixed' ? ' dashboard__rebalance-mode-btn--active' : ''
-                  }`}
-                  onClick={() => handleRebalanceModeChange('fixed')}
-                >
-                  고정 전략
-                </button>
-                <button
-                  type="button"
-                  className={`dashboard__rebalance-mode-btn${
-                    rebalanceMode === 'network' ? ' dashboard__rebalance-mode-btn--active' : ''
-                  }`}
-                  onClick={() => handleRebalanceModeChange('network')}
-                >
-                  네트워크
-                </button>
-              </div>
-
-              {rebalanceMode === 'network' && (
-                <>
-                  <NetworkTargetControls
-                    targetMode={networkTargetMode}
-                    windowDays={networkWindowDays}
-                    onTargetModeChange={handleNetworkTargetModeChange}
-                    onWindowDaysChange={handleNetworkWindowDaysChange}
-                  />
-                  <p className="dashboard__rebalance-hint">
-                    {networkLoading
-                      ? '네트워크 비중 불러오는 중…'
-                      : networkError
-                        ? networkError
-                        : formatNetworkBenchmarkHint()}
-                  </p>
-                </>
-              )}
+              <p className="dashboard__rebalance-hint">
+                {participating
+                  ? networkLoading
+                    ? '그룹 목표 불러오는 중…'
+                    : networkError || formatNetworkHint()
+                  : '개인 고정 전략 사용 중 · Network Data Pool에서 네트워크 참여를 켤 수 있습니다.'}
+              </p>
 
               {allocation.totalValuedAmount > 0 ? (
                 <>

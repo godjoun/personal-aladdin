@@ -2,7 +2,7 @@
  * strategyPresets.js — 리밸런싱 전략 프리셋 정의
  */
 
-import { setRebalanceMode } from '../services/rebalanceSettings.js'
+import { setNetworkParticipationEnabled } from '../services/networkParticipation.js'
 
 const PRESET_KEY = 'aladdin_active_preset'
 const TARGETS_KEY = 'aladdin_fixed_targets'
@@ -96,6 +96,6 @@ export function applyStrategyPreset(presetId) {
 
   localStorage.setItem(PRESET_KEY, presetId)
   localStorage.setItem(TARGETS_KEY, JSON.stringify(preset.targets))
-  setRebalanceMode('fixed')
+  setNetworkParticipationEnabled(false)
   return true
 }

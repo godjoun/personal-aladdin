@@ -20,6 +20,7 @@ import { reconcilePayload } from './reconcile.js'
 import { buildHostReport } from './hostAnalytics.js'
 import { mergeNetworkHistoryFromStations } from './networkHistoryStorage.js'
 import { resolveNetworkAllocation } from './networkAnalytics.js'
+import { buildStationAnalytics } from './stationAnalytics.js'
 import { loadStation, listStations, saveStation } from './storage.js'
 import { proxyPublicData } from './marketProxy.js'
 
@@ -201,6 +202,33 @@ app.get('/api/admin/stations/:id', requireAdminAuth, (req, res) => {
     lastSyncAt: station.lastSyncAt,
     payload: station.latestPayload,
     reconciliation: station.reconciliation,
+  })
+})
+
+/** 관리자 — 스테이션 리스크·회계·성과 분석 */
+app.get('/api/admin/stations/:id/analytics', requireAdminAuth, (req, res) => {
+  const station = loadStation(req.params.id)
+
+  if (!station) {
+    res.status(404).json({ error: '스테이션을 찾을 수 없습니다.' })
+    return
+  }
+
+  if (!station.latestPayload) {
+    res.status(404).json({ error: '업로드된 데이터가 없습니다.' })
+    return
+  }
+
+  const windowDays = Math.min(
+    90,
+    Math.max(1, Number.parseInt(String(req.query.windowDays ?? '30'), 10) || 30),
+  )
+
+  res.json({
+    stationId: station.id,
+    name: station.name,
+    lastSyncAt: station.lastSyncAt,
+    analytics: buildStationAnalytics(station.latestPayload, { windowDays }),
   })
 })
 

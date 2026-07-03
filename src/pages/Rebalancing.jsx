@@ -2,119 +2,53 @@
  * Rebalancing.jsx — 리밸런싱 전용 화면
  */
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { calculateAssetClassAllocation } from '../utils/calculator.js'
 import { buildAssetRows } from '../utils/portfolioRows.js'
 import {
   analyzeRebalancing,
   getTargetWeightSum,
-  networkAllocationToTargets,
   REBALANCE_THRESHOLD,
 } from '../utils/rebalanceEngine.js'
 import {
   applyStrategyPreset,
   getActivePresetId,
-  getFixedTargetAllocation,
   getPresetById,
   STRATEGY_PRESETS,
 } from '../data/strategyPresets.js'
-import {
-  fetchNetworkBenchmark,
-  getCachedNetworkBenchmark,
-} from '../services/networkBenchmark.js'
-import {
-  getRebalanceMode,
-  setRebalanceMode,
-  getNetworkTargetMode,
-  setNetworkTargetMode,
-  getNetworkWindowDays,
-  setNetworkWindowDays,
-} from '../services/rebalanceSettings.js'
-import NetworkTargetControls from '../components/NetworkTargetControls.jsx'
+import { useNetworkRebalance } from '../hooks/useNetworkRebalance.js'
 import { formatCurrency, formatPercent, getPnlClass } from '../utils/formatters.js'
 import '../styles/WorkspacePages.css'
 
 function Rebalancing({ assets = [], prices = [] }) {
-  const [rebalanceMode, setRebalanceModeState] = useState(getRebalanceMode)
   const [activePresetId, setActivePresetId] = useState(getActivePresetId)
-  const [networkBenchmark, setNetworkBenchmark] = useState(getCachedNetworkBenchmark)
-  const [networkLoading, setNetworkLoading] = useState(false)
-  const [networkError, setNetworkError] = useState('')
-  const [networkTargetMode, setNetworkTargetModeState] = useState(getNetworkTargetMode)
-  const [networkWindowDays, setNetworkWindowDaysState] = useState(getNetworkWindowDays)
   const [presetMessage, setPresetMessage] = useState('')
+  const {
+    participating,
+    networkLoading,
+    networkError,
+    getActiveTargets,
+    formatNetworkHint,
+    targetSource,
+  } = useNetworkRebalance()
 
   const assetRows = buildAssetRows(assets, prices)
   const allocation = calculateAssetClassAllocation(assetRows)
 
-  const activeTargets =
-    rebalanceMode === 'network' && networkBenchmark?.networkAllocation?.length
-      ? networkAllocationToTargets(networkBenchmark.networkAllocation)
-      : getFixedTargetAllocation()
+  const activeTargets = getActiveTargets()
 
   const rebalanceCheck = analyzeRebalancing(allocation, activeTargets)
   const targetSum = getTargetWeightSum(activeTargets)
   const targetSumValid =
-    rebalanceMode === 'fixed' ? Math.abs(targetSum - 100) < 0.01 : targetSum > 0
+    targetSource === 'fixed' ? Math.abs(targetSum - 100) < 0.01 : targetSum > 0
   const activePreset = getPresetById(activePresetId)
-
-  async function refreshNetworkBenchmark() {
-    if (rebalanceMode !== 'network') return
-
-    setNetworkLoading(true)
-    setNetworkError('')
-
-    try {
-      const data = await fetchNetworkBenchmark({
-        targetMode: networkTargetMode,
-        windowDays: networkWindowDays,
-      })
-      setNetworkBenchmark(data)
-    } catch (error) {
-      setNetworkError(error.message)
-    } finally {
-      setNetworkLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    refreshNetworkBenchmark()
-  }, [rebalanceMode, networkTargetMode, networkWindowDays])
-
-  function handleNetworkTargetModeChange(mode) {
-    setNetworkTargetMode(mode)
-    setNetworkTargetModeState(mode)
-  }
-
-  function handleNetworkWindowDaysChange(days) {
-    setNetworkWindowDays(days)
-    setNetworkWindowDaysState(days)
-  }
-
-  function formatNetworkBenchmarkHint() {
-    if (!networkBenchmark) {
-      return '스테이션 등록·데이터 업로드 후 네트워크 비중이 목표로 적용됩니다.'
-    }
-
-    const modeLabel =
-      networkBenchmark.targetMode === 'average'
-        ? `최근 ${networkBenchmark.windowDays}일 평균 (${networkBenchmark.sampleDays ?? 0}일 표본)`
-        : '최신 업로드 기준'
-
-    return `목표 = ${networkBenchmark.syncedStationCount}개 스테이션 합산 · ${modeLabel}`
-  }
-
-  function handleModeChange(mode) {
-    setRebalanceMode(mode)
-    setRebalanceModeState(mode)
-    setPresetMessage('')
-  }
 
   function handleLoadPreset(presetId) {
     if (applyStrategyPreset(presetId)) {
       setActivePresetId(presetId)
-      setRebalanceModeState('fixed')
-      setPresetMessage(`${getPresetById(presetId)?.name} 전략을 목표 비중으로 적용했습니다.`)
+      setPresetMessage(
+        `${getPresetById(presetId)?.name} 전략을 적용했습니다. 네트워크 참여는 꺼집니다.`,
+      )
     }
   }
 
@@ -140,36 +74,39 @@ function Rebalancing({ assets = [], prices = [] }) {
       </header>
 
       <div className="workspace-page__toolbar">
-        <div className="dashboard__rebalance-mode" role="group" aria-label="리밸런싱 목표">
-          <button
-            type="button"
-            className={`dashboard__rebalance-mode-btn${
-              rebalanceMode === 'fixed' ? ' dashboard__rebalance-mode-btn--active' : ''
-            }`}
-            onClick={() => handleModeChange('fixed')}
-          >
-            고정 전략
-          </button>
-          <button
-            type="button"
-            className={`dashboard__rebalance-mode-btn${
-              rebalanceMode === 'network' ? ' dashboard__rebalance-mode-btn--active' : ''
-            }`}
-            onClick={() => handleModeChange('network')}
-          >
-            네트워크
-          </button>
-        </div>
+        <span
+          className={`workspace-page__status-badge${
+            participating ? ' workspace-page__status-badge--network' : ''
+          }`}
+        >
+          {participating ? '네트워크 참여 · 그룹 목표' : '개인 고정 전략'}
+        </span>
         <span className="workspace-page__toolbar-meta">
           총 평가 {formatCurrency(allocation.totalValuedAmount)}
         </span>
       </div>
 
-      {rebalanceMode === 'fixed' && (
+      {participating ? (
+        <section className="workspace-section">
+          <h3 className="workspace-section__title">그룹 목표</h3>
+          <p className="workspace-section__desc">
+            Network Data Pool에서 <strong>네트워크 참여</strong>를 켜면 비중이 자동 업로드되고,
+            아래 그룹 평균이 목표로 적용됩니다. 목표 방식(최신 / N일 평균)은 Data Pool 패널에서
+            변경할 수 있습니다.
+          </p>
+          <p className="dashboard__rebalance-hint workspace-section__desc">
+            {networkLoading
+              ? '그룹 비중 불러오는 중…'
+              : networkError
+                ? networkError
+                : formatNetworkHint()}
+          </p>
+        </section>
+      ) : (
         <section className="workspace-section">
           <h3 className="workspace-section__title">전략 프리셋</h3>
           <p className="workspace-section__desc">
-            프리셋을 불러오면 <strong>고정 전략</strong> 목표 비중이 바뀝니다.
+            프리셋을 불러오면 개인 고정 전략 목표 비중이 바뀝니다.
             {activePreset && (
               <>
                 {' '}
@@ -205,27 +142,10 @@ function Rebalancing({ assets = [], prices = [] }) {
         </section>
       )}
 
-      {rebalanceMode === 'network' && (
-        <section className="workspace-section">
-          <h3 className="workspace-section__title">네트워크 목표</h3>
-          <NetworkTargetControls
-            targetMode={networkTargetMode}
-            windowDays={networkWindowDays}
-            onTargetModeChange={handleNetworkTargetModeChange}
-            onWindowDaysChange={handleNetworkWindowDaysChange}
-          />
-          <p className="dashboard__rebalance-hint workspace-section__desc">
-            {networkLoading
-              ? '네트워크 비중 불러오는 중…'
-              : networkError
-                ? networkError
-                : formatNetworkBenchmarkHint()}
-          </p>
-        </section>
-      )}
-
       <section className="workspace-section">
-        <h3 className="workspace-section__title">목표 비중</h3>
+        <h3 className="workspace-section__title">
+          {participating ? '그룹 목표 비중' : '목표 비중'}
+        </h3>
         {!targetSumValid && (
           <p className="workspace-page__warn">
             목표 비중 합계가 100%가 아닙니다 ({targetSum.toFixed(1)}%)
