@@ -39,7 +39,9 @@ function Dashboard({
   autoMarketRefresh = true,
   onAutoMarketRefreshChange,
   onAssetsChange,
+  onAssetAdded,
   onTradesChange,
+  onTradeRecorded,
   onNavigate,
   assetFormSlot,
 }) {
@@ -153,6 +155,7 @@ function Dashboard({
                 onTradesChange?.()
                 onAssetsChange?.()
               }}
+              onTradeRecorded={onTradeRecorded}
             />
 
             {summary.valuedCount < assets.length && (

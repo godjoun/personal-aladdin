@@ -9,6 +9,7 @@
  * @param {Object} props
  * @param {Array<Object>} props.assets - 현재 저장된 자산 목록
  * @param {Function} props.onAssetsChange - 저장/삭제 후 App 이 state 를 갱신할 콜백
+ * @param {Function} [props.onAssetAdded] - 자산 저장 성공 시 (삭제 제외)
  */
 
 import { useState } from 'react'
@@ -40,7 +41,7 @@ function formatPrice(value) {
   }).format(value)
 }
 
-function AssetForm({ assets = [], onAssetsChange, hideList = false }) {
+function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false }) {
   // form — 현재 입력 중인 값들 (controlled component)
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState('')
@@ -149,7 +150,11 @@ function AssetForm({ assets = [], onAssetsChange, hideList = false }) {
     // 입력창 초기화 + App 의 assets state 갱신
     setForm(EMPTY_FORM)
     setError('')
-    onAssetsChange()
+    if (onAssetAdded) {
+      onAssetAdded()
+    } else {
+      onAssetsChange()
+    }
   }
 
   /**

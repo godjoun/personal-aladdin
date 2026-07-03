@@ -9,6 +9,7 @@ import CrisisSimulator from './pages/CrisisSimulator.jsx'
 import Rebalancing from './pages/Rebalancing.jsx'
 import Report from './pages/Report.jsx'
 import StationPanel from './components/StationPanel.jsx'
+import NetworkParticipationNudge from './components/NetworkParticipationNudge.jsx'
 import { getAssets } from './services/assetStorage.js'
 import { fetchPricesForAssets } from './services/marketSync.js'
 import {
@@ -25,6 +26,10 @@ import {
   markPassedSlotsCompleted,
 } from './services/marketScheduleSettings.js'
 import { maybeAutoPushToCentral, rememberHomeAppUrl } from './services/stationClient.js'
+import {
+  getNetworkParticipationEnabled,
+  NETWORK_PARTICIPATION_CHANGED,
+} from './services/networkParticipation.js'
 import {
   calculateHoldingValue,
   calculateProfitLoss,
@@ -107,6 +112,13 @@ function App() {
     getAutoMarketRefreshEnabled,
   )
   const [activeView, setActiveView] = useState(APP_VIEWS.dashboard)
+  const [networkNudgeVisible, setNetworkNudgeVisible] = useState(false)
+
+  function maybePromptNetworkParticipation() {
+    if (!getNetworkParticipationEnabled()) {
+      setNetworkNudgeVisible(true)
+    }
+  }
 
   function reloadSnapshots() {
     setSnapshots(getPortfolioSnapshots())
@@ -176,6 +188,28 @@ function App() {
     reloadTrades()
     setMarketPrices(getMarketPrices())
   }, [])
+
+  useEffect(() => {
+    function handleParticipationChange() {
+      if (getNetworkParticipationEnabled()) {
+        setNetworkNudgeVisible(false)
+      }
+    }
+
+    window.addEventListener(NETWORK_PARTICIPATION_CHANGED, handleParticipationChange)
+    return () => {
+      window.removeEventListener(NETWORK_PARTICIPATION_CHANGED, handleParticipationChange)
+    }
+  }, [])
+
+  async function handleAssetAdded() {
+    maybePromptNetworkParticipation()
+    await handleAssetsChange()
+  }
+
+  function handleTradeRecorded() {
+    maybePromptNetworkParticipation()
+  }
 
   async function refreshMarketPrices() {
     const currentAssets = getAssets()
@@ -318,6 +352,11 @@ function App() {
         </div>
       </header>
 
+      <NetworkParticipationNudge
+        visible={networkNudgeVisible}
+        onDismiss={() => setNetworkNudgeVisible(false)}
+      />
+
       <main className="app-main">
         {activeView === APP_VIEWS.dashboard && (
           <Dashboard
@@ -329,12 +368,15 @@ function App() {
             autoMarketRefresh={autoMarketRefresh}
             onAutoMarketRefreshChange={setAutoMarketRefresh}
             onAssetsChange={handleAssetsChange}
+            onAssetAdded={handleAssetAdded}
+            onTradeRecorded={handleTradeRecorded}
             onTradesChange={refreshData}
             onNavigate={setActiveView}
             assetFormSlot={
               <AssetForm
                 assets={assets}
                 onAssetsChange={handleAssetsChange}
+                onAssetAdded={handleAssetAdded}
                 hideList
               />
             }

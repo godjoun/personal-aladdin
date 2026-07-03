@@ -27,7 +27,7 @@ function StationPanel() {
   } = useStationPanel()
 
   return (
-    <section className="station-panel station-panel--compact" aria-label="네트워크 데이터 풀">
+    <section className="station-panel station-panel--compact" id="network-data-pool" aria-label="네트워크 데이터 풀">
       <div className="station-panel__row">
         <div className="station-panel__brand">
           <span className="station-panel__title">Network Data Pool</span>

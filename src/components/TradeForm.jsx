@@ -14,7 +14,7 @@ const EMPTY_TRADE = {
   memo: '',
 }
 
-function TradeForm({ assets = [], onTradesChange }) {
+function TradeForm({ assets = [], onTradesChange, onTradeRecorded }) {
   const [form, setForm] = useState(EMPTY_TRADE)
   const [error, setError] = useState('')
 
@@ -69,6 +69,7 @@ function TradeForm({ assets = [], onTradesChange }) {
     }))
     setError('')
     onTradesChange?.()
+    onTradeRecorded?.()
   }
 
   if (assets.length === 0) {

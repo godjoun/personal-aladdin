@@ -1,0 +1,85 @@
+/**
+ * NetworkParticipationNudge.css
+ */
+
+.network-nudge {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 1.25rem 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(52, 152, 219, 0.45);
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.12) 0%, rgba(52, 152, 219, 0.04) 100%);
+  box-shadow: 0 0 0 1px rgba(52, 152, 219, 0.08);
+}
+
+.network-nudge__title {
+  margin: 0 0 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-accent-blue);
+}
+
+.network-nudge__text {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+  max-width: 52rem;
+}
+
+.network-nudge__text strong {
+  color: var(--color-text);
+}
+
+.network-nudge__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.network-nudge__link {
+  padding: 0.35rem 0.65rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-bg);
+  background: var(--color-accent-blue);
+  border-radius: 4px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.network-nudge__link:hover {
+  filter: brightness(1.08);
+}
+
+.network-nudge__dismiss {
+  padding: 0.35rem 0.65rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .network-nudge {
+    flex-direction: column;
+    margin: 0 0.75rem 0.75rem;
+  }
+
+  .network-nudge__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
