@@ -1,0 +1,21 @@
+# Render.com 원클릭 배포 설정
+# https://render.com 에서 New → Blueprint → 이 repo 연결
+
+services:
+  - type: web
+    name: aladdin-personal
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ADMIN_KEY
+        generateValue: true
+      - key: API_KEY
+        sync: false
+      - key: BASE_URL
+        value: https://apis.data.go.kr/1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo
+      - key: STOCK_BASE_URL
+        value: https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo

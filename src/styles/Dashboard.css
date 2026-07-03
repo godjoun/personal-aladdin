@@ -1,0 +1,754 @@
+/**
+ * Dashboard.css — ALADDIN 1988 터미널 대시보드
+ */
+
+.dashboard {
+  width: 100%;
+}
+
+/* ── 핵심 지표 카드 ───────────────────────────────────── */
+
+.dashboard__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.dashboard__metric-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+  min-height: 90px;
+}
+
+.dashboard__metric-card--gold {
+  border-color: var(--color-primary-dim);
+  background: linear-gradient(135deg, rgba(243, 156, 18, 0.08) 0%, var(--color-surface) 100%);
+}
+
+.dashboard__metric-card--alert {
+  border-color: rgba(255, 77, 77, 0.5);
+  background: var(--color-danger-bg);
+}
+
+.dashboard__metric-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.dashboard__metric-value {
+  font-family: var(--font-mono);
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  text-shadow: 0 0 20px rgba(248, 231, 28, 0.15);
+}
+
+.dashboard__metric-value--gold {
+  color: var(--color-primary-light);
+  text-shadow: 0 0 24px rgba(248, 231, 28, 0.25);
+}
+
+.dashboard__metric-value--danger {
+  color: var(--color-loss);
+}
+
+.dashboard__metric-value--profit {
+  color: var(--color-profit);
+}
+
+.dashboard__metric-value--loss {
+  color: var(--color-loss);
+}
+
+.dashboard__metric-sub {
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+/* ── 툴바 ─────────────────────────────────────────────── */
+
+.dashboard__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard__toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dashboard__auto-refresh {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dashboard__auto-refresh input {
+  margin-top: 0.15rem;
+  accent-color: var(--color-accent-blue);
+}
+
+.dashboard__auto-refresh span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  line-height: 1.35;
+}
+
+.dashboard__auto-refresh small {
+  font-size: 0.62rem;
+  color: var(--color-text-dim);
+}
+
+.dashboard__badge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 0.3rem 0.65rem;
+  color: var(--color-primary-light);
+  border: 1px solid var(--color-primary-dim);
+  border-radius: 4px;
+  background: rgba(243, 156, 18, 0.06);
+}
+
+.dashboard__refresh-btn {
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-bg);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.dashboard__refresh-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.dashboard__refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dashboard__refresh-btn--success {
+  background: #27ae60;
+  border-color: #27ae60;
+}
+
+.dashboard__refresh-btn--error {
+  background: var(--color-loss);
+  border-color: var(--color-loss);
+}
+
+/* ── 워크스페이스 2열 ─────────────────────────────────── */
+
+.dashboard__workspace {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 1rem;
+  align-items: start;
+}
+
+.dashboard__main-panel {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+  padding: 1rem;
+  min-width: 0;
+}
+
+.dashboard__panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dashboard__panel-title {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+}
+
+.dashboard__panel-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  color: var(--color-profit);
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  border-radius: 3px;
+}
+
+/* ── 전략 프리셋 카드 ─────────────────────────────────── */
+
+.dashboard__presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard__preset {
+  position: relative;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg);
+}
+
+.dashboard__preset--gold {
+  border-color: rgba(248, 231, 28, 0.35);
+}
+
+.dashboard__preset--orange {
+  border-color: rgba(243, 156, 18, 0.35);
+}
+
+.dashboard__preset--gray {
+  border-color: var(--color-border);
+}
+
+.dashboard__preset--active {
+  border-color: var(--color-primary);
+  background: rgba(243, 156, 18, 0.06);
+}
+
+.dashboard__preset-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 0.25rem;
+}
+
+.dashboard__preset-desc {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard__preset-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary-dim);
+  border-radius: 3px;
+}
+
+.dashboard__preset-badge--muted {
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+/* ── 사이드바 ─────────────────────────────────────────── */
+
+.dashboard__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dashboard__sidebar-panel {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+}
+
+.dashboard__sidebar-title {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.dashboard__sidebar-empty {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+/* 구조 레이어 막대 */
+.dashboard__structural-bar {
+  display: flex;
+  height: 28px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  margin-bottom: 0.75rem;
+}
+
+.dashboard__structural-segment {
+  min-width: 2px;
+  transition: width 0.4s ease;
+}
+
+.dashboard__layer-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dashboard__layer-item {
+  display: grid;
+  grid-template-columns: 8px 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.72rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.dashboard__layer-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard__layer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.dashboard__layer-name {
+  color: var(--color-text);
+}
+
+.dashboard__layer-weight {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-primary-light);
+}
+
+.dashboard__layer-value {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+}
+
+.dashboard__layer-total {
+  margin-top: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+/* 위기 시뮬레이션 사이드 리스트 */
+.dashboard__crisis-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.dashboard__crisis-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.72rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+.dashboard__crisis-item--worst {
+  border-color: rgba(255, 77, 77, 0.4);
+  background: var(--color-danger-bg);
+}
+
+.dashboard__crisis-name {
+  color: var(--color-text-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard__crisis-rate {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* 리밸런싱 사이드 리스트 */
+.dashboard__rebalance-mode {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard__rebalance-mode-btn {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.dashboard__rebalance-mode-btn--active {
+  color: var(--color-bg);
+  background: var(--color-accent-blue);
+  border-color: var(--color-accent-blue);
+}
+
+.dashboard__rebalance-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.dashboard__rebalance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dashboard__rebalance-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.72rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+.dashboard__rebalance-item--alert {
+  border-color: rgba(243, 156, 18, 0.35);
+  background: rgba(243, 156, 18, 0.05);
+}
+
+.dashboard__rebalance-class {
+  color: var(--color-text);
+}
+
+.dashboard__rebalance-weights {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+/* ── 테이블 ───────────────────────────────────────────── */
+
+.dashboard__notice {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-primary-dim);
+  border-radius: 4px;
+  background: rgba(243, 156, 18, 0.05);
+}
+
+.dashboard__table-section {
+  margin-top: 1rem;
+}
+
+.dashboard__table-title {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.65rem;
+}
+
+.dashboard__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+}
+
+.dashboard__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard__table th,
+.dashboard__table td {
+  padding: 0.6rem 0.75rem;
+  text-align: right;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.dashboard__table th:first-child,
+.dashboard__table td:first-child {
+  text-align: left;
+}
+
+.dashboard__table th {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: var(--color-surface-elevated);
+}
+
+.dashboard__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dashboard__table tbody tr:hover {
+  background: rgba(243, 156, 18, 0.03);
+}
+
+.dashboard__asset-name {
+  display: block;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.dashboard__asset-symbol {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+}
+
+.dashboard__asset-pnl {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  margin-top: 0.15rem;
+}
+
+.dashboard__type-badge {
+  display: inline-block;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--color-accent-blue);
+  background: rgba(52, 152, 219, 0.12);
+  border: 1px solid rgba(52, 152, 219, 0.3);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.dashboard__cell--mono {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+.dashboard__cell--value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-profit);
+}
+
+.dashboard__cell--profit {
+  color: var(--color-profit);
+  font-weight: 600;
+}
+
+.dashboard__cell--loss {
+  color: var(--color-loss);
+  font-weight: 600;
+}
+
+.dashboard__no-price {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: 0.72rem;
+}
+
+.dashboard__delete-btn {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+  font-family: inherit;
+  color: var(--color-loss);
+  background: transparent;
+  border: 1px solid rgba(255, 77, 77, 0.35);
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.dashboard__delete-btn:hover {
+  background: var(--color-danger-bg);
+}
+
+/* ── 빈 상태 ─────────────────────────────────────────── */
+
+.dashboard__empty {
+  padding: 2rem 1.5rem;
+  text-align: center;
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+  font-size: 0.85rem;
+}
+
+.dashboard__empty strong {
+  color: var(--color-primary-light);
+}
+
+.dashboard__empty--spaced {
+  margin-top: 1rem;
+}
+
+/* ── Daily Ledger (블랙록식 일별 원장) ─────────────────── */
+
+.dashboard__ledger {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+}
+
+.dashboard__ledger-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dashboard__ledger-title {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.dashboard__ledger-stats {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dashboard__ledger-stat {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 0.2rem 0.5rem;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+}
+
+.dashboard__ledger-stat--danger {
+  color: var(--color-loss);
+  border-color: rgba(255, 77, 77, 0.35);
+  background: var(--color-danger-bg);
+}
+
+.dashboard__ledger-empty {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.dashboard__table--ledger th,
+.dashboard__table--ledger td {
+  font-size: 0.75rem;
+}
+
+/* ── 반응형 ───────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .dashboard__metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dashboard__workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard__presets {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard__toolbar-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dashboard__refresh-btn {
+    width: 100%;
+  }
+
+  .dashboard__table thead {
+    display: none;
+  }
+
+  .dashboard__table tbody tr {
+    display: block;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .dashboard__table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.3rem 0;
+    border-bottom: none;
+    text-align: right;
+  }
+
+  .dashboard__table td::before {
+    content: attr(data-label);
+    font-weight: 500;
+    color: var(--color-text-muted);
+    margin-right: 1rem;
+  }
+}

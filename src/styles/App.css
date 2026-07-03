@@ -1,0 +1,322 @@
+/**
+ * App.css — ALADDIN 1988 PERSONAL 셸 레이아웃
+ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* ── 헤더 ─────────────────────────────────────────────── */
+
+.aladdin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, #161616 0%, var(--color-bg) 100%);
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 10001;
+}
+
+.aladdin-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.aladdin-header__logo {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-primary-dim);
+  border-radius: 6px;
+  background: rgba(243, 156, 18, 0.08);
+  color: var(--color-primary);
+}
+
+.aladdin-header__logo svg {
+  width: 22px;
+  height: 22px;
+}
+
+.aladdin-header__titles {
+  min-width: 0;
+}
+
+.aladdin-header__title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--color-primary);
+  margin-bottom: 0.15rem;
+}
+
+.aladdin-header__subtitle {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* 네비게이션 탭 */
+.aladdin-nav {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.aladdin-nav__tab {
+  padding: 0.45rem 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.aladdin-nav__tab--active {
+  color: var(--color-bg);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  font-weight: 600;
+}
+
+.aladdin-nav__tab--disabled {
+  opacity: 0.45;
+}
+
+/* 헤더 우측 컨트롤 */
+.aladdin-header__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.aladdin-control {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.aladdin-control input {
+  accent-color: var(--color-primary);
+}
+
+.aladdin-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--color-profit);
+  border: 1px solid rgba(0, 255, 65, 0.3);
+  border-radius: 4px;
+  background: rgba(0, 255, 65, 0.06);
+}
+
+.aladdin-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-profit);
+  box-shadow: 0 0 6px var(--color-profit);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* ── 시스템 배너 행 ───────────────────────────────────── */
+
+.system-banners {
+  display: grid;
+  grid-template-columns: 1fr 1fr minmax(220px, 280px);
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.system-banner {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+}
+
+.system-banner__title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin-bottom: 0.4rem;
+}
+
+.system-banner__text {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+}
+
+.system-monitor {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+}
+
+.system-monitor__title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.system-monitor__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  margin-bottom: 0.3rem;
+}
+
+.system-monitor__row:last-child {
+  margin-bottom: 0;
+}
+
+.system-monitor__label {
+  color: var(--color-text-muted);
+}
+
+.system-monitor__value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-primary-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.system-monitor__value--danger {
+  color: var(--color-loss);
+}
+
+/* ── 메인 영역 ───────────────────────────────────────── */
+
+.app-main {
+  flex: 1;
+  padding: 1rem 1.25rem 2rem;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* 블랙 스크린 — 본문만 가림, 헤더 컨트롤은 항상 접근 가능 */
+.app__black-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: #000;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app__black-screen-hint {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: #444;
+  text-align: center;
+  line-height: 1.8;
+  pointer-events: none;
+  user-select: none;
+}
+
+.app__black-screen-hint span {
+  display: block;
+  font-size: 0.7rem;
+  color: #333;
+}
+
+.app__black-screen-exit {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #888;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+  z-index: 10002;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.app__black-screen-exit:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary-dim);
+}
+
+@media (max-width: 900px) {
+  .system-banners {
+    grid-template-columns: 1fr;
+  }
+
+  .aladdin-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .aladdin-nav {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 0.25rem;
+  }
+}

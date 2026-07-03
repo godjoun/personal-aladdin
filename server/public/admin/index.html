@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ALADDIN Central — Host Console</title>
+    <style>
+      :root {
+        --bg: #0c0c0c;
+        --surface: #141414;
+        --border: #2a2a2a;
+        --text: #e8e6e3;
+        --muted: #7a7f8c;
+        --gold: #f39c12;
+        --green: #00ff41;
+        --red: #ff4d4d;
+        --blue: #3498db;
+        --mono: 'JetBrains Mono', ui-monospace, monospace;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        padding: 1.5rem;
+        line-height: 1.5;
+      }
+      h1 {
+        font-size: 1.1rem;
+        color: var(--gold);
+        letter-spacing: 0.06em;
+        margin-bottom: 0.25rem;
+      }
+      h2 {
+        font-size: 0.85rem;
+        color: var(--gold);
+        margin: 0 0 0.75rem;
+        letter-spacing: 0.04em;
+      }
+      h3 {
+        font-size: 0.78rem;
+        color: var(--muted);
+        margin: 1rem 0 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+      .guide {
+        font-size: 0.82rem;
+        color: var(--muted);
+        margin: 0;
+        padding-left: 1.1rem;
+      }
+      .guide li { margin-bottom: 0.35rem; }
+      .guide strong { color: var(--text); }
+      .panel {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--surface);
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
+      label { font-size: 0.75rem; color: var(--muted); display: block; margin-bottom: 0.35rem; }
+      input {
+        width: 100%;
+        max-width: 400px;
+        padding: 0.55rem 0.7rem;
+        background: #0a0a0a;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.85rem;
+      }
+      button, .btn-link {
+        margin-top: 0;
+        padding: 0.45rem 0.75rem;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #0c0c0c;
+        background: var(--gold);
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      #loadBtn { margin-top: 0.65rem; }
+      .btn-link {
+        display: inline-block;
+        color: var(--gold);
+        background: transparent;
+        border: 1px solid var(--border);
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 0.65rem;
+        margin-bottom: 0.5rem;
+      }
+      .metric {
+        padding: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: #0a0a0a;
+      }
+      .metric__label {
+        font-size: 0.65rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        margin-bottom: 0.35rem;
+      }
+      .metric__value {
+        font-family: var(--mono);
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--gold);
+      }
+      .metric__value--sm { font-size: 0.8rem; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+      }
+      th, td {
+        padding: 0.55rem 0.65rem;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+      th { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; }
+      td.num, th.num { text-align: right; font-family: var(--mono); }
+      .ok { color: var(--green); }
+      .warn { color: var(--red); }
+      .muted { color: var(--muted); }
+      .mono { font-family: var(--mono); font-size: 0.75rem; }
+      .bar-row {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        margin-bottom: 0.45rem;
+        font-size: 0.78rem;
+      }
+      .bar-track {
+        flex: 1;
+        height: 8px;
+        background: #0a0a0a;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .bar-fill { height: 100%; background: var(--blue); }
+      pre {
+        overflow: auto;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        background: #0a0a0a;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 0.75rem;
+        max-height: 280px;
+      }
+      .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.5rem;
+      }
+      .detail-header h2 { margin-bottom: 0; }
+      .badge {
+        display: inline-block;
+        padding: 0.2rem 0.45rem;
+        border-radius: 3px;
+        font-size: 0.68rem;
+        font-family: var(--mono);
+        border: 1px solid var(--border);
+      }
+      .badge--ok { color: var(--green); border-color: var(--green); }
+      .badge--warn { color: var(--red); border-color: var(--red); }
+      .empty { color: var(--muted); font-size: 0.8rem; padding: 0.5rem 0; }
+      details { margin-top: 1rem; }
+      summary {
+        cursor: pointer;
+        color: var(--muted);
+        font-size: 0.75rem;
+        margin-bottom: 0.5rem;
+      }
+      .profit { color: var(--green); }
+      .loss { color: var(--red); }
+      .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+      .topbar__titles { flex: 1; min-width: 200px; }
+      .topbar h1 { margin-bottom: 0.25rem; }
+      .topbar .sub { margin-bottom: 0; }
+      .home-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.5rem 0.9rem;
+        font-family: var(--mono);
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--gold);
+        background: #0a0a0a;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .home-link:hover {
+        border-color: var(--gold);
+        background: rgba(243, 156, 18, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">
+      <div class="topbar__titles">
+        <h1>ALADDIN CENTRAL HOST</h1>
+        <p class="sub">호스트 전용 — 친구·스테이션이 업로드한 포트폴리오를 모아 보는 화면입니다.</p>
+      </div>
+      <a id="homeLink" class="home-link" href="/">← ALADDIN 홈으로</a>
+    </div>
+
+    <div class="panel">
+      <h2>데이터 보는 방법</h2>
+      <ol class="guide">
+        <li><strong>ADMIN_KEY</strong> 입력 후 <strong>데이터 불러오기</strong> 클릭</li>
+        <li>위 <strong>Host Intelligence Report</strong>에서 전체 네트워크 집계 확인</li>
+        <li>아래 <strong>Stations</strong> 표에서 <strong>포트폴리오 보기</strong> 클릭 → 종목·거래·비중을 표로 확인</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <label for="adminKey">ADMIN_KEY</label>
+      <input id="adminKey" type="password" placeholder="서버 .env 의 ADMIN_KEY" />
+      <button type="button" id="loadBtn">데이터 불러오기</button>
+    </div>
+
+    <div class="panel" id="reportPanel" hidden>
+      <h2>Host Intelligence Report — 전체 집계</h2>
+      <div class="metrics" id="metrics"></div>
+      <h3>네트워크 자산군 비중</h3>
+      <div id="allocationBars"></div>
+      <h3>스테이션 비교</h3>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>스테이션</th>
+              <th class="num">평가액</th>
+              <th class="num">수익률</th>
+              <th class="num">주식 비중</th>
+              <th>주력 자산군</th>
+              <th>대조</th>
+            </tr>
+          </thead>
+          <tbody id="compareRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Stations — 스테이션 목록</h2>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>스테이션</th>
+              <th>마지막 업로드</th>
+              <th class="num">평가액</th>
+              <th class="num">종목 수</th>
+              <th class="num">주식 비중</th>
+              <th>대조</th>
+              <th>동의 시각</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="stationRows">
+            <tr><td colspan="8" class="mono">ADMIN_KEY 입력 후 불러오기</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" id="detailPanel" hidden>
+      <div class="detail-header">
+        <h2 id="detailTitle">스테이션 포트폴리오</h2>
+        <button type="button" class="btn-link" id="closeDetailBtn">닫기</button>
+      </div>
+      <div class="metrics" id="detailMetrics"></div>
+
+      <h3>자산군 비중</h3>
+      <div id="detailAllocation"></div>
+
+      <h3>보유 종목</h3>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>종목</th>
+              <th>유형</th>
+              <th class="num">수량</th>
+              <th class="num">현재가</th>
+              <th class="num">평가액</th>
+              <th class="num">비중</th>
+              <th class="num">손익</th>
+            </tr>
+          </thead>
+          <tbody id="detailPositions"></tbody>
+        </table>
+      </div>
+
+      <h3>최근 거래 (최대 10건)</h3>
+      <div style="overflow-x:auto">
+        <table>
+          <thead>
+            <tr>
+              <th>일시</th>
+              <th>구분</th>
+              <th>종목</th>
+              <th class="num">수량</th>
+              <th class="num">단가</th>
+              <th>메모</th>
+            </tr>
+          </thead>
+          <tbody id="detailTrades"></tbody>
+        </table>
+      </div>
+
+      <details>
+        <summary>원본 JSON (개발자용)</summary>
+        <pre id="detailJson"></pre>
+      </details>
+    </div>
+
+    <script>
+      const apiBase = window.location.origin
+      const homeLink = document.getElementById('homeLink')
+
+      function resolveHomeUrl() {
+        const remembered = localStorage.getItem('aladdin_home_url')
+        if (remembered) return remembered
+
+        // 로컬 개발: 앱(5173) ↔ 중앙(3001) 분리 실행
+        if (window.location.port === '3001') {
+          return 'http://localhost:5173/'
+        }
+
+        return `${window.location.origin}/`
+      }
+
+      homeLink.href = resolveHomeUrl()
+      const adminKeyInput = document.getElementById('adminKey')
+      const loadBtn = document.getElementById('loadBtn')
+      const stationRows = document.getElementById('stationRows')
+      const compareRows = document.getElementById('compareRows')
+      const detailPanel = document.getElementById('detailPanel')
+      const detailTitle = document.getElementById('detailTitle')
+      const detailMetrics = document.getElementById('detailMetrics')
+      const detailAllocation = document.getElementById('detailAllocation')
+      const detailPositions = document.getElementById('detailPositions')
+      const detailTrades = document.getElementById('detailTrades')
+      const detailJson = document.getElementById('detailJson')
+      const closeDetailBtn = document.getElementById('closeDetailBtn')
+      const reportPanel = document.getElementById('reportPanel')
+      const metrics = document.getElementById('metrics')
+      const allocationBars = document.getElementById('allocationBars')
+
+      adminKeyInput.value = localStorage.getItem('aladdin_admin_key') || ''
+
+      function headers() {
+        return { 'X-Admin-Key': adminKeyInput.value.trim() }
+      }
+
+      function formatWon(value) {
+        if (value == null || Number.isNaN(value)) return '—'
+        return new Intl.NumberFormat('ko-KR').format(Math.round(value)) + '원'
+      }
+
+      function formatPct(value, digits = 1) {
+        if (value == null || Number.isNaN(value)) return '—'
+        const sign = value > 0 ? '+' : ''
+        return `${sign}${value.toFixed(digits)}%`
+      }
+
+      function formatDate(iso) {
+        if (!iso) return '—'
+        return new Date(iso).toLocaleString('ko-KR')
+      }
+
+      function pnlClass(value) {
+        if (value == null || value === 0) return ''
+        return value > 0 ? 'profit' : 'loss'
+      }
+
+      function reconcileLabel(status, mismatchCount) {
+        if (status === 'ok') return '<span class="ok">적정</span>'
+        if (status === 'review_needed') {
+          return `<span class="warn">점검 필요${mismatchCount ? ` (${mismatchCount}건)` : ''}</span>`
+        }
+        return '<span class="muted">—</span>'
+      }
+
+      function getLatestSnapshot(payload) {
+        const snapshots = payload?.snapshots
+        if (!Array.isArray(snapshots) || snapshots.length === 0) return null
+        return [...snapshots].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]
+      }
+
+      function renderAllocationBars(container, groups) {
+        if (!groups?.length) {
+          container.innerHTML = '<p class="empty">비중 데이터 없음</p>'
+          return
+        }
+
+        container.innerHTML = groups
+          .map(
+            (row) => `
+          <div class="bar-row">
+            <span style="width:56px">${row.assetClass}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${Math.min(row.weight, 100)}%"></div></div>
+            <span class="mono">${row.weight.toFixed(1)}% · ${formatWon(row.totalValue)}</span>
+          </div>`,
+          )
+          .join('')
+      }
+
+      function renderReport(report) {
+        reportPanel.hidden = false
+
+        metrics.innerHTML = `
+          <div class="metric"><div class="metric__label">업로드된 스테이션</div><div class="metric__value">${report.syncedStationCount}/${report.stationCount}</div></div>
+          <div class="metric"><div class="metric__label">네트워크 총 평가</div><div class="metric__value">${formatWon(report.totalNetworkAum)}</div></div>
+          <div class="metric"><div class="metric__label">평균 주식 비중</div><div class="metric__value">${report.benchmarks.avgEquityWeight.toFixed(1)}%</div></div>
+          <div class="metric"><div class="metric__label">스테이션당 평균</div><div class="metric__value metric__value--sm">${formatWon(report.benchmarks.avgValuedAmount)}</div></div>
+          <div class="metric"><div class="metric__label">대조 적정</div><div class="metric__value ok">${report.reconciliationSummary.ok}</div></div>
+          <div class="metric"><div class="metric__label">대조 점검</div><div class="metric__value warn">${report.reconciliationSummary.reviewNeeded}</div></div>
+        `
+
+        renderAllocationBars(allocationBars, report.networkAllocation)
+
+        compareRows.innerHTML = (report.stations ?? []).length
+          ? report.stations
+              .map(
+                (s) => `
+            <tr>
+              <td><strong>${s.name}</strong></td>
+              <td class="num">${formatWon(s.totalValuedAmount)}</td>
+              <td class="num ${pnlClass(s.totalReturnRate)}">${formatPct(s.totalReturnRate)}</td>
+              <td class="num">${s.equityWeight.toFixed(1)}%</td>
+              <td>${s.dominantClass}</td>
+              <td>${reconcileLabel(s.reconciliationStatus)}</td>
+            </tr>`,
+              )
+              .join('')
+          : '<tr><td colspan="6" class="empty">비교할 스테이션 없음</td></tr>'
+      }
+
+      function renderDetail(data) {
+        const snapshot = getLatestSnapshot(data.payload)
+        const reconciliation = data.reconciliation
+
+        detailPanel.hidden = false
+        detailTitle.textContent = `${data.name} — 포트폴리오`
+        detailJson.textContent = JSON.stringify(data, null, 2)
+
+        const reconBadge =
+          reconciliation?.status === 'ok'
+            ? '<span class="badge badge--ok">시세 대조 적정</span>'
+            : reconciliation?.status === 'review_needed'
+              ? `<span class="badge badge--warn">시세 대조 점검 (${reconciliation.mismatchCount ?? 0}건)</span>`
+              : '<span class="badge">대조 정보 없음</span>'
+
+        detailMetrics.innerHTML = `
+          <div class="metric"><div class="metric__label">마지막 업로드</div><div class="metric__value metric__value--sm">${formatDate(data.lastSyncAt)}</div></div>
+          <div class="metric"><div class="metric__label">총 평가액</div><div class="metric__value">${formatWon(snapshot?.totalValuedAmount)}</div></div>
+          <div class="metric"><div class="metric__label">총 투자원금</div><div class="metric__value metric__value--sm">${formatWon(snapshot?.totalInvested)}</div></div>
+          <div class="metric"><div class="metric__label">평가 손익</div><div class="metric__value metric__value--sm ${pnlClass(snapshot?.totalProfitLoss)}">${formatWon(snapshot?.totalProfitLoss)}</div></div>
+          <div class="metric"><div class="metric__label">수익률</div><div class="metric__value ${pnlClass(snapshot?.totalReturnRate)}">${formatPct(snapshot?.totalReturnRate)}</div></div>
+          <div class="metric"><div class="metric__label">스냅샷 기준일</div><div class="metric__value metric__value--sm">${snapshot?.date ?? '—'}</div></div>
+          <div class="metric"><div class="metric__label">대조 상태</div><div class="metric__value metric__value--sm">${reconBadge}</div></div>
+          <div class="metric"><div class="metric__label">동의 시각</div><div class="metric__value metric__value--sm">${formatDate(data.payload?.consent?.agreedAt)}</div></div>
+        `
+
+        renderAllocationBars(detailAllocation, snapshot?.allocation)
+
+        const positions = snapshot?.positions ?? []
+        detailPositions.innerHTML = positions.length
+          ? positions
+              .map(
+                (p) => `
+            <tr>
+              <td><strong>${p.name || p.symbol}</strong><br><span class="mono muted">${p.symbol || '—'}</span></td>
+              <td>${p.assetType || '—'}</td>
+              <td class="num">${p.quantity ?? '—'}</td>
+              <td class="num">${p.markPrice != null ? formatWon(p.markPrice) : '—'}</td>
+              <td class="num">${formatWon(p.holdingValue)}</td>
+              <td class="num">${p.weight != null ? p.weight.toFixed(1) + '%' : '—'}</td>
+              <td class="num ${pnlClass(p.profitLoss)}">${formatWon(p.profitLoss)}<br><span class="muted">${formatPct(p.profitRate)}</span></td>
+            </tr>`,
+              )
+              .join('')
+          : '<tr><td colspan="7" class="empty">보유 종목 없음 (가격 새로고침·스냅샷 기록 후 업로드 필요)</td></tr>'
+
+        const trades = [...(data.payload?.trades ?? [])]
+          .sort((a, b) => new Date(b.tradedAt) - new Date(a.tradedAt))
+          .slice(0, 10)
+
+        detailTrades.innerHTML = trades.length
+          ? trades
+              .map(
+                (t) => `
+            <tr>
+              <td class="mono">${formatDate(t.tradedAt)}</td>
+              <td class="${t.side === 'buy' ? 'profit' : 'loss'}">${t.side === 'buy' ? '매수' : '매도'}</td>
+              <td><strong>${t.name || t.symbol}</strong><br><span class="mono muted">${t.symbol || '—'}</span></td>
+              <td class="num">${t.quantity ?? '—'}</td>
+              <td class="num">${t.price != null ? formatWon(t.price) : '—'}</td>
+              <td class="muted">${t.memo || '—'}</td>
+            </tr>`,
+              )
+              .join('')
+          : '<tr><td colspan="6" class="empty">기록된 거래 없음</td></tr>'
+
+        detailPanel.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+
+      async function loadAll() {
+        const adminKey = adminKeyInput.value.trim()
+        localStorage.setItem('aladdin_admin_key', adminKey)
+
+        const [stationsRes, reportRes] = await Promise.all([
+          fetch(`${apiBase}/api/admin/stations`, { headers: headers() }),
+          fetch(`${apiBase}/api/admin/report`, { headers: headers() }),
+        ])
+
+        if (!stationsRes.ok) {
+          const err = await stationsRes.json().catch(() => ({}))
+          stationRows.innerHTML = `<tr><td colspan="8" class="warn">${err.error || stationsRes.status}</td></tr>`
+          reportPanel.hidden = true
+          return
+        }
+
+        const { stations } = await stationsRes.json()
+        const reportData = reportRes.ok ? await reportRes.json() : null
+
+        if (reportData) {
+          renderReport(reportData)
+        } else {
+          reportPanel.hidden = true
+        }
+
+        if (stations.length === 0) {
+          stationRows.innerHTML = '<tr><td colspan="8" class="mono">등록된 스테이션이 없습니다.</td></tr>'
+          return
+        }
+
+        const reportByName = new Map((reportData?.stations ?? []).map((s) => [s.name, s]))
+
+        stationRows.innerHTML = stations
+          .map((s) => {
+            const summary = reportByName.get(s.name)
+            return `
+          <tr>
+            <td><strong>${s.name}</strong></td>
+            <td class="mono">${formatDate(s.lastSyncAt)}</td>
+            <td class="num">${formatWon(summary?.totalValuedAmount ?? s.totalValuedAmount)}</td>
+            <td class="num">${s.assetCount ?? '—'}</td>
+            <td class="num">${summary ? summary.equityWeight.toFixed(1) + '%' : '—'}</td>
+            <td>${reconcileLabel(s.reconciliationStatus, s.mismatchCount)}</td>
+            <td class="mono">${summary?.consentAt ? formatDate(summary.consentAt) : '—'}</td>
+            <td><button type="button" data-id="${s.id}" class="detail-btn">포트폴리오 보기</button></td>
+          </tr>`
+          })
+          .join('')
+
+        document.querySelectorAll('.detail-btn').forEach((btn) => {
+          btn.addEventListener('click', () => loadDetail(btn.dataset.id))
+        })
+      }
+
+      async function loadDetail(id) {
+        const res = await fetch(`${apiBase}/api/admin/stations/${id}`, {
+          headers: headers(),
+        })
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          alert(err.error || '스테이션을 불러오지 못했습니다.')
+          return
+        }
+
+        renderDetail(await res.json())
+      }
+
+      loadBtn.addEventListener('click', loadAll)
+      closeDetailBtn.addEventListener('click', () => {
+        detailPanel.hidden = true
+      })
+    </script>
+  </body>
+</html>
