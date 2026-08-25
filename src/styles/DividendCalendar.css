@@ -1,0 +1,228 @@
+/**
+ * DividendCalendar.css — 배당 달력 v1
+ */
+
+.dividend-calendar__summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dividend-calendar__next {
+  padding: 0.85rem 1rem;
+}
+
+.dividend-calendar__next-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.dividend-calendar__empty {
+  margin: 0;
+}
+
+.dividend-calendar__panel {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface-panel);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dividend-calendar__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.dividend-calendar__month-label {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: 0.03em;
+  min-width: 7.5rem;
+  text-align: center;
+}
+
+.dividend-calendar__nav-btn,
+.dividend-calendar__today-btn {
+  padding: 0.4rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.dividend-calendar__nav-btn:hover,
+.dividend-calendar__today-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary-dim);
+}
+
+.dividend-calendar__today-btn {
+  margin-left: auto;
+  color: var(--color-bg);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.dividend-calendar__today-btn:hover {
+  color: var(--color-bg);
+  filter: brightness(1.05);
+}
+
+.dividend-calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.dividend-calendar__weekday {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-align: center;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.25rem 0;
+}
+
+.dividend-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.dividend-calendar__cell {
+  min-height: 6.5rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: 4px;
+  background: var(--color-bg);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.dividend-calendar__cell--pad {
+  background: transparent;
+  border-color: transparent;
+  min-height: 6.5rem;
+}
+
+.dividend-calendar__cell--today {
+  border-color: rgba(243, 156, 18, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.2);
+}
+
+.dividend-calendar__cell--has-events {
+  background: linear-gradient(
+    180deg,
+    rgba(243, 156, 18, 0.04) 0%,
+    var(--color-bg) 100%
+  );
+}
+
+.dividend-calendar__day-num {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.dividend-calendar__cell--today .dividend-calendar__day-num {
+  color: var(--color-primary);
+}
+
+.dividend-calendar__event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  overflow: auto;
+  max-height: 5.2rem;
+}
+
+.dividend-calendar__event {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding: 0.25rem 0.3rem;
+  border-radius: 3px;
+  border-left: 2px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dividend-calendar__event--estimated {
+  border-left-color: rgba(52, 152, 219, 0.7);
+}
+
+.dividend-calendar__event--confirmed {
+  border-left-color: rgba(243, 156, 18, 0.85);
+}
+
+.dividend-calendar__event--paid {
+  border-left-color: rgba(46, 204, 113, 0.75);
+}
+
+.dividend-calendar__event-name {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.dividend-calendar__event-amount {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--color-text);
+}
+
+.dividend-calendar__event-status {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 900px) {
+  .dividend-calendar__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dividend-calendar__cell,
+  .dividend-calendar__cell--pad {
+    min-height: 5.2rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .dividend-calendar__summary {
+    grid-template-columns: 1fr;
+  }
+
+  .dividend-calendar__today-btn {
+    margin-left: 0;
+  }
+
+  .dividend-calendar__cell {
+    min-height: 4.5rem;
+    padding: 0.25rem;
+  }
+
+  .dividend-calendar__event-name {
+    font-size: 0.6rem;
+  }
+}

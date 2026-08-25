@@ -49,6 +49,17 @@ export {
 } from './tradeStorage.js'
 
 export {
+  getDividendEvents,
+  saveDividendEvents,
+  addDividendEvent,
+  updateDividendEvent,
+  deleteDividendEvent,
+  getDividendEventsByYear,
+  getDividendEventsByMonth,
+  calculateDividendAmount,
+} from './dividendStorage.js'
+
+export {
   addAssetWithInitialTrade,
   recordTrade,
   removeAssetWithTrades,

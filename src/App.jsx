@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import CrisisSimulator from './pages/CrisisSimulator.jsx'
 import Rebalancing from './pages/Rebalancing.jsx'
 import Report from './pages/Report.jsx'
+import DividendCalendar from './pages/DividendCalendar.jsx'
 import StationPanel from './components/StationPanel.jsx'
 import NetworkParticipationNudge from './components/NetworkParticipationNudge.jsx'
 import { getAssets } from './services/assetStorage.js'
@@ -44,6 +45,7 @@ const APP_VIEWS = {
   crisis: 'crisis',
   rebalance: 'rebalance',
   report: 'report',
+  dividend: 'dividend',
 }
 
 const NAV_TABS = [
@@ -51,6 +53,7 @@ const NAV_TABS = [
   { id: APP_VIEWS.crisis, label: '위기 시뮬레이터' },
   { id: APP_VIEWS.rebalance, label: '리밸런싱' },
   { id: APP_VIEWS.report, label: '리포트' },
+  { id: APP_VIEWS.dividend, label: '배당 달력' },
 ]
 
 function runCalculatorTests(prices) {
@@ -395,6 +398,7 @@ function App() {
             snapshots={snapshots}
           />
         )}
+        {activeView === APP_VIEWS.dividend && <DividendCalendar />}
       </main>
     </div>
   )

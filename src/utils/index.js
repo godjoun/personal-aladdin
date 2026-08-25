@@ -57,3 +57,12 @@ export {
 } from './portfolioAnalytics.js'
 
 export { computePositionFromTrades } from './positionEngine.js'
+
+export {
+  parseDividendPaymentDate,
+  getDividendEventAmount,
+  calculateMonthlyDividendSummary,
+  calculateYearPaidDividend,
+  getNextDividendEvent,
+  getDividendStatusLabel,
+} from './dividendCalculator.js'
