@@ -2,6 +2,23 @@
  * DividendCalendar.css — 배당 달력 v1
  */
 
+.dividend-calendar--embedded {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dividend-calendar--embedded .dividend-calendar__panel {
+  border: none;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.dividend-calendar__embedded-header {
+  margin: 0;
+}
+
 .dividend-calendar__summary {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -22,7 +39,7 @@
 
 .dividend-calendar__panel {
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-surface-panel);
   padding: 0.85rem;
   display: flex;
@@ -39,44 +56,42 @@
 
 .dividend-calendar__month-label {
   font-family: var(--font-display);
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: var(--color-primary);
-  letter-spacing: 0.03em;
+  color: var(--color-text);
+  letter-spacing: 0.02em;
   min-width: 7.5rem;
   text-align: center;
 }
 
 .dividend-calendar__nav-btn,
 .dividend-calendar__today-btn {
-  padding: 0.4rem 0.75rem;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
+  padding: 0.45rem 0.8rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--color-text-muted);
-  background: var(--color-bg);
+  color: var(--color-text);
+  background: #f6f8fa;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .dividend-calendar__nav-btn:hover,
 .dividend-calendar__today-btn:hover {
-  color: var(--color-primary);
   border-color: var(--color-primary-dim);
+  color: var(--color-primary);
 }
 
 .dividend-calendar__today-btn {
   margin-left: auto;
-  color: var(--color-bg);
+  color: #fff;
   background: var(--color-primary);
   border-color: var(--color-primary);
 }
 
 .dividend-calendar__today-btn:hover {
-  color: var(--color-bg);
+  color: #fff;
   filter: brightness(1.05);
 }
 
@@ -87,12 +102,9 @@
 }
 
 .dividend-calendar__weekday {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   text-align: center;
   color: var(--color-text-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
   padding: 0.25rem 0;
 }
 
@@ -105,9 +117,9 @@
 .dividend-calendar__cell {
   min-height: 6.5rem;
   border: 1px solid var(--color-border-light);
-  border-radius: 4px;
-  background: var(--color-bg);
-  padding: 0.35rem;
+  border-radius: 6px;
+  background: #fafbfc;
+  padding: 0.4rem;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -120,21 +132,17 @@
 }
 
 .dividend-calendar__cell--today {
-  border-color: rgba(243, 156, 18, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(243, 156, 18, 0.2);
+  border-color: var(--color-primary-dim);
+  box-shadow: inset 0 0 0 1px var(--color-primary-dim);
 }
 
 .dividend-calendar__cell--has-events {
-  background: linear-gradient(
-    180deg,
-    rgba(243, 156, 18, 0.04) 0%,
-    var(--color-bg) 100%
-  );
+  background: #fff;
 }
 
 .dividend-calendar__day-num {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--color-text-muted);
 }
@@ -158,26 +166,26 @@
   display: flex;
   flex-direction: column;
   gap: 0.05rem;
-  padding: 0.25rem 0.3rem;
-  border-radius: 3px;
-  border-left: 2px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.02);
+  padding: 0.28rem 0.35rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--color-border);
+  background: #f6f8fa;
 }
 
 .dividend-calendar__event--estimated {
-  border-left-color: rgba(52, 152, 219, 0.7);
+  border-left-color: #0969da;
 }
 
 .dividend-calendar__event--confirmed {
-  border-left-color: rgba(243, 156, 18, 0.85);
+  border-left-color: #bf8700;
 }
 
 .dividend-calendar__event--paid {
-  border-left-color: rgba(46, 204, 113, 0.75);
+  border-left-color: #1a7f37;
 }
 
 .dividend-calendar__event-name {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-text);
   line-height: 1.25;
@@ -186,15 +194,13 @@
 
 .dividend-calendar__event-amount {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   color: var(--color-text);
 }
 
 .dividend-calendar__event-status {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.68rem;
   color: var(--color-text-muted);
-  letter-spacing: 0.02em;
 }
 
 @media (max-width: 900px) {
@@ -223,6 +229,6 @@
   }
 
   .dividend-calendar__event-name {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
   }
 }

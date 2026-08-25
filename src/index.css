@@ -1,44 +1,39 @@
 /**
- * index.css — 전역(Global) 스타일
- * ALADDIN 1988 PERSONAL — 레트로 터미널 / 사이버펑크 테마
+ * index.css — 전역 스타일
+ * ALADDIN 단순 투자 대시보드 (라이트)
  */
 
 :root {
-  /* 브랜드 */
-  --color-primary: #f39c12;
-  --color-primary-light: #f8e71c;
-  --color-primary-dim: rgba(243, 156, 18, 0.35);
-  --color-accent-blue: #3498db;
-  --color-accent-purple: #9b59b6;
+  --color-primary: #1f6feb;
+  --color-primary-light: #388bfd;
+  --color-primary-dim: rgba(31, 111, 235, 0.25);
+  --color-accent-blue: #1f6feb;
+  --color-accent-purple: #8250df;
 
-  /* 텍스트 */
-  --color-text: #e8e6e3;
-  --color-text-muted: #7a7f8c;
-  --color-text-dim: #5a5f6c;
+  --color-text: #1f2328;
+  --color-text-muted: #656d76;
+  --color-text-dim: #8b949e;
 
-  /* 배경·표면 */
-  --color-bg: #0c0c0c;
-  --color-surface: #141414;
-  --color-surface-elevated: #1a1a1a;
-  --color-surface-panel: rgba(20, 20, 20, 0.85);
+  --color-bg: #f4f5f7;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-panel: #ffffff;
 
-  /* 테두리 */
-  --color-border: #2a2a2a;
-  --color-border-light: rgba(255, 255, 255, 0.08);
+  --color-border: #d8dee4;
+  --color-border-light: #eaeef2;
 
-  /* 상태 색상 */
-  --color-profit: #00ff41;
-  --color-loss: #ff4d4d;
-  --color-warning: #ff6b6b;
-  --color-danger-bg: rgba(255, 77, 77, 0.08);
+  /* 한국 투자 UX: 상승 빨강 / 하락 파랑 계열은 피하고, 가독성 높은 대비 사용 */
+  --color-profit: #c62828;
+  --color-loss: #1565c0;
+  --color-warning: #b45309;
+  --color-danger-bg: rgba(198, 40, 40, 0.06);
 
-  /* 폰트 */
-  --font-display: 'Orbitron', system-ui, sans-serif;
-  --font-sans: system-ui, -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+  --font-display: 'IBM Plex Sans', 'Noto Sans KR', sans-serif;
+  --font-sans: 'IBM Plex Sans', 'Noto Sans KR', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace;
 
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   color: var(--color-text);
   background-color: var(--color-bg);
@@ -94,32 +89,11 @@ code {
   font-size: 0.9em;
   padding: 0.15em 0.4em;
   border-radius: 3px;
-  background-color: var(--color-surface-elevated);
+  background-color: #eef1f4;
   border: 1px solid var(--color-border);
 }
 
-/* CRT 스캔라인 오버레이 */
+/* CRT 오버레이 클래스는 파일 유지용 — UI 에서는 미사용 */
 .crt-overlay {
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(0, 0, 0, 0.18) 0px,
-    rgba(0, 0, 0, 0.18) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-}
-
-.crt-overlay--on {
-  opacity: 0.45;
-}
-
-/* CRT 활성 시 미세한 화면 글로우 */
-.app--crt .app-main {
-  text-shadow: 0 0 1px rgba(243, 156, 18, 0.15);
+  display: none;
 }

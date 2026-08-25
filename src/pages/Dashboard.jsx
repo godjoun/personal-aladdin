@@ -1,60 +1,70 @@
 /**
- * Dashboard.jsx — 포트폴리오 메인 화면
+ * Dashboard.jsx — 단일 개인 투자 대시보드
  */
 
 import { useEffect, useState } from 'react'
+import AssetForm from '../components/AssetForm.jsx'
+import TradeForm from '../components/TradeForm.jsx'
+import HoldingsTable from '../components/dashboard/HoldingsTable.jsx'
+import DividendCalendar from './DividendCalendar.jsx'
 import { removeAssetWithTrades } from '../services/tradeService.js'
-import { calculateAssetClassAllocation } from '../utils/calculator.js'
+import { getDividendEvents } from '../services/dividendStorage.js'
 import {
   buildAssetRows,
   calculatePortfolioSummary,
 } from '../utils/portfolioRows.js'
-import { simulateCrisisScenarios } from '../utils/riskEngine.js'
 import {
-  analyzeRebalancing,
-  getTargetWeightSum,
-} from '../utils/rebalanceEngine.js'
-import { useNetworkRebalance } from '../hooks/useNetworkRebalance.js'
-import DashboardMetrics from '../components/dashboard/DashboardMetrics.jsx'
-import DashboardToolbar, { REFRESH_STATUS } from '../components/dashboard/DashboardToolbar.jsx'
-import HoldingsTable from '../components/dashboard/HoldingsTable.jsx'
-import DashboardSidebar from '../components/dashboard/DashboardSidebar.jsx'
-import NetworkComparePanel from '../components/dashboard/NetworkComparePanel.jsx'
-import PortfolioChart from '../components/PortfolioChart.jsx'
-import PortfolioLedger from '../components/PortfolioLedger.jsx'
-import TradeForm from '../components/TradeForm.jsx'
+  calculateMonthlyDividendSummary,
+  calculateYearPaidDividend,
+  getDividendEventAmount,
+  getDividendStatusLabel,
+  getNextDividendEvent,
+} from '../utils/dividendCalculator.js'
+import {
+  formatCurrency,
+  formatPercent,
+  formatProfitLoss,
+  getPnlClass,
+} from '../utils/formatters.js'
 import '../styles/Dashboard.css'
 
-function getMaxWeightDeviation(rebalance) {
-  if (!rebalance.items.length) return 0
-  return Math.max(...rebalance.items.map((item) => Math.abs(item.difference)))
+const REFRESH_STATUS = {
+  IDLE: 'idle',
+  LOADING: 'loading',
+  SUCCESS: 'success',
+  ERROR: 'error',
+}
+
+const REFRESH_LABELS = {
+  [REFRESH_STATUS.IDLE]: '시세 갱신',
+  [REFRESH_STATUS.LOADING]: '갱신 중…',
+  [REFRESH_STATUS.SUCCESS]: '갱신 완료',
+  [REFRESH_STATUS.ERROR]: '갱신 실패',
+}
+
+function formatUpdatedAt(date) {
+  if (!date) return '—'
+  return new Intl.DateTimeFormat('ko-KR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
 }
 
 function Dashboard({
   prices = [],
   assets = [],
-  snapshots = [],
-  trades = [],
   onRefreshPrices,
-  autoMarketRefresh = true,
-  onAutoMarketRefreshChange,
+  lastUpdatedAt = null,
   onAssetsChange,
   onAssetAdded,
   onTradesChange,
   onTradeRecorded,
-  onNavigate,
-  assetFormSlot,
 }) {
   const [refreshStatus, setRefreshStatus] = useState(REFRESH_STATUS.IDLE)
-  const {
-    participating,
-    networkLoading,
-    networkError,
-    refreshNetworkBenchmark,
-    getActiveTargets,
-    formatNetworkHint,
-    targetSource,
-  } = useNetworkRebalance()
+  const [managePanel, setManagePanel] = useState(null)
 
   useEffect(() => {
     if (
@@ -70,10 +80,8 @@ function Dashboard({
     if (refreshStatus === REFRESH_STATUS.LOADING) return
 
     setRefreshStatus(REFRESH_STATUS.LOADING)
-
     try {
       await onRefreshPrices()
-      await refreshNetworkBenchmark()
       setRefreshStatus(REFRESH_STATUS.SUCCESS)
     } catch (error) {
       console.error('[Dashboard] 시세 갱신 실패:', error)
@@ -87,68 +95,188 @@ function Dashboard({
     onTradesChange?.()
   }
 
+  function toggleManagePanel(panel) {
+    setManagePanel((current) => (current === panel ? null : panel))
+  }
+
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+
   const assetRows = buildAssetRows(assets, prices)
   const summary = calculatePortfolioSummary(assetRows)
-  const allocation = calculateAssetClassAllocation(assetRows)
-  const crisisSimulation = simulateCrisisScenarios(allocation)
-  const activeTargets = getActiveTargets()
-  const rebalanceCheck = analyzeRebalancing(allocation, activeTargets)
-  const targetSum = getTargetWeightSum(activeTargets)
-  const targetSumValid =
-    targetSource === 'fixed' ? Math.abs(targetSum - 100) < 0.01 : targetSum > 0
-  const maxDeviation = getMaxWeightDeviation(rebalanceCheck)
-  const worstScenario = crisisSimulation.scenarios.find(
-    (s) => s.id === crisisSimulation.worstScenarioId,
+
+  const totalHoldingValue = summary.totalHoldingValue
+  const totalInvested = summary.totalInvested
+  const totalProfitLoss = totalHoldingValue - totalInvested
+  const totalReturnRate =
+    totalInvested > 0 ? (totalProfitLoss / totalInvested) * 100 : null
+
+  const dividendEvents = getDividendEvents()
+  const monthlyDividend = calculateMonthlyDividendSummary(
+    dividendEvents,
+    year,
+    month,
   )
-  const rebalanceStatus = !targetSumValid
-    ? '설정 오류'
-    : rebalanceCheck.reviewCount > 0
-      ? '점검 필요'
-      : '적정'
-  const hasValuation = allocation.totalValuedAmount > 0
+  const thisMonthDividend =
+    monthlyDividend.estimated + monthlyDividend.confirmed + monthlyDividend.paid
+  const yearPaidDividend = calculateYearPaidDividend(dividendEvents, year)
+  const nextDividend = getNextDividendEvent(dividendEvents, now)
 
   return (
-    <div className="dashboard" aria-label="포트폴리오">
-      <DashboardMetrics
-        totalHoldingValue={summary.totalHoldingValue}
-        worstScenario={worstScenario}
-        maxDeviation={maxDeviation}
-        rebalanceStatus={rebalanceStatus}
-        targetSumValid={targetSumValid}
-        targetSum={targetSum}
-      />
-
-      <NetworkComparePanel
-        participating={participating}
-        networkLoading={networkLoading}
-        networkError={networkError}
-        formatNetworkHint={formatNetworkHint}
-        rebalanceCheck={rebalanceCheck}
-        hasValuation={hasValuation}
-      />
-
-      <DashboardToolbar
-        assetCount={assets.length}
-        priceCount={prices.length}
-        autoMarketRefresh={autoMarketRefresh}
-        onAutoMarketRefreshChange={onAutoMarketRefreshChange}
-        refreshStatus={refreshStatus}
-        onRefresh={handleRefreshPrices}
-      />
-
-      {assets.length === 0 ? (
-        <div className="dashboard__empty">
-          <p>
-            등록된 자산이 없습니다.
-            <br />
-            아래 폼에서 <strong>자산을 추가</strong>해 주세요.
-          </p>
+    <div className="simple-dash" aria-label="내 투자 대시보드">
+      <header className="simple-dash__header">
+        <div className="simple-dash__brand">
+          <h1 className="simple-dash__title">ALADDIN</h1>
+          <p className="simple-dash__subtitle">내 투자 대시보드</p>
         </div>
-      ) : (
-        <div className="dashboard__workspace">
-          <div className="dashboard__main-panel">
-            {assetFormSlot}
+        <div className="simple-dash__header-actions">
+          <p className="simple-dash__updated">
+            마지막 업데이트
+            <span>{formatUpdatedAt(lastUpdatedAt)}</span>
+          </p>
+          <button
+            type="button"
+            className={`simple-dash__refresh simple-dash__refresh--${refreshStatus}`}
+            onClick={handleRefreshPrices}
+            disabled={refreshStatus === REFRESH_STATUS.LOADING}
+          >
+            {REFRESH_LABELS[refreshStatus]}
+          </button>
+        </div>
+      </header>
 
+      <section className="simple-dash__metrics" aria-label="요약">
+        <article className="simple-dash__metric">
+          <p className="simple-dash__metric-label">총 평가자산</p>
+          <p className="simple-dash__metric-value">
+            {formatCurrency(totalHoldingValue)}
+          </p>
+        </article>
+        <article className="simple-dash__metric">
+          <p className="simple-dash__metric-label">총 투자원금</p>
+          <p className="simple-dash__metric-value">
+            {formatCurrency(totalInvested)}
+          </p>
+        </article>
+        <article className="simple-dash__metric">
+          <p className="simple-dash__metric-label">총 평가손익</p>
+          <p
+            className={`simple-dash__metric-value ${getPnlClass(totalProfitLoss)}`}
+          >
+            {formatProfitLoss(totalProfitLoss)}
+          </p>
+        </article>
+        <article className="simple-dash__metric">
+          <p className="simple-dash__metric-label">총 수익률</p>
+          <p
+            className={`simple-dash__metric-value ${getPnlClass(totalReturnRate)}`}
+          >
+            {formatPercent(totalReturnRate)}
+          </p>
+        </article>
+        <article className="simple-dash__metric">
+          <p className="simple-dash__metric-label">이번 달 배당</p>
+          <p className="simple-dash__metric-value">
+            {formatCurrency(thisMonthDividend)}
+          </p>
+        </article>
+        <article className="simple-dash__metric">
+          <p className="simple-dash__metric-label">올해 누적 배당</p>
+          <p className="simple-dash__metric-value">
+            {formatCurrency(yearPaidDividend)}
+          </p>
+        </article>
+      </section>
+
+      <section className="simple-dash__mid" aria-label="보유 종목과 다음 배당">
+        <div className="simple-dash__card simple-dash__holdings">
+          {assets.length === 0 ? (
+            <div className="simple-dash__empty">
+              <p>등록된 보유 종목이 없습니다.</p>
+              <p className="simple-dash__empty-hint">
+                아래 관리 영역에서 자산을 추가해 주세요.
+              </p>
+            </div>
+          ) : (
+            <HoldingsTable
+              assetRows={assetRows}
+              onDeleteAsset={handleDeleteAsset}
+            />
+          )}
+        </div>
+
+        <aside className="simple-dash__card simple-dash__next-dividend">
+          <h2 className="simple-dash__section-title">다음 배당</h2>
+          {nextDividend ? (
+            <div className="simple-dash__next-body">
+              <p className="simple-dash__next-name">
+                {nextDividend.fundName || nextDividend.symbol || '—'}
+              </p>
+              <dl className="simple-dash__next-meta">
+                <div>
+                  <dt>지급 예정일</dt>
+                  <dd>{nextDividend.paymentDate || '—'}</dd>
+                </div>
+                <div>
+                  <dt>예상/확정 금액</dt>
+                  <dd>{formatCurrency(getDividendEventAmount(nextDividend))}</dd>
+                </div>
+                <div>
+                  <dt>상태</dt>
+                  <dd>{getDividendStatusLabel(nextDividend.status)}</dd>
+                </div>
+              </dl>
+            </div>
+          ) : (
+            <p className="simple-dash__empty-hint">예정된 배당이 없습니다.</p>
+          )}
+        </aside>
+      </section>
+
+      <section className="simple-dash__card simple-dash__calendar" aria-label="배당 달력">
+        <DividendCalendar embedded />
+      </section>
+
+      <section className="simple-dash__card simple-dash__manage" aria-label="관리">
+        <h2 className="simple-dash__section-title">관리</h2>
+        <div className="simple-dash__manage-actions">
+          <button
+            type="button"
+            className={`simple-dash__manage-btn${
+              managePanel === 'asset' ? ' simple-dash__manage-btn--active' : ''
+            }`}
+            onClick={() => toggleManagePanel('asset')}
+            aria-expanded={managePanel === 'asset'}
+          >
+            + 자산 추가
+          </button>
+          <button
+            type="button"
+            className={`simple-dash__manage-btn${
+              managePanel === 'trade' ? ' simple-dash__manage-btn--active' : ''
+            }`}
+            onClick={() => toggleManagePanel('trade')}
+            aria-expanded={managePanel === 'trade'}
+            disabled={assets.length === 0}
+          >
+            + 거래 기록
+          </button>
+        </div>
+
+        {managePanel === 'asset' && (
+          <div className="simple-dash__manage-panel">
+            <AssetForm
+              assets={assets}
+              onAssetsChange={onAssetsChange}
+              onAssetAdded={onAssetAdded}
+              hideList
+            />
+          </div>
+        )}
+
+        {managePanel === 'trade' && (
+          <div className="simple-dash__manage-panel">
             <TradeForm
               assets={assets}
               onTradesChange={() => {
@@ -157,43 +285,9 @@ function Dashboard({
               }}
               onTradeRecorded={onTradeRecorded}
             />
-
-            {summary.valuedCount < assets.length && (
-              <p className="dashboard__notice">
-                {assets.length - summary.valuedCount}건은 시세 없음 — 평가에서 제외
-              </p>
-            )}
-
-            <HoldingsTable
-              assetRows={assetRows}
-              allocation={allocation}
-              onDeleteAsset={handleDeleteAsset}
-            />
           </div>
-
-          <DashboardSidebar
-            allocation={allocation}
-            trades={trades}
-            participating={participating}
-            networkLoading={networkLoading}
-            networkError={networkError}
-            formatNetworkHint={formatNetworkHint}
-            rebalanceCheck={rebalanceCheck}
-            onNavigate={onNavigate}
-          />
-        </div>
-      )}
-
-      {assets.length === 0 && assetFormSlot}
-
-      {assets.length > 0 && prices.length === 0 && (
-        <div className="dashboard__empty dashboard__empty--spaced">
-          <p>시세 데이터가 없습니다. API 설정 후 <strong>시세 갱신</strong>을 눌러 주세요.</p>
-        </div>
-      )}
-
-      <PortfolioChart snapshots={snapshots} />
-      <PortfolioLedger snapshots={snapshots} />
+        )}
+      </section>
     </div>
   )
 }

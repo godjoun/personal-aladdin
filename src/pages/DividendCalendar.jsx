@@ -94,7 +94,7 @@ function groupEventsByPaymentDate(events, year, month) {
   return map
 }
 
-function DividendCalendar() {
+function DividendCalendar({ embedded = false }) {
   const now = new Date()
   const [viewYear, setViewYear] = useState(now.getFullYear())
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1)
@@ -106,10 +106,15 @@ function DividendCalendar() {
     [viewYear, viewMonth],
   )
   const eventsByDate = groupEventsByPaymentDate(events, viewYear, viewMonth)
-  const monthlySummary = calculateMonthlyDividendSummary(events, viewYear, viewMonth)
-  const yearPaid = calculateYearPaidDividend(events, viewYear)
-  const nextEvent = getNextDividendEvent(events, new Date())
   const isEmpty = events.length === 0
+
+  const monthlySummary = embedded
+    ? null
+    : calculateMonthlyDividendSummary(events, viewYear, viewMonth)
+  const yearPaid = embedded
+    ? null
+    : calculateYearPaidDividend(events, viewYear)
+  const nextEvent = embedded ? null : getNextDividendEvent(events, new Date())
 
   function goPrevMonth() {
     const next = shiftMonth(viewYear, viewMonth, -1)
@@ -132,59 +137,71 @@ function DividendCalendar() {
   const todayKey = toDateKey(now.getFullYear(), now.getMonth() + 1, now.getDate())
 
   return (
-    <div className="workspace-page dividend-calendar">
-      <header className="workspace-page__header">
-        <h2 className="workspace-page__title">배당 달력</h2>
-        <p className="workspace-page__desc">
-          등록된 배당 일정을 paymentDate 기준으로 월별 확인합니다. (로컬 저장 · API 없음)
-        </p>
-      </header>
-
-      <section
-        className="workspace-page__summary workspace-page__summary--4 dividend-calendar__summary"
-        aria-label="배당 요약"
-      >
-        <article className="workspace-page__summary-card">
-          <p className="workspace-page__summary-label">이번 달 예상</p>
-          <p className="workspace-page__summary-value">
-            {formatCurrency(monthlySummary.estimated)}
-          </p>
-        </article>
-        <article className="workspace-page__summary-card">
-          <p className="workspace-page__summary-label">이번 달 확정</p>
-          <p className="workspace-page__summary-value">
-            {formatCurrency(monthlySummary.confirmed)}
-          </p>
-        </article>
-        <article className="workspace-page__summary-card">
-          <p className="workspace-page__summary-label">이번 달 지급완료</p>
-          <p className="workspace-page__summary-value">
-            {formatCurrency(monthlySummary.paid)}
-          </p>
-        </article>
-        <article className="workspace-page__summary-card">
-          <p className="workspace-page__summary-label">올해 누적 지급액</p>
-          <p className="workspace-page__summary-value">{formatCurrency(yearPaid)}</p>
-          <p className="workspace-page__summary-sub">{viewYear}년 · PAID만 합산</p>
-        </article>
-      </section>
-
-      <section className="workspace-page__summary-card dividend-calendar__next">
-        <p className="workspace-page__summary-label">다음 지급 예정</p>
-        {nextEvent ? (
-          <div className="dividend-calendar__next-body">
-            <p className="workspace-page__summary-value">
-              {nextEvent.fundName || nextEvent.symbol || '—'}
+    <div
+      className={`dividend-calendar${embedded ? ' dividend-calendar--embedded' : ' workspace-page'}`}
+    >
+      {!embedded && (
+        <>
+          <header className="workspace-page__header">
+            <h2 className="workspace-page__title">배당 달력</h2>
+            <p className="workspace-page__desc">
+              등록된 배당 일정을 paymentDate 기준으로 월별 확인합니다. (로컬 저장 · API 없음)
             </p>
-            <p className="workspace-page__summary-sub">
-              {nextEvent.paymentDate} · {formatCurrency(getDividendEventAmount(nextEvent))} ·{' '}
-              {getDividendStatusLabel(nextEvent.status)}
-            </p>
-          </div>
-        ) : (
-          <p className="workspace-page__summary-sub">예정된 지급이 없습니다.</p>
-        )}
-      </section>
+          </header>
+
+          <section
+            className="workspace-page__summary workspace-page__summary--4 dividend-calendar__summary"
+            aria-label="배당 요약"
+          >
+            <article className="workspace-page__summary-card">
+              <p className="workspace-page__summary-label">이번 달 예상</p>
+              <p className="workspace-page__summary-value">
+                {formatCurrency(monthlySummary.estimated)}
+              </p>
+            </article>
+            <article className="workspace-page__summary-card">
+              <p className="workspace-page__summary-label">이번 달 확정</p>
+              <p className="workspace-page__summary-value">
+                {formatCurrency(monthlySummary.confirmed)}
+              </p>
+            </article>
+            <article className="workspace-page__summary-card">
+              <p className="workspace-page__summary-label">이번 달 지급완료</p>
+              <p className="workspace-page__summary-value">
+                {formatCurrency(monthlySummary.paid)}
+              </p>
+            </article>
+            <article className="workspace-page__summary-card">
+              <p className="workspace-page__summary-label">올해 누적 지급액</p>
+              <p className="workspace-page__summary-value">{formatCurrency(yearPaid)}</p>
+              <p className="workspace-page__summary-sub">{viewYear}년 · PAID만 합산</p>
+            </article>
+          </section>
+
+          <section className="workspace-page__summary-card dividend-calendar__next">
+            <p className="workspace-page__summary-label">다음 지급 예정</p>
+            {nextEvent ? (
+              <div className="dividend-calendar__next-body">
+                <p className="workspace-page__summary-value">
+                  {nextEvent.fundName || nextEvent.symbol || '—'}
+                </p>
+                <p className="workspace-page__summary-sub">
+                  {nextEvent.paymentDate} · {formatCurrency(getDividendEventAmount(nextEvent))} ·{' '}
+                  {getDividendStatusLabel(nextEvent.status)}
+                </p>
+              </div>
+            ) : (
+              <p className="workspace-page__summary-sub">예정된 지급이 없습니다.</p>
+            )}
+          </section>
+        </>
+      )}
+
+      {embedded && (
+        <header className="dividend-calendar__embedded-header">
+          <h2 className="simple-dash__section-title">배당 달력</h2>
+        </header>
+      )}
 
       {isEmpty && (
         <p className="workspace-page__empty dividend-calendar__empty">
