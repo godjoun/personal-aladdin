@@ -7,10 +7,14 @@ import AssetForm from '../components/AssetForm.jsx'
 import TradeForm from '../components/TradeForm.jsx'
 import DividendForm from '../components/DividendForm.jsx'
 import HoldingsTable from '../components/dashboard/HoldingsTable.jsx'
+import StockBriefingDrawer from '../components/dashboard/StockBriefingDrawer.jsx'
 import DividendCalendar from './DividendCalendar.jsx'
 import { removeAssetWithTrades } from '../services/tradeService.js'
 import { fetchKiwoomBalances } from '../services/kiwoomApi.js'
 import { syncKiwoomDividends } from '../services/kiwoomDividendSync.js'
+import {
+  fetchAttentionSummary,
+} from '../services/stockBriefingApi.js'
 import {
   deleteDividendEvent,
   getDividendEvents,
@@ -176,6 +180,25 @@ function Dashboard({
   const [detailEvent, setDetailEvent] = useState(null)
   const [dayDetail, setDayDetail] = useState(null)
   const [syncedAt, setSyncedAt] = useState(lastUpdatedAt)
+  const [briefingSymbol, setBriefingSymbol] = useState(null)
+  const [attentionItems, setAttentionItems] = useState([])
+
+  async function loadAttentionSummary(rows) {
+    try {
+      const unique = []
+      const seen = new Set()
+      for (const row of rows || []) {
+        const symbol = String(row.symbol || '').trim()
+        if (!symbol || seen.has(symbol)) continue
+        seen.add(symbol)
+        unique.push({ symbol, name: row.name })
+      }
+      const summary = await fetchAttentionSummary(unique)
+      setAttentionItems(Array.isArray(summary?.items) ? summary.items : [])
+    } catch {
+      // 주의사항 실패는 대시보드를 막지 않음
+    }
+  }
 
   async function loadKiwoomBalances({ preserveOnFail = true } = {}) {
     setKiwoomStatus(KIWOOM_STATUS.LOADING)
@@ -190,7 +213,7 @@ function Dashboard({
           ])
         }
         setKiwoomStatus(KIWOOM_STATUS.ERROR)
-        return false
+        return { ok: false, holdings: [] }
       }
       setKiwoomHoldings(result.holdings)
       setWithdrawableByAccount(
@@ -205,7 +228,7 @@ function Dashboard({
       const now = new Date()
       setSyncedAt(now)
       onKiwoomSynced?.(now)
-      return true
+      return { ok: true, holdings: result.holdings }
     } catch (error) {
       console.error('[Dashboard] 키움 잔고 조회 실패:', error.message)
       if (!preserveOnFail) {
@@ -216,7 +239,7 @@ function Dashboard({
         ])
       }
       setKiwoomStatus(KIWOOM_STATUS.ERROR)
-      return false
+      return { ok: false, holdings: [] }
     }
   }
 
@@ -299,7 +322,8 @@ function Dashboard({
     setSyncStep(SYNC_STEPS.ACCOUNTS)
 
     try {
-      const balanceOk = await loadKiwoomBalances({ preserveOnFail: true })
+      const balanceResult = await loadKiwoomBalances({ preserveOnFail: true })
+      const balanceOk = Boolean(balanceResult?.ok)
 
       setSyncStep(SYNC_STEPS.TRADES)
       let marketOk = false
@@ -317,6 +341,13 @@ function Dashboard({
         await persistManualLedger()
       } catch {
         // 수동 백업 실패는 동기화 전체 실패로 보지 않음
+      }
+
+      // 뉴스/공시 주의사항 — 실패해도 잔고·배당 성공을 뒤집지 않음
+      try {
+        await loadAttentionSummary(balanceResult?.holdings || [])
+      } catch {
+        // ignore
       }
 
       setSyncStep(SYNC_STEPS.DONE)
@@ -424,6 +455,20 @@ function Dashboard({
     () => filterRowsByAccount(assetRows, accountFilter),
     [assetRows, accountFilter],
   )
+
+  const briefingHoldings = useMemo(() => {
+    if (!briefingSymbol) return []
+    return assetRows.filter(
+      (row) =>
+        String(row.symbol || '').replace(/^A/i, '') ===
+        String(briefingSymbol).replace(/^A/i, ''),
+    )
+  }, [assetRows, briefingSymbol])
+
+  const briefingName =
+    briefingHoldings[0]?.name ||
+    attentionItems.find((item) => item.symbol === briefingSymbol)?.name ||
+    briefingSymbol
 
   const summary = useMemo(() => {
     if (usingKiwoom) {
@@ -709,6 +754,9 @@ function Dashboard({
             <HoldingsTable
               assetRows={filteredAssetRows}
               onDeleteAsset={handleDeleteAsset}
+              onSelectAsset={(row) => {
+                if (row?.symbol) setBriefingSymbol(row.symbol)
+              }}
               hideTitle
               accountFilter="all"
               searchQuery={holdingsSearch}
@@ -716,6 +764,37 @@ function Dashboard({
             />
           )}
         </div>
+
+        <section className="simple-dash__attention" aria-label="보유종목 주의사항">
+          <div className="simple-dash__attention-header">
+            <h2 className="simple-dash__section-title">보유종목 주의사항</h2>
+            <span className="simple-dash__attention-count">
+              {attentionItems.length}건
+            </span>
+          </div>
+          {attentionItems.length === 0 ? (
+            <p className="simple-dash__muted">현재 확인된 주요 주의사항 없음</p>
+          ) : (
+            <ul className="simple-dash__attention-list">
+              {attentionItems.map((item) => (
+                <li key={`${item.symbol}-${item.title}`}>
+                  <button
+                    type="button"
+                    className="simple-dash__attention-item"
+                    onClick={() => item.symbol && setBriefingSymbol(item.symbol)}
+                  >
+                    <strong>{item.name || item.symbol}</strong>
+                    <span>
+                      {item.source === 'disclosure' ? '공시' : '뉴스'} ·{' '}
+                      {item.title}
+                    </span>
+                    <span className="simple-dash__muted">{item.evidence}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         <aside
           className={`simple-dash__card simple-dash__next-dividend${
@@ -1026,6 +1105,14 @@ function Dashboard({
           </div>
         </div>
       )}
+
+      <StockBriefingDrawer
+        open={Boolean(briefingSymbol)}
+        symbol={briefingSymbol}
+        stockName={briefingName}
+        holdings={briefingHoldings}
+        onClose={() => setBriefingSymbol(null)}
+      />
     </div>
   )
 }

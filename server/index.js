@@ -11,6 +11,11 @@ import { config } from 'dotenv'
 import { proxyPublicData } from './marketProxy.js'
 import { getKiwoomAuthStatus, getKiwoomBalances, searchKiwoomStocks } from './kiwoomClient.js'
 import { getKiwoomDividendPayments } from './kiwoomTransactions.js'
+import {
+  getHoldingsAttentionSummary,
+  getStockBriefing,
+} from './briefing/stockBriefing.js'
+import { getBriefingIntegrationStatus } from './briefing/briefingStatus.js'
 import { getDb } from './db.js'
 import {
   deleteDividendEventById,
@@ -58,9 +63,13 @@ import {
 } from './security/csrf.js'
 import { clearCookie, parseCookieHeader, setCookie } from './security/cookies.js'
 import {
+  asAccountType,
   asDate,
   asId,
+  asNonNegativeNumber,
   asSearchQuery,
+  asSymbol,
+  asTrimmedString,
   sanitizeDividendEvent,
   sanitizeDividendEvents,
   sanitizeManualAssets,
@@ -288,6 +297,8 @@ export function createApp() {
   app.use('/api/dividends', requireAuth, requireCsrf)
   app.use('/api/manual', requireAuth, requireCsrf)
   app.use('/api/public-data', requireAuth, requireCsrf)
+  app.use('/api/stocks', requireAuth, requireCsrf)
+  app.use('/api/briefing', requireAuth, requireCsrf)
 
   app.get('/api/public-data', async (req, res) => {
     const service = req.query.service === 'stock' ? 'stock' : 'etf'
@@ -384,6 +395,120 @@ export function createApp() {
         ok: false,
         error: 'Kiwoom dividends inquiry failed',
         dividends: [],
+      })
+    }
+  })
+
+  /** 종목 브리핑 (잔고/뉴스/공시 — 부분 실패 허용) */
+  app.get('/api/stocks/:symbol/briefing', async (req, res) => {
+    const symbol = asSymbol(req.params.symbol)
+    if (!symbol) {
+      res.status(400).json({ ok: false, message: 'Invalid symbol' })
+      return
+    }
+    const stockName = asTrimmedString(req.query.name, 80) || ''
+    let holdings = []
+    if (typeof req.query.holdings === 'string' && req.query.holdings) {
+      try {
+        const parsed = JSON.parse(req.query.holdings)
+        if (Array.isArray(parsed)) {
+          holdings = parsed.slice(0, 8).map((row) => ({
+            accountType: asAccountType(row?.accountType),
+            quantity: asNonNegativeNumber(row?.quantity),
+            averageBuyPrice: asNonNegativeNumber(row?.averageBuyPrice),
+            latestPrice: asNonNegativeNumber(row?.latestPrice),
+            holdingValue: asNonNegativeNumber(row?.holdingValue),
+            profitLoss:
+              row?.profitLoss == null || row?.profitLoss === ''
+                ? null
+                : Number(row.profitLoss),
+            profitRate:
+              row?.profitRate == null || row?.profitRate === ''
+                ? null
+                : Number(row.profitRate),
+          }))
+        }
+      } catch {
+        holdings = []
+      }
+    }
+
+    try {
+      const briefing = await getStockBriefing(symbol, {
+        stockName,
+        holdings,
+      })
+      res.status(200).json(briefing)
+    } catch {
+      console.error('[Server] stock briefing failed')
+      safeError(res, 500)
+    }
+  })
+
+  app.get('/api/stocks/:symbol/news', async (req, res) => {
+    const symbol = asSymbol(req.params.symbol)
+    if (!symbol) {
+      res.status(400).json({ ok: false, message: 'Invalid symbol', items: [] })
+      return
+    }
+    const stockName = asTrimmedString(req.query.name, 80) || symbol
+    try {
+      const { fetchNaverNews } = await import('./news/naverNewsProvider.js')
+      const result = await fetchNaverNews(stockName, {
+        symbol,
+        stockName,
+        display: 10,
+      })
+      res.status(200).json(result)
+    } catch {
+      res.status(200).json({
+        ok: false,
+        configured: false,
+        items: [],
+        message: 'News unavailable',
+      })
+    }
+  })
+
+  app.post('/api/stocks/attention-summary', async (req, res) => {
+    const raw = Array.isArray(req.body?.holdings) ? req.body.holdings : []
+    const holdings = raw
+      .slice(0, 20)
+      .map((row) => ({
+        symbol: asSymbol(row?.symbol) || '',
+        name: asTrimmedString(row?.name, 80) || '',
+      }))
+      .filter((row) => row.symbol || row.name)
+
+    try {
+      const summary = await getHoldingsAttentionSummary(holdings, { limit: 5 })
+      res.status(200).json(summary)
+    } catch {
+      res.status(200).json({ ok: true, items: [] })
+    }
+  })
+
+  /** 브리핑 외부 연동 상태 (키 값 미반환) */
+  app.get('/api/briefing/status', async (_req, res) => {
+    try {
+      const status = await getBriefingIntegrationStatus({
+        refreshCorpMap: false,
+      })
+      if (status.dart && !status.dartCorpMapReady) {
+        getBriefingIntegrationStatus({ refreshCorpMap: true }).catch(() => {})
+      }
+      res.status(200).json({
+        kiwoom: Boolean(status.kiwoom),
+        naverNews: Boolean(status.naverNews),
+        dart: Boolean(status.dart),
+        dartCorpMapReady: Boolean(status.dartCorpMapReady),
+      })
+    } catch {
+      res.status(200).json({
+        kiwoom: false,
+        naverNews: false,
+        dart: false,
+        dartCorpMapReady: false,
       })
     }
   })

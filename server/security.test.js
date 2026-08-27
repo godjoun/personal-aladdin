@@ -153,6 +153,7 @@ describe('ALADDIN security hardening', () => {
       '/api/manual/trades',
       '/api/dividends',
       '/api/public-data?service=etf',
+      '/api/stocks/005930/briefing',
     ]) {
       const res = await request('GET', p)
       expect(res.status, p).toBe(401)

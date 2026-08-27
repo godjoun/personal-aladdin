@@ -19,6 +19,25 @@ export function formatCurrency(value) {
   }).format(num)
 }
 
+/**
+ * ka10001 mac / sale_amt / bus_pro / cup_nga 는 억원 단위 정수.
+ * 일반 원화(formatCurrency)로 표시하지 않는다.
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function formatEokWon(value) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  const num = Number(value)
+  if (!Number.isFinite(num)) return null
+  const formatted = new Intl.NumberFormat('ko-KR', {
+    maximumFractionDigits: 0,
+  }).format(num)
+  return `${formatted}억`
+}
+
 export function formatPercent(rate) {
   if (rate === null || rate === undefined) return '—'
   const sign = rate > 0 ? '+' : ''

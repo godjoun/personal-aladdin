@@ -22,6 +22,7 @@ const SORT_KEYS = {
 function HoldingsTable({
   assetRows,
   onDeleteAsset,
+  onSelectAsset,
   hideTitle = false,
   accountFilter = 'all',
   searchQuery = '',
@@ -145,8 +146,25 @@ function HoldingsTable({
                   </span>
                 </td>
                 <td data-label="종목명">
-                  <span className="simple-dash__asset-name">{row.name}</span>
-                  <span className="simple-dash__asset-symbol">{row.symbol || '—'}</span>
+                  {onSelectAsset && row.symbol ? (
+                    <button
+                      type="button"
+                      className="simple-dash__asset-link"
+                      onClick={() => onSelectAsset(row)}
+                    >
+                      <span className="simple-dash__asset-name">{row.name}</span>
+                      <span className="simple-dash__asset-symbol">
+                        {row.symbol || '—'}
+                      </span>
+                    </button>
+                  ) : (
+                    <>
+                      <span className="simple-dash__asset-name">{row.name}</span>
+                      <span className="simple-dash__asset-symbol">
+                        {row.symbol || '—'}
+                      </span>
+                    </>
+                  )}
                 </td>
                 <td data-label="수량" className="simple-dash__mono">
                   {formatQuantity(row.quantity)}
