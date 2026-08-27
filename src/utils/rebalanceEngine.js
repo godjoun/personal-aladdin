@@ -115,23 +115,3 @@ export function analyzeRebalancing(allocation, targetAllocation = DEFAULT_TARGET
   }
 }
 
-/**
- * 네트워크 집계 비중 → 리밸런싱 목표 맵 (%)
- * @param {Array<{ assetClass: string, weight: number }>} networkAllocation
- */
-export function networkAllocationToTargets(networkAllocation) {
-  const targets = {}
-
-  for (const row of networkAllocation ?? []) {
-    targets[row.assetClass] = row.weight
-  }
-
-  return targets
-}
-
-/**
- * 목표 비중 합계가 100%인지 점검
- */
-export function getTargetWeightSum(targetAllocation = DEFAULT_TARGET_ALLOCATION) {
-  return Object.values(targetAllocation).reduce((sum, weight) => sum + weight, 0)
-}

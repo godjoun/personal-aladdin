@@ -1,26 +1,17 @@
 /**
  * AssetForm.jsx — 보유 자산 입력 폼
  * ─────────────────────────────────────────────────────────
- * 사용자가 종목·수량·매수가 등을 입력하고
- * assetStorage 를 통해 localStorage 에 저장합니다.
- *
- * 저장 후 Dashboard 가 API 시세와 비교해 평가금액·손익을 계산합니다.
- *
- * @param {Object} props
- * @param {Array<Object>} props.assets - 현재 저장된 자산 목록
- * @param {Function} props.onAssetsChange - 저장/삭제 후 App 이 state 를 갱신할 콜백
- * @param {Function} [props.onAssetAdded] - 자산 저장 성공 시 (삭제 제외)
+ * 종목명 입력 시 서버 종목 검색(autocomplete)으로 코드 자동 채움.
+ * 검색 실패 시에도 수동 입력으로 저장 가능합니다.
  */
 
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { addAssetWithInitialTrade, removeAssetWithTrades } from '../services/tradeService.js'
-import { lookupSymbolsByName } from '../services/symbolLookup.js'
+import { searchStocks } from '../services/symbolLookup.js'
 import '../styles/AssetForm.css'
 
-/** 자산군 선택 옵션 */
 const ASSET_TYPES = ['주식', '채권', '부동산', '현금', '암호화폐', '기타']
 
-/** 폼 초기값 — 제출 후 입력창을 비울 때도 사용 */
 const EMPTY_FORM = {
   name: '',
   symbol: '',
@@ -30,9 +21,9 @@ const EMPTY_FORM = {
   memo: '',
 }
 
-/**
- * 숫자를 원화로 간단히 표시 (목록용)
- */
+const SEARCH_DEBOUNCE_MS = 250
+const MIN_QUERY_LENGTH = 1
+
 function formatPrice(value) {
   return new Intl.NumberFormat('ko-KR', {
     style: 'currency',
@@ -42,86 +33,146 @@ function formatPrice(value) {
 }
 
 function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false }) {
-  // form — 현재 입력 중인 값들 (controlled component)
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState('')
-  const [isLookingUp, setIsLookingUp] = useState(false)
-  const [lookupCandidates, setLookupCandidates] = useState([])
+  const [suggestions, setSuggestions] = useState([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchFailed, setSearchFailed] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const [emptyResult, setEmptyResult] = useState(false)
 
-  /**
-   * 종목명으로 API 에서 종목코드를 자동 검색합니다.
-   * (주식·ETF 시세 API 의 likeItmsNm 사용)
-   */
-  async function handleLookupSymbol() {
-    if (!form.name.trim()) {
-      setError('먼저 종목명을 입력해 주세요.')
-      return
+  const listboxId = useId()
+  const searchSeq = useRef(0)
+  const blurTimer = useRef(null)
+  const nameFieldRef = useRef(null)
+
+  useEffect(() => {
+    const query = form.name.trim()
+
+    if (query.length < MIN_QUERY_LENGTH) {
+      setSuggestions([])
+      setEmptyResult(false)
+      setIsSearching(false)
+      setSearchFailed(false)
+      setActiveIndex(-1)
+      return undefined
     }
 
-    setIsLookingUp(true)
-    setError('')
-    setLookupCandidates([])
+    const seq = ++searchSeq.current
+    setIsSearching(true)
+    setSearchFailed(false)
 
-    try {
-      const candidates = await lookupSymbolsByName(form.name, form.assetType)
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchStocks(query, { assetType: form.assetType })
+        if (seq !== searchSeq.current) return
 
-      if (candidates.length === 0) {
-        setError('검색 결과가 없습니다. 종목명을 확인하거나 종목코드를 직접 입력해 주세요.')
-        return
+        setSuggestions(results)
+        setEmptyResult(results.length === 0)
+        setSearchOpen(true)
+        setActiveIndex(results.length > 0 ? 0 : -1)
+      } catch {
+        if (seq !== searchSeq.current) return
+        setSuggestions([])
+        setEmptyResult(false)
+        setSearchFailed(true)
+        setSearchOpen(true)
+        setActiveIndex(-1)
+      } finally {
+        if (seq === searchSeq.current) {
+          setIsSearching(false)
+        }
       }
+    }, SEARCH_DEBOUNCE_MS)
 
-      if (candidates.length === 1) {
-        setForm((prev) => ({
-          ...prev,
-          symbol: candidates[0].symbol,
-          name: candidates[0].name || prev.name,
-        }))
-        return
+    return () => clearTimeout(timer)
+  }, [form.name, form.assetType])
+
+  useEffect(() => {
+    return () => {
+      if (blurTimer.current) {
+        clearTimeout(blurTimer.current)
       }
-
-      // 여러 건이면 사용자가 고를 수 있게 목록 표시
-      setLookupCandidates(candidates)
-    } catch (lookupError) {
-      console.error('[AssetForm] 종목코드 검색 실패:', lookupError)
-      setError('종목코드 검색에 실패했습니다. .env 의 API_KEY 를 확인해 주세요.')
-    } finally {
-      setIsLookingUp(false)
     }
-  }
+  }, [])
 
-  /** 검색 결과 목록에서 한 종목을 선택 */
   function handleSelectCandidate(candidate) {
     setForm((prev) => ({
       ...prev,
       symbol: candidate.symbol,
       name: candidate.name || prev.name,
     }))
-    setLookupCandidates([])
+    setSuggestions([])
+    setSearchOpen(false)
+    setEmptyResult(false)
+    setActiveIndex(-1)
+    setError('')
   }
 
-  /**
-   * input / select / textarea 변경 시 form state 업데이트
-   * name 속성으로 어떤 필드인지 구분합니다.
-   */
   function handleChange(event) {
     const { name, value } = event.target
     setForm((prev) => ({ ...prev, [name]: value }))
     setError('')
+
+    if (name === 'name') {
+      setSearchOpen(true)
+    }
   }
 
-  /**
-   * 폼 제출 — addAsset() 호출 후 부모(App)에 알림
-   */
+  function handleNameKeyDown(event) {
+    if (!searchOpen) return
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      if (suggestions.length === 0) return
+      setActiveIndex((prev) => (prev + 1) % suggestions.length)
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (suggestions.length === 0) return
+      setActiveIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1))
+      return
+    }
+
+    if (event.key === 'Enter' && activeIndex >= 0 && suggestions[activeIndex]) {
+      event.preventDefault()
+      handleSelectCandidate(suggestions[activeIndex])
+      return
+    }
+
+    if (event.key === 'Escape') {
+      setSearchOpen(false)
+      setActiveIndex(-1)
+    }
+  }
+
+  function handleNameBlur() {
+    blurTimer.current = setTimeout(() => {
+      setSearchOpen(false)
+    }, 150)
+  }
+
+  function handleNameFocus() {
+    if (blurTimer.current) {
+      clearTimeout(blurTimer.current)
+    }
+    if (form.name.trim().length >= MIN_QUERY_LENGTH) {
+      setSearchOpen(true)
+    }
+  }
+
   function handleSubmit(event) {
     event.preventDefault()
 
-    // 필수 항목 검사
     if (!form.name.trim()) {
       setError('종목명을 입력해 주세요.')
       return
     }
     if (!form.symbol.trim()) {
-      setError('종목코드를 입력해 주세요.')
+      setError('종목코드를 입력해 주세요. 검색 목록에서 선택하거나 직접 입력할 수 있습니다.')
       return
     }
 
@@ -137,7 +188,6 @@ function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false
       return
     }
 
-    // 자산 + 최초 매수 거래 기록
     addAssetWithInitialTrade({
       name: form.name.trim(),
       symbol: form.symbol.trim(),
@@ -147,8 +197,9 @@ function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false
       memo: form.memo.trim(),
     })
 
-    // 입력창 초기화 + App 의 assets state 갱신
     setForm(EMPTY_FORM)
+    setSuggestions([])
+    setSearchOpen(false)
     setError('')
     if (onAssetAdded) {
       onAssetAdded()
@@ -157,9 +208,6 @@ function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false
     }
   }
 
-  /**
-   * 자산 삭제 버튼 클릭
-   */
   function handleDelete(id) {
     removeAssetWithTrades(id)
     onAssetsChange()
@@ -167,76 +215,90 @@ function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false
 
   return (
     <section className="asset-form" aria-label="보유 자산 입력">
-      <h2 className="asset-form__title">자산 등록 터미널</h2>
+      <h2 className="asset-form__title">자산 등록</h2>
       <p className="asset-form__desc">
-        종목명 · 코드 · 수량 · 매수가 입력 → 저장 후 Portfolio Holdings 에 반영
+        종목명을 입력하면 검색 결과가 나타납니다. 선택하면 종목코드가 자동으로 채워집니다.
       </p>
 
       <form onSubmit={handleSubmit}>
         <div className="asset-form__grid">
-          {/* 종목명 */}
-          <div className="asset-form__field">
+          <div className="asset-form__field asset-form__field--autocomplete">
             <label className="asset-form__label asset-form__label--required" htmlFor="name">
               종목명
             </label>
             <input
               id="name"
+              ref={nameFieldRef}
               className="asset-form__input"
               type="text"
               name="name"
               value={form.name}
               onChange={handleChange}
-              placeholder="예: 삼성전자"
+              onKeyDown={handleNameKeyDown}
+              onBlur={handleNameBlur}
+              onFocus={handleNameFocus}
+              placeholder="예: 성일, TIGER 미국"
+              autoComplete="off"
+              role="combobox"
+              aria-expanded={searchOpen}
+              aria-controls={listboxId}
+              aria-autocomplete="list"
+              aria-activedescendant={
+                activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
+              }
             />
+
+            {searchOpen && form.name.trim().length >= MIN_QUERY_LENGTH && (
+              <div className="asset-form__suggest" id={listboxId} role="listbox">
+                {isSearching && (
+                  <p className="asset-form__suggest-status">검색 중…</p>
+                )}
+                {!isSearching && searchFailed && (
+                  <p className="asset-form__suggest-status">
+                    검색에 실패했습니다. 종목코드는 직접 입력할 수 있습니다.
+                  </p>
+                )}
+                {!isSearching && !searchFailed && emptyResult && (
+                  <p className="asset-form__suggest-status">검색 결과 없음</p>
+                )}
+                {!isSearching &&
+                  suggestions.map((candidate, index) => (
+                    <button
+                      key={candidate.symbol}
+                      id={`${listboxId}-option-${index}`}
+                      type="button"
+                      role="option"
+                      aria-selected={index === activeIndex}
+                      className={`asset-form__suggest-item${
+                        index === activeIndex ? ' asset-form__suggest-item--active' : ''
+                      }`}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleSelectCandidate(candidate)}
+                    >
+                      <span className="asset-form__suggest-name">{candidate.name}</span>
+                      <span className="asset-form__suggest-symbol">{candidate.symbol}</span>
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
 
-          {/* 종목코드 + 자동 찾기 */}
           <div className="asset-form__field">
             <label className="asset-form__label asset-form__label--required" htmlFor="symbol">
               종목코드
             </label>
-            <div className="asset-form__symbol-row">
-              <input
-                id="symbol"
-                className="asset-form__input"
-                type="text"
-                name="symbol"
-                value={form.symbol}
-                onChange={handleChange}
-                placeholder="예: 005930"
-              />
-              <button
-                type="button"
-                className="asset-form__lookup-btn"
-                onClick={handleLookupSymbol}
-                disabled={isLookingUp}
-              >
-                {isLookingUp ? '검색 중...' : '코드 자동 찾기'}
-              </button>
-            </div>
-            <p className="asset-form__hint">종목명 입력 후 「코드 자동 찾기」를 누르세요.</p>
+            <input
+              id="symbol"
+              className="asset-form__input"
+              type="text"
+              name="symbol"
+              value={form.symbol}
+              onChange={handleChange}
+              placeholder="검색 선택 또는 직접 입력"
+            />
+            <p className="asset-form__hint">검색이 안 되면 코드를 직접 입력해도 됩니다.</p>
           </div>
 
-          {lookupCandidates.length > 0 && (
-            <div className="asset-form__field asset-form__field--full">
-              <p className="asset-form__hint">검색 결과가 여러 개입니다. 선택해 주세요.</p>
-              <ul className="asset-form__candidates">
-                {lookupCandidates.map((candidate) => (
-                  <li key={candidate.symbol}>
-                    <button
-                      type="button"
-                      className="asset-form__candidate-btn"
-                      onClick={() => handleSelectCandidate(candidate)}
-                    >
-                      {candidate.name} ({candidate.symbol})
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* 자산군 */}
           <div className="asset-form__field">
             <label className="asset-form__label" htmlFor="assetType">
               자산군
@@ -256,7 +318,6 @@ function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false
             </select>
           </div>
 
-          {/* 보유 수량 */}
           <div className="asset-form__field">
             <label className="asset-form__label asset-form__label--required" htmlFor="quantity">
               보유 수량
@@ -274,7 +335,6 @@ function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false
             />
           </div>
 
-          {/* 평균 매수가 */}
           <div className="asset-form__field">
             <label
               className="asset-form__label asset-form__label--required"
@@ -295,7 +355,6 @@ function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false
             />
           </div>
 
-          {/* 메모 — 전체 너비 */}
           <div className="asset-form__field asset-form__field--full">
             <label className="asset-form__label" htmlFor="memo">
               메모
@@ -320,41 +379,38 @@ function AssetForm({ assets = [], onAssetsChange, onAssetAdded, hideList = false
         </div>
       </form>
 
-      {/* 저장된 자산 목록 — hideList 이면 Dashboard 테이블에서 표시 */}
       {!hideList && (
-      <div className="asset-form__list">
-        <h3 className="asset-form__list-title">
-          저장된 자산 ({assets.length}건)
-        </h3>
+        <div className="asset-form__list">
+          <h3 className="asset-form__list-title">저장된 자산 ({assets.length}건)</h3>
 
-        {assets.length === 0 ? (
-          <p className="asset-form__list-empty">아직 등록된 자산이 없습니다.</p>
-        ) : (
-          assets.map((asset) => (
-            <div key={asset.id} className="asset-form__item">
-              <div className="asset-form__item-info">
-                <p className="asset-form__item-name">
-                  {asset.name}{' '}
-                  <span className="asset-form__item-symbol">({asset.symbol})</span>
-                </p>
-                <p className="asset-form__item-meta">
-                  {asset.assetType} · {asset.quantity}주 · 평균매수가{' '}
-                  {formatPrice(asset.averageBuyPrice)}
-                  {asset.memo && ` · ${asset.memo}`}
-                </p>
+          {assets.length === 0 ? (
+            <p className="asset-form__list-empty">아직 등록된 자산이 없습니다.</p>
+          ) : (
+            assets.map((asset) => (
+              <div key={asset.id} className="asset-form__item">
+                <div className="asset-form__item-info">
+                  <p className="asset-form__item-name">
+                    {asset.name}{' '}
+                    <span className="asset-form__item-symbol">({asset.symbol})</span>
+                  </p>
+                  <p className="asset-form__item-meta">
+                    {asset.assetType} · {asset.quantity}주 · 평균매수가{' '}
+                    {formatPrice(asset.averageBuyPrice)}
+                    {asset.memo && ` · ${asset.memo}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="asset-form__delete"
+                  onClick={() => handleDelete(asset.id)}
+                  aria-label={`${asset.name} 삭제`}
+                >
+                  삭제
+                </button>
               </div>
-              <button
-                type="button"
-                className="asset-form__delete"
-                onClick={() => handleDelete(asset.id)}
-                aria-label={`${asset.name} 삭제`}
-              >
-                삭제
-              </button>
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
       )}
     </section>
   )

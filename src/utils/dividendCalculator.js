@@ -230,7 +230,11 @@ export function getNextDividendEvent(events, today = new Date()) {
 
   for (const event of events) {
     try {
-      if (!event || event.status === 'PAID') {
+      // 미래 일정만: ESTIMATED / CONFIRMED (PAID·기타 제외)
+      if (
+        !event ||
+        (event.status !== 'ESTIMATED' && event.status !== 'CONFIRMED')
+      ) {
         continue
       }
 
@@ -272,8 +276,56 @@ export function getNextDividendEvent(events, today = new Date()) {
  * @returns {string}
  */
 export function getDividendStatusLabel(status) {
-  if (status === 'ESTIMATED') return '예상'
+  if (status === 'ESTIMATED') return '예정'
   if (status === 'CONFIRMED') return '확정'
   if (status === 'PAID') return '지급완료'
   return status ?? '—'
+}
+
+/**
+ * 최근 12개월(이번 달 포함) 월별 PAID 합계
+ *
+ * @param {Array<Object>} events
+ * @param {Date} [today]
+ * @returns {Array<{ year: number, month: number, label: string, total: number }>}
+ */
+export function calculateLast12MonthsDividendBars(events, today = new Date()) {
+  const bars = []
+  const base = startOfLocalDay(today)
+
+  for (let offset = 11; offset >= 0; offset -= 1) {
+    const cursor = new Date(base.getFullYear(), base.getMonth() - offset, 1)
+    const year = cursor.getFullYear()
+    const month = cursor.getMonth() + 1
+    const summary = calculateMonthlyDividendSummary(events, year, month)
+    bars.push({
+      year,
+      month,
+      label: `${month}월`,
+      total: summary.paid,
+    })
+  }
+
+  return bars
+}
+
+/**
+ * 최근 PAID 지급 목록 (최신순)
+ *
+ * @param {Array<Object>} events
+ * @param {number} [limit=5]
+ */
+export function getRecentPaidDividends(events, limit = 5) {
+  if (!Array.isArray(events)) return []
+
+  return events
+    .filter((event) => event?.status === 'PAID')
+    .map((event) => {
+      const date = parseDividendPaymentDate(event.paymentDate)
+      return { event, date, amount: getDividendEventAmount(event) }
+    })
+    .filter((item) => item.date)
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, Math.max(1, limit))
+    .map((item) => item.event)
 }

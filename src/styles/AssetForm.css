@@ -123,6 +123,67 @@
   cursor: not-allowed;
 }
 
+.asset-form__field--autocomplete {
+  position: relative;
+}
+
+.asset-form__suggest {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.2rem);
+  left: 0;
+  right: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.asset-form__suggest-status {
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.asset-form__suggest-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  text-align: left;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.asset-form__suggest-item:hover,
+.asset-form__suggest-item--active {
+  border-color: var(--color-border);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.asset-form__suggest-name {
+  font-weight: 600;
+}
+
+.asset-form__suggest-symbol {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
 .asset-form__hint {
   margin: 0.25rem 0 0;
   font-size: 0.65rem;
@@ -145,7 +206,7 @@
   font-family: var(--font-mono);
   text-align: left;
   color: var(--color-text);
-  background: #0a0a0a;
+  background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: 4px;
   cursor: pointer;

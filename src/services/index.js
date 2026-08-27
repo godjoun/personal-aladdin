@@ -1,7 +1,5 @@
 /**
  * services/ 폴더 — 진입점(index)
- * ─────────────────────────────────────────────────────────
- * services 폴더의 함수들을 한곳에서 export 합니다.
  */
 
 export {
@@ -16,17 +14,18 @@ export { getAssets, saveAssets, addAsset, deleteAsset } from './assetStorage.js'
 
 export { fetchPricesForAssets } from './marketSync.js'
 
-export { lookupSymbolsByName } from './symbolLookup.js'
-
-export { exportLocalVault } from './dataExport.js'
+export {
+  fetchKiwoomBalances,
+  flattenKiwoomBalanceHoldings,
+} from './kiwoomApi.js'
 
 export {
-  registerStation,
-  pushVaultToCentral,
-  getStationCredentials,
-  checkCentralHealth,
-  getCentralAdminUrl,
-} from './stationClient.js'
+  fetchKiwoomDividendPayments,
+  syncKiwoomDividends,
+  upsertKiwoomDividendEvents,
+} from './kiwoomDividendSync.js'
+
+export { lookupSymbolsByName } from './symbolLookup.js'
 
 export {
   getPortfolioSnapshots,

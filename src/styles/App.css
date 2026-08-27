@@ -18,6 +18,12 @@
   box-sizing: border-box;
 }
 
+.app-loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
 @media (max-width: 720px) {
   .app-main {
     padding: 1rem 0.85rem 2rem;

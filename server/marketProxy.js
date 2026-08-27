@@ -1,12 +1,15 @@
 /**
- * marketProxy.js — 공공데이터 API 서버 프록시 (배포용)
- * API_KEY 는 서버 환경 변수에만 두고, 브라우저에는 노출하지 않습니다.
+ * marketProxy.js — 공공데이터 API 서버 프록시 (trusted upstream only)
  */
+
+import { PUBLIC_DATA_ALLOWED_KEYS } from './security/validate.js'
 
 const DEFAULT_ETF_URL =
   'https://apis.data.go.kr/1160100/service/GetSecuritiesProductInfoService/getETFPriceInfo'
 const DEFAULT_STOCK_URL =
   'https://apis.data.go.kr/1160100/service/GetStockSecuritiesInfoService/getStockPriceInfo'
+
+const ALLOWED_HOST = 'apis.data.go.kr'
 
 function getDefaultBasDt() {
   const date = new Date()
@@ -18,6 +21,26 @@ function getDefaultBasDt() {
 }
 
 /**
+ * env BASE_URL이 신뢰 호스트인지 확인
+ * @param {string} raw
+ */
+function assertTrustedBaseUrl(raw) {
+  let url
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error('Invalid upstream URL configuration')
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error('Upstream must use HTTPS')
+  }
+  if (url.hostname !== ALLOWED_HOST) {
+    throw new Error('Upstream host is not allowed')
+  }
+  return url
+}
+
+/**
  * @param {'stock' | 'etf'} service
  * @param {Record<string, string>} queryParams
  */
@@ -25,15 +48,16 @@ export async function proxyPublicData(service, queryParams = {}) {
   const apiKey = process.env.API_KEY?.trim()
 
   if (!apiKey) {
-    throw new Error('서버에 API_KEY 가 설정되지 않았습니다. Render 환경 변수를 확인하세요.')
+    throw new Error('Public data API is not configured')
   }
 
-  const baseUrl =
+  const baseRaw =
     service === 'stock'
       ? process.env.STOCK_BASE_URL?.trim() || DEFAULT_STOCK_URL
       : process.env.BASE_URL?.trim() || DEFAULT_ETF_URL
 
-  const url = new URL(baseUrl)
+  const url = assertTrustedBaseUrl(baseRaw)
+  url.search = ''
   url.searchParams.set('serviceKey', apiKey)
   url.searchParams.set('resultType', 'json')
 
@@ -43,17 +67,27 @@ export async function proxyPublicData(service, queryParams = {}) {
     basDt: getDefaultBasDt(),
   }
 
-  const mergedParams = { ...defaultParams, ...queryParams }
+  const mergedParams = { ...defaultParams }
+  for (const [key, value] of Object.entries(queryParams || {})) {
+    if (!PUBLIC_DATA_ALLOWED_KEYS.has(key)) continue
+    if (value === undefined || value === null) continue
+    const str = String(value).slice(0, 80)
+    if (!str) continue
+    if (/^https?:/i.test(str) || str.includes('://')) continue
+    mergedParams[key] = str
+  }
+
   Object.entries(mergedParams).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && String(value).length > 0) {
-      url.searchParams.set(key, String(value))
-    }
+    url.searchParams.set(key, String(value))
   })
 
-  const response = await fetch(url.toString())
+  const response = await fetch(url.toString(), {
+    redirect: 'error',
+    signal: AbortSignal.timeout(15000),
+  })
 
   if (!response.ok) {
-    throw new Error(`공공데이터 HTTP 오류: ${response.status} ${response.statusText}`)
+    throw new Error('Public data upstream request failed')
   }
 
   return response.json()

@@ -1,17 +1,15 @@
 /**
- * symbolLookup.js — 종목명으로 종목코드 검색
+ * symbolLookup.js — 종목명/코드 검색
  * ─────────────────────────────────────────────────────────
- * 공공데이터 API 의 likeItmsNm 파라미터를 사용합니다.
- * 주식 API 먼저 시도하고, 없으면 ETF API 를 시도합니다.
+ * 우선: 서버 키움 종목 캐시 (/api/kiwoom/stocks/search)
+ * 실패 시: 공공데이터 likeItmsNm 보완 (수동 입력도 항상 가능)
  */
 
 import { fetchMarketData } from '../api/marketApi.js'
 import { fetchStockMarketData } from '../api/stockApi.js'
 import { parseMarketPricesFromApi } from './storage.js'
+import { apiFetch } from './apiClient.js'
 
-/**
- * symbol 기준으로 중복 제거
- */
 function dedupeBySymbol(items) {
   const map = new Map()
 
@@ -28,10 +26,10 @@ function dedupeBySymbol(items) {
 }
 
 /**
- * 종목명으로 종목코드 후보를 검색합니다.
+ * 공공데이터 보완 검색
  *
- * @param {string} name - 종목명 (예: 삼성전자)
- * @param {string} [assetType='주식'] - 자산군
+ * @param {string} name
+ * @param {string} [assetType='주식']
  * @returns {Promise<Array<{ symbol: string, name: string }>>}
  */
 export async function lookupSymbolsByName(name, assetType = '주식') {
@@ -49,25 +47,60 @@ export async function lookupSymbolsByName(name, assetType = '주식') {
 
   let results = []
 
-  // 주식 자산군이면 주식 시세 API 먼저
   if (assetType === '주식') {
     try {
       const stockResult = await fetchStockMarketData(params)
       results.push(...parseMarketPricesFromApi(stockResult))
     } catch (error) {
-      console.error('[symbolLookup] 주식 검색 실패:', error)
+      console.error('[symbolLookup] 주식 검색 실패:', error.message)
     }
   }
 
-  // 결과가 없으면 ETF API 도 시도
   if (results.length === 0) {
     try {
       const etfResult = await fetchMarketData(params)
       results.push(...parseMarketPricesFromApi(etfResult))
     } catch (error) {
-      console.error('[symbolLookup] ETF 검색 실패:', error)
+      console.error('[symbolLookup] ETF 검색 실패:', error.message)
     }
   }
 
-  return dedupeBySymbol(results)
+  return dedupeBySymbol(results).slice(0, 10)
+}
+
+/**
+ * 종목 자동완성 검색 (키움 서버 캐시 우선)
+ *
+ * @param {string} query
+ * @param {{ assetType?: string }} [options]
+ * @returns {Promise<Array<{ symbol: string, name: string }>>}
+ */
+export async function searchStocks(query, options = {}) {
+  const keyword = String(query ?? '').trim()
+  if (keyword.length < 1) {
+    return []
+  }
+
+  try {
+    const response = await apiFetch(
+      `/api/kiwoom/stocks/search?q=${encodeURIComponent(keyword)}`,
+    )
+
+    if (response.ok) {
+      const data = await response.json()
+      if (Array.isArray(data)) {
+        return data
+          .filter((item) => item?.symbol && item?.name)
+          .map((item) => ({
+            symbol: String(item.symbol),
+            name: String(item.name),
+          }))
+          .slice(0, 10)
+      }
+    }
+  } catch (error) {
+    console.warn('[symbolLookup] 키움 종목 검색 실패, 공공데이터로 보완:', error.message)
+  }
+
+  return lookupSymbolsByName(keyword, options.assetType || '주식')
 }

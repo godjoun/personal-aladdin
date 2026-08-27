@@ -1,0 +1,73 @@
+/**
+ * LoginForm.css
+ */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(ellipse at top, #e8eef5 0%, transparent 55%),
+    linear-gradient(180deg, #f4f6f8 0%, #e9eef3 100%);
+}
+
+.login-card {
+  width: min(380px, 100%);
+  padding: 1.75rem 1.5rem;
+  background: #fff;
+  border: 1px solid var(--color-border, #d0d7de);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.login-card__brand {
+  margin: 0;
+  font-family: var(--font-display, Georgia, serif);
+  font-size: 1.75rem;
+  letter-spacing: 0.06em;
+}
+
+.login-card__hint {
+  margin: 0 0 0.75rem;
+  color: var(--color-text-muted, #656d76);
+  font-size: 0.9rem;
+}
+
+.login-card__label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #656d76);
+  margin-top: 0.35rem;
+}
+
+.login-card__input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--color-border, #d0d7de);
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.login-card__error {
+  margin: 0.35rem 0 0;
+  color: #cf222e;
+  font-size: 0.88rem;
+}
+
+.login-card__submit {
+  margin-top: 0.85rem;
+  padding: 0.65rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-primary, #1f6feb);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.login-card__submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}

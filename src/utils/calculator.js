@@ -4,25 +4,48 @@
  * localStorage 에 저장된 시세(prices)를 바탕으로
  * 평가금액, 손익, 수익률 등을 계산합니다.
  *
- * 이 파일은 "숫자 계산"만 담당합니다.
- *   - 화면 표시 → pages/
- *   - 데이터 저장 → services/storage.js
- *   - API 호출   → api/marketApi.js
- *
- * 나중에 포트폴리오 평가금액, 자산 비중, 리스크 계산의
- * 기초가 되는 함수들을 여기에 모아 둡니다.
+ * 현재가 null/undefined/빈문자열/비가정 숫자는 0원으로 취급하지 않습니다.
  */
 
 /**
- * 문자열·숫자를 안전하게 숫자로 바꿉니다.
- * API 종가(closePrice)는 "75000" 같은 문자열로 올 수 있습니다.
+ * 계산에 쓸 수 있는 현재가인지 판별합니다.
+ * 0 이하는 유효 시세로 보지 않습니다.
  *
- * @param {number|string} value - 변환할 값
- * @returns {number} 유효한 숫자. 변환 불가 시 0
+ * @param {unknown} value
+ * @returns {boolean}
  */
-function toNumber(value) {
+export function hasValidPrice(value) {
+  if (value === null || value === undefined || value === '') {
+    return false
+  }
+
   const num = Number(value)
-  return Number.isFinite(num) ? num : 0
+  return Number.isFinite(num) && num > 0
+}
+
+/**
+ * 문자열·숫자를 안전하게 숫자로 바꿉니다.
+ * 변환 불가 시 null (0 으로 강제하지 않음)
+ *
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+export function toNullableNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+function toNumberOrZero(value) {
+  const num = toNullableNumber(value)
+  return num == null ? 0 : num
 }
 
 /**
@@ -31,10 +54,6 @@ function toNumber(value) {
  * @param {Array<Object>} prices - storage 에서 읽은 시세 배열
  * @param {string} symbol - 종목 코드 (예: "005930")
  * @returns {Object|null} 최신 MarketPrice 객체. 없으면 null
- *
- * 동작 방식:
- *   1. symbol 이 같은 항목만 필터
- *   2. date(기준일) 기준 내림차순 정렬 → 맨 앞이 최신
  */
 export function getLatestPriceBySymbol(prices, symbol) {
   if (!Array.isArray(prices) || !symbol) {
@@ -47,7 +66,6 @@ export function getLatestPriceBySymbol(prices, symbol) {
     return null
   }
 
-  // date 는 "YYYYMMDD" 형식 → 문자열 비교로도 날짜 순서가 맞음
   const sorted = [...matched].sort((a, b) => b.date.localeCompare(a.date))
 
   return sorted[0]
@@ -56,14 +74,9 @@ export function getLatestPriceBySymbol(prices, symbol) {
 /**
  * 특정 종목(symbol)의 시세 "이력" 전체를 날짜순으로 반환합니다.
  *
- * @param {Array<Object>} prices - storage 에서 읽은 시세 배열
- * @param {string} symbol - 종목 코드
- * @returns {Array<Object>} 날짜 오름차순(과거 → 최신) 배열
- *
- * 용도 예시:
- *   - 차트 그리기
- *   - 기간별 수익률 분석
- *   - 변동성(리스크) 계산의 입력 데이터
+ * @param {Array<Object>} prices
+ * @param {string} symbol
+ * @returns {Array<Object>}
  */
 export function getPriceHistoryBySymbol(prices, symbol) {
   if (!Array.isArray(prices) || !symbol) {
@@ -76,87 +89,74 @@ export function getPriceHistoryBySymbol(prices, symbol) {
 }
 
 /**
- * 보유 평가금액을 계산합니다.
+ * 보유 평가금액: 수량 × 현재가
+ * 현재가가 없으면 null
  *
- * 공식: 보유 수량 × 최신 가격
- *
- * @param {number|string} quantity - 보유 수량 (주식이면 주 수)
- * @param {number|string} latestPrice - 최신 가격 (보통 종가)
- * @returns {number} 평가금액 (원)
- *
- * 예시:
- *   calculateHoldingValue(10, 75000) → 750000
+ * @param {number|string} quantity
+ * @param {number|string|null|undefined} latestPrice
+ * @returns {number | null}
  */
 export function calculateHoldingValue(quantity, latestPrice) {
-  const qty = toNumber(quantity)
-  const price = toNumber(latestPrice)
-
-  return qty * price
-}
-
-/**
- * 평가 손익(금액)을 계산합니다.
- *
- * 공식: (최신 가격 - 평균 매수가) × 보유 수량
- *
- * @param {number|string} quantity - 보유 수량
- * @param {number|string} averageBuyPrice - 평균 매수 단가
- * @param {number|string} latestPrice - 최신 가격
- * @returns {number} 손익 금액. 양수=이익, 음수=손실
- *
- * 예시:
- *   매수가 70,000원, 현재가 75,000원, 10주 보유
- *   → (75000 - 70000) × 10 = 50000 (5만 원 이익)
- */
-export function calculateProfitLoss(quantity, averageBuyPrice, latestPrice) {
-  const qty = toNumber(quantity)
-  const avgPrice = toNumber(averageBuyPrice)
-  const currentPrice = toNumber(latestPrice)
-
-  return (currentPrice - avgPrice) * qty
-}
-
-/**
- * 수익률(%)을 계산합니다.
- *
- * 공식: ((최신 가격 - 평균 매수가) / 평균 매수가) × 100
- *
- * @param {number|string} averageBuyPrice - 평균 매수 단가
- * @param {number|string} latestPrice - 최신 가격
- * @returns {number} 수익률(%). 양수=수익, 음수=손실
- *
- * 예시:
- *   매수가 70,000원, 현재가 75,000원
- *   → ((75000 - 70000) / 70000) × 100 ≈ 7.14 (%)
- */
-export function calculateProfitRate(averageBuyPrice, latestPrice) {
-  const avgPrice = toNumber(averageBuyPrice)
-  const currentPrice = toNumber(latestPrice)
-
-  // 0 으로 나누면 Infinity 가 되므로 방어
-  if (avgPrice === 0) {
-    return 0
+  if (!hasValidPrice(latestPrice)) {
+    return null
   }
 
-  return ((currentPrice - avgPrice) / avgPrice) * 100
+  const qty = toNullableNumber(quantity)
+  if (qty == null) {
+    return null
+  }
+
+  return qty * Number(latestPrice)
 }
 
 /**
- * 자산군(assetType)별 평가금액 비중을 계산합니다.
+ * 평가 손익: (현재가 - 평균매수가) × 수량
+ * 현재가가 없으면 null
  *
- * 입력: buildAssetRows() 가 만든 행 배열
- *   - hasPrice, holdingValue, assetType 필드 필요
+ * @param {number|string} quantity
+ * @param {number|string} averageBuyPrice
+ * @param {number|string|null|undefined} latestPrice
+ * @returns {number | null}
+ */
+export function calculateProfitLoss(quantity, averageBuyPrice, latestPrice) {
+  if (!hasValidPrice(latestPrice)) {
+    return null
+  }
+
+  const qty = toNullableNumber(quantity)
+  const avgPrice = toNullableNumber(averageBuyPrice)
+  if (qty == null || avgPrice == null) {
+    return null
+  }
+
+  return (Number(latestPrice) - avgPrice) * qty
+}
+
+/**
+ * 수익률(%): ((현재가 - 평균매수가) / 평균매수가) × 100
+ * 현재가가 없으면 null
  *
- * assetType 은 AssetForm 의 "자산군" 값입니다.
- * (요청서의 assetClass 와 같은 의미)
+ * @param {number|string} averageBuyPrice
+ * @param {number|string|null|undefined} latestPrice
+ * @returns {number | null}
+ */
+export function calculateProfitRate(averageBuyPrice, latestPrice) {
+  if (!hasValidPrice(latestPrice)) {
+    return null
+  }
+
+  const avgPrice = toNullableNumber(averageBuyPrice)
+  if (avgPrice == null || avgPrice === 0) {
+    return null
+  }
+
+  return ((Number(latestPrice) - avgPrice) / avgPrice) * 100
+}
+
+/**
+ * 자산군(assetType)별 평가금액 비중
  *
- * @param {Array<Object>} assetRows - 보유 자산 + 시세 매칭 결과
- * @returns {{
- *   groups: Array<{ assetClass: string, totalValue: number, weight: number, assetCount: number }>,
- *   totalValuedAmount: number,
- *   noPriceAssets: Array<Object>,
- *   noPriceCount: number
- * }}
+ * @param {Array<Object>} assetRows
  */
 export function calculateAssetClassAllocation(assetRows) {
   if (!Array.isArray(assetRows)) {
@@ -168,17 +168,14 @@ export function calculateAssetClassAllocation(assetRows) {
     }
   }
 
-  // 시세가 있는 자산만 비중 계산에 포함
   const valuedRows = assetRows.filter((row) => row.hasPrice)
   const noPriceAssets = assetRows.filter((row) => !row.hasPrice)
 
-  // 전체 평가금액 합계 (비중 % 의 분모)
   const totalValuedAmount = valuedRows.reduce(
-    (sum, row) => sum + row.holdingValue,
+    (sum, row) => sum + toNumberOrZero(row.holdingValue),
     0,
   )
 
-  // assetType(자산군)별로 평가금액 합산
   const groupMap = new Map()
 
   for (const row of valuedRows) {
@@ -190,12 +187,11 @@ export function calculateAssetClassAllocation(assetRows) {
       assetCount: 0,
     }
 
-    existing.totalValue += row.holdingValue
+    existing.totalValue += toNumberOrZero(row.holdingValue)
     existing.assetCount += 1
     groupMap.set(assetClass, existing)
   }
 
-  // 비중(%) 계산 후 평가금액 내림차순 정렬
   const groups = Array.from(groupMap.values())
     .map((group) => ({
       ...group,

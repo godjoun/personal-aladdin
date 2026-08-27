@@ -1,10 +1,10 @@
 /**
  * utils/ 폴더 — 진입점(index)
- * ─────────────────────────────────────────────────────────
- * utils 폴더의 함수들을 한곳에서 export 합니다.
  */
 
 export {
+  hasValidPrice,
+  toNullableNumber,
   getLatestPriceBySymbol,
   getPriceHistoryBySymbol,
   calculateHoldingValue,
@@ -14,47 +14,23 @@ export {
 } from './calculator.js'
 
 export {
-  DEFAULT_ASSET_SHOCKS,
-  CRISIS_SCENARIOS,
-  calculateScenarioLossRate,
-  simulateCrisisScenarios,
-} from './riskEngine.js'
-
-export {
-  getAllocationCandidates,
-  allocationFromTargets,
-  amountsFromTargets,
-  evaluateAllocationCandidate,
-  recommendAllocations,
-  getCandidateScenarioResult,
-  rankRecommendationsForView,
-} from './allocationOptimizer.js'
-
-export {
   DEFAULT_TARGET_ALLOCATION,
   REBALANCE_THRESHOLD,
   calculateWeightDifference,
   needsRebalanceReview,
   analyzeRebalancing,
-  networkAllocationToTargets,
-  getTargetWeightSum,
 } from './rebalanceEngine.js'
+
+export { simulateCrisisScenarios } from './riskEngine.js'
 
 export { buildAssetRows, calculatePortfolioSummary } from './portfolioRows.js'
 
 export {
-  formatSnapshotDate,
-  calculateMaxDrawdown,
-  enrichSnapshotsWithDailyChange,
-} from './snapshotAnalytics.js'
-
-export {
-  buildAllocationTimeSeries,
-  calculateProfitContributions,
-  calculatePeriodValueContributions,
-  calculateRollingVolatility,
-  calculateSharpeRatio,
-} from './portfolioAnalytics.js'
+  buildKiwoomHoldingRow,
+  buildKiwoomHoldingRows,
+  buildDashboardHoldingsView,
+  calculateKiwoomPortfolioSummary,
+} from './kiwoomDashboard.js'
 
 export { computePositionFromTrades } from './positionEngine.js'
 
@@ -65,4 +41,12 @@ export {
   calculateYearPaidDividend,
   getNextDividendEvent,
   getDividendStatusLabel,
+  calculateLast12MonthsDividendBars,
+  getRecentPaidDividends,
 } from './dividendCalculator.js'
+
+export {
+  DIVIDEND_STATUSES,
+  validateAndBuildDividendPayload,
+  dividendEventToFormValues,
+} from './dividendForm.js'

@@ -92,8 +92,3 @@ code {
   background-color: #eef1f4;
   border: 1px solid var(--color-border);
 }
-
-/* CRT 오버레이 클래스는 파일 유지용 — UI 에서는 미사용 */
-.crt-overlay {
-  display: none;
-}

@@ -1,18 +1,46 @@
-# Render.com 원클릭 배포 설정
-# https://render.com 에서 New → Blueprint → 이 repo 연결
+# Render.com Blueprint — ALADDIN (Web Service 1개 + persistent disk)
+# 실제 secret 값은 넣지 않습니다. Dashboard에서 sync:false 항목을 입력하세요.
+# Persistent disk는 Free plan에서 불가 → starter 이상 필요.
+# https://render.com/docs/blueprint-spec
 
 services:
   - type: web
     name: aladdin-personal
     runtime: node
-    plan: free
-    buildCommand: npm install && npm run build
+    plan: starter
+    region: oregon
+    buildCommand: npm ci && npm run build
     startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: aladdin-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
-      - key: ADMIN_KEY
-        generateValue: true
+      - key: NODE_VERSION
+        value: "24"
+      - key: ALADDIN_DB_PATH
+        value: /var/data/aladdin.sqlite
+      - key: ALADDIN_BACKUP_DIR
+        value: /var/data/backups
+      - key: ALADDIN_TRUST_PROXY
+        value: "1"
+      - key: ALADDIN_ADMIN_USERNAME
+        sync: false
+      - key: ALADDIN_ADMIN_PASSWORD_HASH
+        sync: false
+      - key: ALADDIN_SESSION_SECRET
+        sync: false
+      - key: KIWOOM_ISA_APP_KEY
+        sync: false
+      - key: KIWOOM_ISA_APP_SECRET
+        sync: false
+      - key: KIWOOM_GENERAL_APP_KEY
+        sync: false
+      - key: KIWOOM_GENERAL_APP_SECRET
+        sync: false
       - key: API_KEY
         sync: false
       - key: BASE_URL

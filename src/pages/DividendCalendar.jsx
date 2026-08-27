@@ -1,25 +1,19 @@
 /**
- * DividendCalendar.jsx — 배당 달력 v1
- * ─────────────────────────────────────────────────────────
- * localStorage 배당 이벤트를 월 달력으로 표시합니다.
- * 외부 API / 입력 폼 / 알림 없음.
+ * DividendCalendar.jsx — 배당 달력 (가독성 개선)
  */
 
 import { useMemo, useState } from 'react'
-import { getDividendEvents } from '../services/dividendStorage.js'
 import {
   calculateMonthlyDividendSummary,
-  calculateYearPaidDividend,
   getDividendEventAmount,
   getDividendStatusLabel,
-  getNextDividendEvent,
   parseDividendPaymentDate,
 } from '../utils/dividendCalculator.js'
 import { formatCurrency } from '../utils/formatters.js'
-import '../styles/WorkspacePages.css'
 import '../styles/DividendCalendar.css'
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
+const MAX_VISIBLE_EVENTS = 3
 
 function pad2(value) {
   return String(value).padStart(2, '0')
@@ -37,14 +31,9 @@ function shiftMonth(year, month, delta) {
   }
 }
 
-/**
- * @param {number} year
- * @param {number} month 1–12
- */
 function buildCalendarCells(year, month) {
   const firstWeekday = new Date(year, month - 1, 1).getDay()
   const daysInMonth = new Date(year, month, 0).getDate()
-  /** @type {Array<{ type: 'pad' | 'day', key: string, day?: number, dateKey?: string }>} */
   const cells = []
 
   for (let i = 0; i < firstWeekday; i += 1) {
@@ -67,17 +56,7 @@ function buildCalendarCells(year, month) {
   return cells
 }
 
-/**
- * paymentDate 가 표시 월에 속하는 이벤트만 dateKey 로 묶습니다.
- * 이전/다음 달 패딩 칸에는 배치하지 않습니다.
- *
- * @param {Array<Object>} events
- * @param {number} year
- * @param {number} month
- * @returns {Map<string, Object[]>}
- */
 function groupEventsByPaymentDate(events, year, month) {
-  /** @type {Map<string, Object[]>} */
   const map = new Map()
 
   for (const event of events) {
@@ -94,150 +73,100 @@ function groupEventsByPaymentDate(events, year, month) {
   return map
 }
 
-function DividendCalendar({ embedded = false }) {
-  const now = new Date()
-  const [viewYear, setViewYear] = useState(now.getFullYear())
-  const [viewMonth, setViewMonth] = useState(now.getMonth() + 1)
+function shortFundName(name) {
+  const text = String(name || '').trim()
+  if (text.length <= 16) return text || '—'
+  return `${text.slice(0, 15)}…`
+}
 
-  // 입력 폼이 없는 v1 — 렌더 시 localStorage 를 직접 읽음
-  const events = getDividendEvents()
+function DividendCalendar({
+  events: eventsProp,
+  onEventClick,
+  onDayClick,
+  viewYear: viewYearProp,
+  viewMonth: viewMonthProp,
+  onViewChange,
+}) {
+  const now = new Date()
+  const [innerYear, setInnerYear] = useState(now.getFullYear())
+  const [innerMonth, setInnerMonth] = useState(now.getMonth() + 1)
+
+  const viewYear = viewYearProp ?? innerYear
+  const viewMonth = viewMonthProp ?? innerMonth
+
+  function setView(year, month) {
+    if (onViewChange) {
+      onViewChange({ year, month })
+      return
+    }
+    setInnerYear(year)
+    setInnerMonth(month)
+  }
+
+  const events = Array.isArray(eventsProp) ? eventsProp : []
   const cells = useMemo(
     () => buildCalendarCells(viewYear, viewMonth),
     [viewYear, viewMonth],
   )
   const eventsByDate = groupEventsByPaymentDate(events, viewYear, viewMonth)
-  const isEmpty = events.length === 0
-
-  const monthlySummary = embedded
-    ? null
-    : calculateMonthlyDividendSummary(events, viewYear, viewMonth)
-  const yearPaid = embedded
-    ? null
-    : calculateYearPaidDividend(events, viewYear)
-  const nextEvent = embedded ? null : getNextDividendEvent(events, new Date())
+  const monthPaid = calculateMonthlyDividendSummary(events, viewYear, viewMonth).paid
 
   function goPrevMonth() {
     const next = shiftMonth(viewYear, viewMonth, -1)
-    setViewYear(next.year)
-    setViewMonth(next.month)
+    setView(next.year, next.month)
   }
 
   function goNextMonth() {
     const next = shiftMonth(viewYear, viewMonth, 1)
-    setViewYear(next.year)
-    setViewMonth(next.month)
-  }
-
-  function goToday() {
-    const today = new Date()
-    setViewYear(today.getFullYear())
-    setViewMonth(today.getMonth() + 1)
+    setView(next.year, next.month)
   }
 
   const todayKey = toDateKey(now.getFullYear(), now.getMonth() + 1, now.getDate())
 
   return (
-    <div
-      className={`dividend-calendar${embedded ? ' dividend-calendar--embedded' : ' workspace-page'}`}
-    >
-      {!embedded && (
-        <>
-          <header className="workspace-page__header">
-            <h2 className="workspace-page__title">배당 달력</h2>
-            <p className="workspace-page__desc">
-              등록된 배당 일정을 paymentDate 기준으로 월별 확인합니다. (로컬 저장 · API 없음)
-            </p>
-          </header>
-
-          <section
-            className="workspace-page__summary workspace-page__summary--4 dividend-calendar__summary"
-            aria-label="배당 요약"
-          >
-            <article className="workspace-page__summary-card">
-              <p className="workspace-page__summary-label">이번 달 예상</p>
-              <p className="workspace-page__summary-value">
-                {formatCurrency(monthlySummary.estimated)}
-              </p>
-            </article>
-            <article className="workspace-page__summary-card">
-              <p className="workspace-page__summary-label">이번 달 확정</p>
-              <p className="workspace-page__summary-value">
-                {formatCurrency(monthlySummary.confirmed)}
-              </p>
-            </article>
-            <article className="workspace-page__summary-card">
-              <p className="workspace-page__summary-label">이번 달 지급완료</p>
-              <p className="workspace-page__summary-value">
-                {formatCurrency(monthlySummary.paid)}
-              </p>
-            </article>
-            <article className="workspace-page__summary-card">
-              <p className="workspace-page__summary-label">올해 누적 지급액</p>
-              <p className="workspace-page__summary-value">{formatCurrency(yearPaid)}</p>
-              <p className="workspace-page__summary-sub">{viewYear}년 · PAID만 합산</p>
-            </article>
-          </section>
-
-          <section className="workspace-page__summary-card dividend-calendar__next">
-            <p className="workspace-page__summary-label">다음 지급 예정</p>
-            {nextEvent ? (
-              <div className="dividend-calendar__next-body">
-                <p className="workspace-page__summary-value">
-                  {nextEvent.fundName || nextEvent.symbol || '—'}
-                </p>
-                <p className="workspace-page__summary-sub">
-                  {nextEvent.paymentDate} · {formatCurrency(getDividendEventAmount(nextEvent))} ·{' '}
-                  {getDividendStatusLabel(nextEvent.status)}
-                </p>
-              </div>
-            ) : (
-              <p className="workspace-page__summary-sub">예정된 지급이 없습니다.</p>
-            )}
-          </section>
-        </>
-      )}
-
-      {embedded && (
-        <header className="dividend-calendar__embedded-header">
-          <h2 className="simple-dash__section-title">배당 달력</h2>
-        </header>
-      )}
-
-      {isEmpty && (
-        <p className="workspace-page__empty dividend-calendar__empty">
-          등록된 배당 일정이 없습니다.
-        </p>
-      )}
-
+    <div className="dividend-calendar dividend-calendar--embedded">
       <section className="dividend-calendar__panel" aria-label="월별 배당 달력">
         <div className="dividend-calendar__toolbar">
-          <button
-            type="button"
-            className="dividend-calendar__nav-btn"
-            onClick={goPrevMonth}
-            aria-label="이전 달"
-          >
-            ‹ 이전
-          </button>
-          <h3 className="dividend-calendar__month-label">
-            {viewYear}년 {viewMonth}월
-          </h3>
-          <button
-            type="button"
-            className="dividend-calendar__nav-btn"
-            onClick={goNextMonth}
-            aria-label="다음 달"
-          >
-            다음 ›
-          </button>
-          <button
-            type="button"
-            className="dividend-calendar__today-btn"
-            onClick={goToday}
-          >
-            오늘
-          </button>
+          <div className="dividend-calendar__nav">
+            <button
+              type="button"
+              className="dividend-calendar__nav-btn"
+              onClick={goPrevMonth}
+              aria-label="이전 달"
+            >
+              &lt;
+            </button>
+            <h3 className="dividend-calendar__month-label">
+              {viewYear}년 {viewMonth}월
+            </h3>
+            <button
+              type="button"
+              className="dividend-calendar__nav-btn"
+              onClick={goNextMonth}
+              aria-label="다음 달"
+            >
+              &gt;
+            </button>
+          </div>
+          <p className="dividend-calendar__month-total">
+            이번 달 총 배당 <strong>{formatCurrency(monthPaid)}</strong>
+          </p>
         </div>
+
+        <ul className="dividend-calendar__legend" aria-label="상태 범례">
+          <li>
+            <span className="dividend-calendar__legend-dot dividend-calendar__legend-dot--paid" />
+            지급완료
+          </li>
+          <li>
+            <span className="dividend-calendar__legend-dot dividend-calendar__legend-dot--confirmed" />
+            확정
+          </li>
+          <li>
+            <span className="dividend-calendar__legend-dot dividend-calendar__legend-dot--estimated" />
+            예정
+          </li>
+        </ul>
 
         <div className="dividend-calendar__weekdays" role="row">
           {WEEKDAYS.map((label) => (
@@ -261,37 +190,57 @@ function DividendCalendar({ embedded = false }) {
 
             const dayEvents = eventsByDate.get(cell.dateKey) ?? []
             const isToday = cell.dateKey === todayKey
+            const visible = dayEvents.slice(0, MAX_VISIBLE_EVENTS)
+            const overflow = dayEvents.length - visible.length
 
             return (
-              <div
+              <button
                 key={cell.key}
-                className={`dividend-calendar__cell${
+                type="button"
+                className={`dividend-calendar__cell dividend-calendar__cell--interactive${
                   isToday ? ' dividend-calendar__cell--today' : ''
                 }${dayEvents.length > 0 ? ' dividend-calendar__cell--has-events' : ''}`}
-                role="gridcell"
+                onClick={() => onDayClick?.(cell.dateKey, dayEvents)}
               >
                 <span className="dividend-calendar__day-num">{cell.day}</span>
                 <ul className="dividend-calendar__event-list">
-                  {dayEvents.map((event) => (
-                    <li
-                      key={event.id}
-                      className={`dividend-calendar__event dividend-calendar__event--${String(
-                        event.status || 'unknown',
-                      ).toLowerCase()}`}
-                    >
-                      <span className="dividend-calendar__event-name">
-                        {event.fundName || event.symbol || '—'}
-                      </span>
-                      <span className="dividend-calendar__event-amount">
-                        {formatCurrency(getDividendEventAmount(event))}
-                      </span>
-                      <span className="dividend-calendar__event-status">
-                        {getDividendStatusLabel(event.status)}
-                      </span>
-                    </li>
-                  ))}
+                  {visible.map((event) => {
+                    const statusClass = String(event.status || 'unknown').toLowerCase()
+                    return (
+                      <li key={event.id}>
+                        <span
+                          className={`dividend-calendar__event dividend-calendar__event--${statusClass}`}
+                          onClick={(clickEvent) => {
+                            clickEvent.stopPropagation()
+                            onEventClick?.(event)
+                          }}
+                          onKeyDown={(keyEvent) => {
+                            if (keyEvent.key === 'Enter') {
+                              keyEvent.stopPropagation()
+                              onEventClick?.(event)
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          <span className="dividend-calendar__event-name">
+                            {shortFundName(event.fundName || event.symbol)}
+                          </span>
+                          <span className="dividend-calendar__event-amount">
+                            {formatCurrency(getDividendEventAmount(event))}
+                          </span>
+                          <span className="dividend-calendar__event-badge">
+                            {getDividendStatusLabel(event.status)}
+                          </span>
+                        </span>
+                      </li>
+                    )
+                  })}
+                  {overflow > 0 && (
+                    <li className="dividend-calendar__overflow">+{overflow}건</li>
+                  )}
                 </ul>
-              </div>
+              </button>
             )
           })}
         </div>

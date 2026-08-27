@@ -1,0 +1,106 @@
+/**
+ * DividendForm.css — 배당 입력 폼
+ */
+
+.dividend-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.dividend-form__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.dividend-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.dividend-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.dividend-form__field--full {
+  grid-column: 1 / -1;
+}
+
+.dividend-form__label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.dividend-form input,
+.dividend-form select {
+  padding: 0.55rem 0.65rem;
+  font-size: 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text);
+}
+
+.dividend-form__advanced-toggle {
+  align-self: flex-start;
+  padding: 0.35rem 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.dividend-form__preview {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.dividend-form__preview strong {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.dividend-form__error {
+  color: #cf222e;
+  font-size: 0.9rem;
+}
+
+.dividend-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.dividend-form__cancel,
+.dividend-form__submit {
+  padding: 0.55rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dividend-form__cancel {
+  color: var(--color-text);
+  background: #f6f8fa;
+  border: 1px solid var(--color-border);
+}
+
+.dividend-form__submit {
+  color: #fff;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+@media (max-width: 640px) {
+  .dividend-form__grid {
+    grid-template-columns: 1fr;
+  }
+}
