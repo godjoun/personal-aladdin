@@ -2,6 +2,8 @@
  * headers.js — 보안 HTTP 헤더 (Helmet 동등, 추가 dependency 없음)
  */
 
+import { shouldSendHsts } from '../listenConfig.js'
+
 /**
  * @param {import('express').Request} req
  * @param {import('express').Response} res
@@ -35,7 +37,7 @@ export function securityHeaders(req, res, next) {
     ].join('; '),
   )
 
-  if (process.env.NODE_ENV === 'production') {
+  if (shouldSendHsts()) {
     res.setHeader(
       'Strict-Transport-Security',
       'max-age=31536000; includeSubDomains',

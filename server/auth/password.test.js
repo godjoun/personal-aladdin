@@ -31,4 +31,13 @@ describe('resolveDbPath', () => {
     expect(result.dbPath).toContain('aladdin.sqlite')
     expect(result.source).toBe('ALADDIN_DATA_DIR')
   })
+
+  it('로컬 production 은 프로젝트 data 기본 경로 허용', () => {
+    const result = resolveDbPath({
+      env: { NODE_ENV: 'production', ALADDIN_LOCAL: '1' },
+      isProd: true,
+    })
+    expect(result.source).toBe('local_default')
+    expect(result.dbPath).toContain('aladdin.sqlite')
+  })
 })

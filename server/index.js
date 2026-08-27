@@ -75,6 +75,10 @@ import {
   sanitizeManualAssets,
   sanitizeManualTrades,
 } from './security/validate.js'
+import {
+  getListenHost,
+  shouldUseSecureCookies,
+} from './listenConfig.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 config({ path: path.join(__dirname, '..', '.env') })
@@ -82,6 +86,7 @@ config({ path: path.join(__dirname, '..', '.env') })
 const isProd = process.env.NODE_ENV === 'production'
 const PORT = Number(process.env.PORT || process.env.CENTRAL_PORT) || 3001
 const distPath = path.join(__dirname, '..', 'dist')
+const LISTEN_HOST = getListenHost()
 
 function authConfigured() {
   const user = process.env.ALADDIN_ADMIN_USERNAME?.trim()
@@ -91,8 +96,7 @@ function authConfigured() {
 }
 
 function cookieSecure(req) {
-  if (isProd) return true
-  return Boolean(req.secure)
+  return shouldUseSecureCookies(req, { isProd })
 }
 
 function sendSessionCookie(res, req, sessionId, expiresAt) {
@@ -699,9 +703,8 @@ const isMain =
 if (isMain) {
   try {
     const app = createApp()
-    // Render 등 컨테이너 환경: 반드시 0.0.0.0 바인딩
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`[Server] ALADDIN API running on port ${PORT}`)
+    app.listen(PORT, LISTEN_HOST, () => {
+      console.log(`[Server] ALADDIN listening on http://${LISTEN_HOST}:${PORT}`)
       if (isProd) {
         console.log('[Server] Production mode — serving dist/')
       }

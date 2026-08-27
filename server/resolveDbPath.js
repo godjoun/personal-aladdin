@@ -4,6 +4,7 @@
 
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { isAladdinLocalMode } from './listenConfig.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -34,6 +35,11 @@ export function resolveDbPath(options = {}) {
       dbPath: path.resolve(dataDir, 'aladdin.sqlite'),
       source: 'ALADDIN_DATA_DIR',
     }
+  }
+
+  // Mac 로컬 LaunchAgent: 프로젝트 server/data 사용 (Render와 구분)
+  if (isProd && isAladdinLocalMode(env)) {
+    return { dbPath: defaultPath, source: 'local_default' }
   }
 
   if (isProd) {

@@ -1,36 +1,28 @@
 #!/usr/bin/env node
 /**
- * start-aladdin.js — 로컬 개인용 ALADDIN 통합 실행
+ * start-aladdin.js — 로컬 UI 오픈 (Vite 없이 127.0.0.1:3001)
  *
- * - Express API (:3001) + Vite frontend
- * - health 준비 후 기본 브라우저 오픈
- * - 이미 API가 살아 있으면 중복 기동하지 않고 화면만 오픈
- * - Ctrl+C 시 child process 정리
- * - 하루 1회 SQLite 백업 (실패해도 기동 계속)
+ * 1) health OK → 브라우저 오픈 후 종료
+ * 2) LaunchAgent kickstart 시도
+ * 3) 그래도 없으면 백그라운드 서버 기동 (detached)
+ * 4) health 대기 후 브라우저 오픈
  */
 
-import { spawn, execFile } from 'child_process'
+import { spawn, execFile, execFileSync } from 'child_process'
 import fs from 'fs'
 import http from 'http'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { config } from 'dotenv'
 import { runDailyBackupIfNeeded } from './dailyBackup.js'
+import { LABEL, getGuiDomain, getPlistPath } from './localLaunchAgent.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
-const API_PORT = Number(process.env.CENTRAL_PORT) || 3001
-const API_ORIGIN = `http://127.0.0.1:${API_PORT}`
-const HEALTH_URL = `${API_ORIGIN}/api/health`
-const RUNTIME_PATH = path.join(ROOT, 'server', 'data', 'aladdin-runtime.json')
-const VITE_PROBE_PORTS = [5173, 5174, 5175, 5176, 5177, 5178, 5179, 5180]
+const APP_URL = 'http://127.0.0.1:3001'
+const HEALTH_URL = `${APP_URL}/api/health`
 
 config({ path: path.join(ROOT, '.env') })
-
-/** @type {import('child_process').ChildProcess[]} */
-const children = []
-let shuttingDown = false
-let browserOpened = false
 
 function log(message) {
   console.log(`[ALADDIN] ${message}`)
@@ -40,11 +32,6 @@ function warn(message) {
   console.warn(`[ALADDIN] ${message}`)
 }
 
-/**
- * @param {string} url
- * @param {number} [timeoutMs]
- * @returns {Promise<{ ok: boolean, status?: number, body?: string }>}
- */
 function httpGet(url, timeoutMs = 1500) {
   return new Promise((resolve) => {
     const req = http.get(url, { timeout: timeoutMs }, (res) => {
@@ -76,78 +63,17 @@ async function isApiHealthy() {
   }
 }
 
-async function waitForApi(timeoutMs = 30_000) {
+async function waitForApi(timeoutMs = 45_000) {
   const start = Date.now()
   while (Date.now() - start < timeoutMs) {
     if (await isApiHealthy()) return true
-    await new Promise((r) => setTimeout(r, 300))
+    await new Promise((r) => setTimeout(r, 400))
   }
   return false
 }
 
-function writeRuntime(frontendUrl) {
-  try {
-    fs.mkdirSync(path.dirname(RUNTIME_PATH), { recursive: true })
-    fs.writeFileSync(
-      RUNTIME_PATH,
-      JSON.stringify(
-        {
-          frontendUrl,
-          apiPort: API_PORT,
-          updatedAt: new Date().toISOString(),
-        },
-        null,
-        2,
-      ),
-      'utf8',
-    )
-  } catch {
-    // non-fatal
-  }
-}
-
-function readRuntimeUrl() {
-  try {
-    const raw = fs.readFileSync(RUNTIME_PATH, 'utf8')
-    const data = JSON.parse(raw)
-    if (typeof data?.frontendUrl === 'string' && data.frontendUrl.startsWith('http')) {
-      return data.frontendUrl
-    }
-  } catch {
-    // ignore
-  }
-  return null
-}
-
-async function probeFrontendUrl() {
-  const saved = readRuntimeUrl()
-  if (saved) {
-    const res = await httpGet(saved)
-    if (res.ok) return saved
-  }
-
-  for (const port of VITE_PROBE_PORTS) {
-    const url = `http://127.0.0.1:${port}/`
-    const res = await httpGet(url)
-    if (!res.ok) continue
-    const body = res.body || ''
-    if (
-      body.includes('vite') ||
-      body.includes('/@vite/client') ||
-      body.includes('id="root"') ||
-      body.includes("id='root'")
-    ) {
-      return `http://localhost:${port}/`
-    }
-  }
-  return null
-}
-
 function openBrowser(url) {
-  if (browserOpened) return
-  browserOpened = true
   log(`브라우저 열기: ${url}`)
-
   if (process.platform === 'darwin') {
     execFile('open', [url], () => {})
     return
@@ -159,168 +85,82 @@ function openBrowser(url) {
   execFile('xdg-open', [url], () => {})
 }
 
-/**
- * @param {string} command
- * @param {string[]} args
- * @param {{ pipeVite?: boolean }} [opts]
- */
-function spawnChild(command, args, opts = {}) {
-  const child = spawn(command, args, {
-    cwd: ROOT,
-    env: {
-      ...process.env,
-      CENTRAL_PORT: String(API_PORT),
-    },
-    stdio: opts.pipeVite ? ['ignore', 'pipe', 'pipe'] : 'inherit',
-    shell: process.platform === 'win32',
-  })
-  children.push(child)
-  child.on('exit', (code, signal) => {
-    if (shuttingDown) return
-    if (signal) {
-      warn(`자식 프로세스 종료 signal=${signal}`)
-    } else if (code && code !== 0) {
-      warn(`자식 프로세스 종료 code=${code}`)
-    }
-  })
-  return child
-}
+function tryKickstartLaunchAgent() {
+  if (process.platform !== 'darwin') return false
+  const plistPath = getPlistPath()
+  if (!fs.existsSync(plistPath)) return false
 
-function shutdown(code = 0) {
-  if (shuttingDown) return
-  shuttingDown = true
-  log('종료 중…')
-
-  for (const child of children) {
-    if (!child.killed && child.exitCode == null) {
-      try {
-        child.kill('SIGTERM')
-      } catch {
-        // ignore
-      }
+  const target = `${getGuiDomain()}/${LABEL}`
+  try {
+    execFileSync('launchctl', ['kickstart', '-k', target], { stdio: 'ignore' })
+    log('LaunchAgent kickstart')
+    return true
+  } catch {
+    try {
+      execFileSync('launchctl', ['bootstrap', getGuiDomain(), plistPath], {
+        stdio: 'ignore',
+      })
+      execFileSync('launchctl', ['kickstart', '-k', target], { stdio: 'ignore' })
+      log('LaunchAgent bootstrap + kickstart')
+      return true
+    } catch {
+      return false
     }
   }
-
-  const forceTimer = setTimeout(() => {
-    for (const child of children) {
-      if (!child.killed && child.exitCode == null) {
-        try {
-          child.kill('SIGKILL')
-        } catch {
-          // ignore
-        }
-      }
-    }
-    process.exit(code)
-  }, 4000)
-
-  const check = setInterval(() => {
-    if (children.every((c) => c.exitCode != null || c.killed)) {
-      clearInterval(check)
-      clearTimeout(forceTimer)
-      process.exit(code)
-    }
-  }, 100)
 }
 
-process.on('SIGINT', () => shutdown(0))
-process.on('SIGTERM', () => shutdown(0))
-
-function extractViteLocalUrl(chunk) {
-  const text = String(chunk)
-  const match =
-    text.match(/Local:\s+(https?:\/\/(?:localhost|127\.0\.0\.1):\d+\/?)/i) ||
-    text.match(/(https?:\/\/(?:localhost|127\.0\.0\.1):\d+\/)/)
-  return match ? match[1].replace(/\/?$/, '/') : null
+function startDetachedServer() {
+  const runner = path.join(ROOT, 'scripts', 'run-local-server.js')
+  log('백그라운드 서버 기동')
+  const child = spawn(process.execPath, [runner], {
+    cwd: ROOT,
+    detached: true,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      ALADDIN_LOCAL: '1',
+      ALADDIN_LISTEN_HOST: '127.0.0.1',
+    },
+  })
+  child.unref()
 }
 
 async function maybeDailyBackup() {
   const result = await runDailyBackupIfNeeded({ projectRoot: ROOT })
-  if (result.status === 'created') {
-    log(`일일 백업 완료`)
-  } else if (result.status === 'skipped') {
-    log('오늘 백업 이미 있음 — 건너뜀')
-  } else if (result.status === 'missing_db') {
-    log('DB 파일 없음 — 백업 건너뜀 (첫 실행이면 정상)')
-  } else if (result.status === 'failed') {
+  if (result.status === 'created') log('일일 백업 완료')
+  else if (result.status === 'failed') {
     warn(`백업 실패(실행은 계속): ${result.message || 'unknown'}`)
   }
-}
-
-async function openExistingSession() {
-  const frontend = await probeFrontendUrl()
-  if (frontend) {
-    openBrowser(frontend)
-    log('이미 실행 중입니다. 브라우저만 열었습니다.')
-    return true
-  }
-
-  warn(
-    'API(:3001)는 응답하지만 frontend를 찾지 못했습니다. 기존 터미널에서 Ctrl+C 후 다시 실행하세요.',
-  )
-  return false
 }
 
 async function main() {
   await maybeDailyBackup()
 
   if (await isApiHealthy()) {
-    await openExistingSession()
-    // 중복 기동 방지 — 이 프로세스는 서버를 붙잡지 않고 종료
+    openBrowser(APP_URL)
+    log('이미 실행 중 — 브라우저만 열었습니다.')
     process.exit(0)
   }
 
-  log(`API 서버 시작 (port ${API_PORT})`)
-  spawnChild(process.execPath, [path.join(ROOT, 'server', 'index.js')])
-
-  const apiReady = await waitForApi()
-  if (!apiReady) {
-    warn('API health 대기 시간 초과')
-    shutdown(1)
-    return
+  const kicked = tryKickstartLaunchAgent()
+  if (!kicked) {
+    startDetachedServer()
   }
-  log('API 준비됨')
 
-  log('frontend(Vite) 시작')
-  const viteBin = path.join(
-    ROOT,
-    'node_modules',
-    'vite',
-    'bin',
-    'vite.js',
-  )
-  const viteArgs = fs.existsSync(viteBin)
-    ? [viteBin]
-    : [path.join(ROOT, 'node_modules', 'vite', 'dist', 'node', 'cli.js')]
+  const ready = await waitForApi()
+  if (!ready) {
+    warn('서버 health 대기 시간 초과')
+    warn('npm run local:install 후 다시 시도하세요.')
+    process.exit(1)
+  }
 
-  const vite = spawnChild(process.execPath, viteArgs, { pipeVite: true })
-
-  vite.stdout?.on('data', (buf) => {
-    process.stdout.write(buf)
-    const url = extractViteLocalUrl(buf)
-    if (url && !browserOpened) {
-      writeRuntime(url)
-      openBrowser(url)
-    }
-  })
-  vite.stderr?.on('data', (buf) => {
-    process.stderr.write(buf)
-    const url = extractViteLocalUrl(buf)
-    if (url && !browserOpened) {
-      writeRuntime(url)
-      openBrowser(url)
-    }
-  })
-
-  vite.on('exit', (code) => {
-    if (!shuttingDown) {
-      warn('Vite가 종료되어 ALADDIN을 닫습니다.')
-      shutdown(code || 0)
-    }
-  })
+  openBrowser(APP_URL)
+  log(`준비됨: ${APP_URL}`)
+  process.exit(0)
 }
 
 main().catch((error) => {
   warn(error?.message || 'ALADDIN start failed')
-  shutdown(1)
+  process.exit(1)
 })

@@ -1,54 +1,63 @@
 #!/bin/bash
-# ALADDIN.command — Mac 더블클릭 실행기 (credential 없음)
+# ALADDIN.command — Mac 더블클릭: 서버 확인/기동 후 브라우저 오픈
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-echo "========================================"
-echo " ALADDIN — 개인 투자 대시보드"
-echo "========================================"
-echo ""
+APP_URL="http://127.0.0.1:3001"
+HEALTH_URL="${APP_URL}/api/health"
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "[오류] Node.js가 없습니다. https://nodejs.org 에서 설치 후 다시 실행하세요."
-  read -r -p "Enter 키를 누르면 종료합니다… " _
-  exit 1
-fi
+health_ok() {
+  local body
+  body="$(curl -fsS --max-time 2 "$HEALTH_URL" 2>/dev/null || true)"
+  echo "$body" | grep -q '"ok":true'
+}
 
-if ! command -v npm >/dev/null 2>&1; then
-  echo "[오류] npm이 없습니다. Node.js 설치를 확인하세요."
-  read -r -p "Enter 키를 누르면 종료합니다… " _
-  exit 1
-fi
+open_app() {
+  open "$APP_URL"
+}
 
-if [ ! -f "$ROOT/.env" ]; then
-  echo "[오류] .env 파일이 없습니다."
-  echo "1) .env.example 을 복사해 .env 를 만드세요."
-  echo "2) npm run auth:setup 으로 로그인을 설정하세요."
-  read -r -p "Enter 키를 누르면 종료합니다… " _
-  exit 1
-fi
-
-if [ ! -d "$ROOT/node_modules" ]; then
-  echo "[안내] 의존성 설치 중 (최초 1회)…"
-  npm install
-fi
-
-echo "[안내] ALADDIN을 시작합니다. 종료는 이 창에서 Ctrl+C 입니다."
-echo ""
-
-set +e
-npm run aladdin
-EXIT_CODE=$?
-set -e
-
-# 정상 종료 / Ctrl+C / SIGTERM
-if [ "$EXIT_CODE" -eq 0 ] || [ "$EXIT_CODE" -eq 130 ] || [ "$EXIT_CODE" -eq 143 ]; then
+if health_ok; then
+  open_app
   exit 0
 fi
 
-echo ""
-echo "[오류] ALADDIN 실행에 실패했습니다. (code=$EXIT_CODE)"
-read -r -p "Enter 키를 누르면 종료합니다… " _
-exit "$EXIT_CODE"
+# LaunchAgent 우선
+if command -v launchctl >/dev/null 2>&1; then
+  LABEL="com.personal-aladdin.server"
+  PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+  DOMAIN="gui/$(id -u)"
+  if [ -f "$PLIST" ]; then
+    launchctl kickstart -k "${DOMAIN}/${LABEL}" >/dev/null 2>&1 || \
+      launchctl bootstrap "$DOMAIN" "$PLIST" >/dev/null 2>&1 || true
+  fi
+fi
+
+# 여전히 down 이면 Node runner 를 백그라운드로
+if ! health_ok; then
+  if ! command -v node >/dev/null 2>&1; then
+    osascript -e 'display alert "ALADDIN" message "Node.js 가 필요합니다."' >/dev/null 2>&1 || true
+    exit 1
+  fi
+  if [ ! -f "$ROOT/.env" ]; then
+    osascript -e 'display alert "ALADDIN" message ".env 파일이 없습니다. auth:setup 을 먼저 해주세요."' >/dev/null 2>&1 || true
+    exit 1
+  fi
+  if [ ! -d "$ROOT/dist" ] || [ ! -f "$ROOT/dist/index.html" ]; then
+    npm run build >/dev/null 2>&1 || true
+  fi
+  nohup node "$ROOT/scripts/run-local-server.js" >/dev/null 2>&1 &
+  disown || true
+fi
+
+for _ in $(seq 1 60); do
+  if health_ok; then
+    open_app
+    exit 0
+  fi
+  sleep 0.5
+done
+
+osascript -e 'display alert "ALADDIN" message "서버를 시작하지 못했습니다. 터미널에서 npm run local:install 을 실행하세요."' >/dev/null 2>&1 || true
+exit 1
