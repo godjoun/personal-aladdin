@@ -14,6 +14,7 @@ import {
   normalizeNewsItem,
   setNewsCache,
 } from './newsProvider.js'
+import { fetchWithTimeout } from '../utils/fetchTimeout.js'
 
 export const NAVER_API_HUB_HOST = 'naverapihub.apigw.ntruss.com'
 export const NAVER_NEWS_PATH = '/search/v1/news'
@@ -108,14 +109,20 @@ export async function fetchNaverNews(query, options = {}) {
 
   let response
   try {
-    response = await fetchImpl(url.toString(), {
-      method: 'GET',
-      headers: {
-        'X-NCP-APIGW-API-KEY-ID': clientId,
-        'X-NCP-APIGW-API-KEY': clientSecret,
+    response = await fetchWithTimeout(
+      fetchImpl,
+      url.toString(),
+      {
+        method: 'GET',
+        headers: {
+          'X-NCP-APIGW-API-KEY-ID': clientId,
+          'X-NCP-APIGW-API-KEY': clientSecret,
+        },
       },
-    })
+      { timeoutMs: options.timeoutMs ?? 12_000 },
+    )
   } catch {
+    if (cached) return { ...cached, cached: true, stale: true }
     return {
       ok: false,
       configured: true,

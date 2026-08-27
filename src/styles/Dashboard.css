@@ -60,6 +60,11 @@
   color: var(--color-text-muted);
 }
 
+.simple-dash__sync-bg {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
 .simple-dash__holdings-tools {
   display: flex;
   align-items: center;

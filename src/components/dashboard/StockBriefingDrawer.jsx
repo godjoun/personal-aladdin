@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { fetchStockBriefing } from '../../services/stockBriefingApi.js'
+import { fetchStockBriefing, peekBriefingCache } from '../../services/stockBriefingApi.js'
 import {
   formatCurrency,
   formatEokWon,
@@ -58,19 +58,29 @@ function StockBriefingDrawer({
     if (!open || !symbol) return undefined
 
     let cancelled = false
-    setLoading(true)
     setError('')
-    setBriefing(null)
+
+    const cached = peekBriefingCache(symbol)
+    if (cached?.payload) {
+      setBriefing(cached.payload)
+      setLoading(false)
+    } else {
+      setBriefing(null)
+      setLoading(true)
+    }
 
     fetchStockBriefing(symbol, {
       name: stockName,
       holdings: holdingsPayload,
+      forceRefresh: Boolean(cached && !cached.fresh),
     })
       .then((payload) => {
         if (!cancelled) setBriefing(payload)
       })
       .catch(() => {
-        if (!cancelled) setError('종목 브리핑을 불러오지 못했습니다.')
+        if (!cancelled && !cached?.payload) {
+          setError('종목 브리핑을 불러오지 못했습니다.')
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

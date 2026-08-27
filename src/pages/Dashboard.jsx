@@ -2,7 +2,7 @@
  * Dashboard.jsx — 단일 개인 투자 대시보드 (v1.1)
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AssetForm from '../components/AssetForm.jsx'
 import TradeForm from '../components/TradeForm.jsx'
 import DividendForm from '../components/DividendForm.jsx'
@@ -22,6 +22,7 @@ import {
 } from '../services/dividendStorage.js'
 import { persistManualLedger } from '../services/dividendPersistence.js'
 import { apiFetch } from '../services/apiClient.js'
+import { measureSyncStep } from '../utils/syncTiming.js'
 import {
   buildDashboardHoldingsView,
   calculateKiwoomPortfolioSummary,
@@ -68,9 +69,15 @@ const KIWOOM_STATUS = {
 const SYNC_STEPS = {
   IDLE: '',
   ACCOUNTS: '계좌 확인 중...',
-  TRADES: '거래내역 확인 중...',
   DIVIDENDS: '배당 확인 중...',
-  DONE: '완료',
+  DONE: '자산 동기화 완료',
+}
+
+const BACKGROUND_STATUS = {
+  IDLE: 'idle',
+  RUNNING: 'running',
+  DONE: 'done',
+  ERROR: 'error',
 }
 
 const ACCOUNT_FILTERS = [
@@ -166,6 +173,7 @@ function Dashboard({
   const [refreshStatus, setRefreshStatus] = useState(REFRESH_STATUS.IDLE)
   const [syncStep, setSyncStep] = useState(SYNC_STEPS.IDLE)
   const [syncNotice, setSyncNotice] = useState('')
+  const [backgroundStatus, setBackgroundStatus] = useState(BACKGROUND_STATUS.IDLE)
   const [kiwoomStatus, setKiwoomStatus] = useState(KIWOOM_STATUS.LOADING)
   const [kiwoomHoldings, setKiwoomHoldings] = useState([])
   const [withdrawableByAccount, setWithdrawableByAccount] = useState([
@@ -182,7 +190,10 @@ function Dashboard({
   const [syncedAt, setSyncedAt] = useState(lastUpdatedAt)
   const [briefingSymbol, setBriefingSymbol] = useState(null)
   const [attentionItems, setAttentionItems] = useState([])
-
+  /** @type {React.MutableRefObject<Promise<unknown> | null>} */
+  const fastSyncLockRef = useRef(null)
+  /** @type {React.MutableRefObject<Promise<unknown> | null>} */
+  const backgroundSyncLockRef = useRef(null)
   async function loadAttentionSummary(rows) {
     try {
       const unique = []
@@ -245,7 +256,8 @@ function Dashboard({
 
   async function loadKiwoomDividends() {
     try {
-      const result = await syncKiwoomDividends({ from: '2026-08-01' })
+      // from 생략 → 증분 커서 (overlap 포함)
+      const result = await syncKiwoomDividends()
       setDividendEvents(getDividendEvents())
       return result
     } catch (error) {
@@ -254,7 +266,25 @@ function Dashboard({
     }
   }
 
-  // App hydrate(manual → dividend) 완료 후 Kiwoom 동기화
+  function runBackgroundSync(holdings) {
+    if (backgroundSyncLockRef.current) return backgroundSyncLockRef.current
+
+    setBackgroundStatus(BACKGROUND_STATUS.RUNNING)
+    const task = measureSyncStep('background attention', async () => {
+      try {
+        await loadAttentionSummary(holdings || [])
+        setBackgroundStatus(BACKGROUND_STATUS.DONE)
+      } catch {
+        setBackgroundStatus(BACKGROUND_STATUS.ERROR)
+      } finally {
+        backgroundSyncLockRef.current = null
+      }
+    })
+    backgroundSyncLockRef.current = task
+    return task
+  }
+
+  // App hydrate(manual → dividend) 완료 후 Kiwoom FAST 동기화
   useEffect(() => {
     if (!persistenceReady) return undefined
 
@@ -262,9 +292,11 @@ function Dashboard({
 
     async function boot() {
       setDividendEvents(getDividendEvents())
-      await loadKiwoomBalances({ preserveOnFail: false })
+      const balanceResult = await loadKiwoomBalances({ preserveOnFail: false })
+      if (cancelled) return
+      await loadKiwoomDividends()
       if (!cancelled) {
-        await loadKiwoomDividends()
+        runBackgroundSync(balanceResult?.holdings || [])
       }
     }
 
@@ -299,6 +331,17 @@ function Dashboard({
   }, [syncNotice])
 
   useEffect(() => {
+    if (
+      backgroundStatus !== BACKGROUND_STATUS.DONE &&
+      backgroundStatus !== BACKGROUND_STATUS.ERROR
+    ) {
+      return undefined
+    }
+    const timer = setTimeout(() => setBackgroundStatus(BACKGROUND_STATUS.IDLE), 6000)
+    return () => clearTimeout(timer)
+  }, [backgroundStatus])
+
+  useEffect(() => {
     if (!manageMode && !detailEvent && !dayDetail) return undefined
 
     function handleKeyDown(event) {
@@ -315,66 +358,74 @@ function Dashboard({
   }, [manageMode, detailEvent, dayDetail])
 
   async function handleFullSync() {
-    if (refreshStatus === REFRESH_STATUS.LOADING) return
+    if (fastSyncLockRef.current) {
+      return fastSyncLockRef.current
+    }
 
     setRefreshStatus(REFRESH_STATUS.LOADING)
     setSyncNotice('')
     setSyncStep(SYNC_STEPS.ACCOUNTS)
 
-    try {
-      const balanceResult = await loadKiwoomBalances({ preserveOnFail: true })
-      const balanceOk = Boolean(balanceResult?.ok)
-
-      setSyncStep(SYNC_STEPS.TRADES)
-      let marketOk = false
+    const task = (async () => {
       try {
-        await onRefreshPrices?.()
-        marketOk = true
-      } catch (error) {
-        console.warn('[Dashboard] 시세 갱신 실패:', error.message)
-      }
+        const balanceResult = await measureSyncStep('balance sync', () =>
+          loadKiwoomBalances({ preserveOnFail: true }),
+        )
+        const balanceOk = Boolean(balanceResult?.ok)
 
-      setSyncStep(SYNC_STEPS.DIVIDENDS)
-      const dividendResult = await loadKiwoomDividends()
-
-      try {
-        await persistManualLedger()
-      } catch {
-        // 수동 백업 실패는 동기화 전체 실패로 보지 않음
-      }
-
-      // 뉴스/공시 주의사항 — 실패해도 잔고·배당 성공을 뒤집지 않음
-      try {
-        await loadAttentionSummary(balanceResult?.holdings || [])
-      } catch {
-        // ignore
-      }
-
-      setSyncStep(SYNC_STEPS.DONE)
-
-      if (balanceOk || marketOk || dividendResult.ok) {
-        setRefreshStatus(REFRESH_STATUS.SUCCESS)
-        setSyncedAt(new Date())
-        if (dividendResult.added > 0) {
-          const amount = (dividendResult.additions || []).reduce(
-            (sum, event) => sum + getDividendEventAmount(event),
-            0,
-          )
-          setSyncNotice(
-            `새 배당 ${dividendResult.added}건 · ${formatCurrency(amount)}`,
-          )
-        } else {
-          setSyncNotice('방금 동기화됨')
+        // FAST: 키움 잔고에 현재가 포함 — 공공시세/잔고 재호출로 UI를 막지 않음
+        // 수동 자산 시세는 스케줄/백그라운드성으로만 (실패 무시)
+        if (assets?.length > 0) {
+          measureSyncStep('manual prices (bg)', async () => {
+            try {
+              await onRefreshPrices?.()
+            } catch {
+              // ignore — 키움 잔고 성공을 유지
+            }
+          })
         }
-      } else {
+
+        setSyncStep(SYNC_STEPS.DIVIDENDS)
+        const dividendResult = await measureSyncStep('dividend sync', () =>
+          loadKiwoomDividends(),
+        )
+
+        persistManualLedger().catch(() => {})
+
+        setSyncStep(SYNC_STEPS.DONE)
+
+        if (balanceOk || dividendResult.ok) {
+          setRefreshStatus(REFRESH_STATUS.SUCCESS)
+          setSyncedAt(new Date())
+          if (dividendResult.added > 0) {
+            const amount = (dividendResult.additions || []).reduce(
+              (sum, event) => sum + getDividendEventAmount(event),
+              0,
+            )
+            setSyncNotice(
+              `자산 최신 · 새 배당 ${dividendResult.added}건 · ${formatCurrency(amount)}`,
+            )
+          } else {
+            setSyncNotice('자산 최신 · 방금 전')
+          }
+        } else {
+          setRefreshStatus(REFRESH_STATUS.ERROR)
+          setSyncNotice('동기화 실패 · 기존 데이터 유지')
+        }
+
+        // BACKGROUND: 공시/뉴스 주의 — FAST 완료 후 별도 진행 (버튼 해제)
+        runBackgroundSync(balanceResult?.holdings || [])
+      } catch (error) {
+        console.error('[Dashboard] 전체 동기화 실패:', error)
         setRefreshStatus(REFRESH_STATUS.ERROR)
         setSyncNotice('동기화 실패 · 기존 데이터 유지')
+      } finally {
+        fastSyncLockRef.current = null
       }
-    } catch (error) {
-      console.error('[Dashboard] 전체 동기화 실패:', error)
-      setRefreshStatus(REFRESH_STATUS.ERROR)
-      setSyncNotice('동기화 실패 · 기존 데이터 유지')
-    }
+    })()
+
+    fastSyncLockRef.current = task
+    return task
   }
 
   function handleDeleteAsset(id) {
@@ -527,10 +578,19 @@ function Dashboard({
     refreshStatus === REFRESH_STATUS.LOADING
       ? syncStep || '동기화 중…'
       : refreshStatus === REFRESH_STATUS.SUCCESS
-        ? '동기화 완료'
+        ? '자산 동기화 완료'
         : refreshStatus === REFRESH_STATUS.ERROR
           ? '동기화 실패'
           : '↻ 전체 동기화'
+
+  const backgroundLabel =
+    backgroundStatus === BACKGROUND_STATUS.RUNNING
+      ? '공시 업데이트 중...'
+      : backgroundStatus === BACKGROUND_STATUS.DONE
+        ? '공시 최신'
+        : backgroundStatus === BACKGROUND_STATUS.ERROR
+          ? '공시 갱신 실패 · 기존 유지'
+          : ''
 
   return (
     <div className="simple-dash" aria-label="내 투자 대시보드">
@@ -603,9 +663,14 @@ function Dashboard({
         </div>
       </header>
 
-      {(syncStep || syncNotice) && (
+      {(syncStep || syncNotice || backgroundLabel) && (
         <p className="simple-dash__sync-status" role="status">
-          {refreshStatus === REFRESH_STATUS.LOADING ? syncStep : syncNotice}
+          {refreshStatus === REFRESH_STATUS.LOADING
+            ? syncStep
+            : syncNotice || (refreshStatus === REFRESH_STATUS.SUCCESS ? '자산 최신' : '')}
+          {backgroundLabel ? (
+            <span className="simple-dash__sync-bg"> · {backgroundLabel}</span>
+          ) : null}
         </p>
       )}
 

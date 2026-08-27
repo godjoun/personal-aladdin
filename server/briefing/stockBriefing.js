@@ -6,6 +6,11 @@ import { getKiwoomStockInfo } from '../kiwoomStockInfo.js'
 import { fetchNaverNews } from '../news/naverNewsProvider.js'
 import { fetchDartDisclosures } from '../dart/dartProvider.js'
 import { buildBriefingRiskSignals } from '../../src/utils/briefingRiskSignals.js'
+import { mapWithConcurrency } from '../utils/serverConcurrency.js'
+
+/** 주의요약 종목별 동시 호출 상한 */
+export const ATTENTION_CONCURRENCY = 3
+
 
 /** 상단 주의 신호에 올릴 중요 공시 최대 건수 */
 export const DISCLOSURE_SIGNAL_LIMIT = 3
@@ -245,27 +250,30 @@ export async function getStockAttentionLite(symbol, options = {}) {
 export async function getHoldingsAttentionSummary(holdings, options = {}) {
   const limit = Math.min(Math.max(Number(options.limit) || 5, 1), 10)
   const list = Array.isArray(holdings) ? holdings.slice(0, 20) : []
+  const concurrency = options.concurrency ?? ATTENTION_CONCURRENCY
 
-  const nested = await Promise.all(
-    list.map(async (row) => {
-      const symbol = String(row.symbol || '')
-        .trim()
-        .replace(/^A/i, '')
-      const name = String(row.name || '').trim()
-      if (!symbol && !name) return []
-      try {
-        return await getStockAttentionLite(symbol || name, {
-          stockName: name,
-          env: options.env,
-          fetchImpl: options.fetchImpl,
-        })
-      } catch {
-        return []
-      }
-    }),
+  const settled = await mapWithConcurrency(list, concurrency, async (row) => {
+    const symbol = String(row.symbol || '')
+      .trim()
+      .replace(/^A/i, '')
+    const name = String(row.name || '').trim()
+    if (!symbol && !name) return []
+    try {
+      return await getStockAttentionLite(symbol || name, {
+        stockName: name,
+        env: options.env,
+        fetchImpl: options.fetchImpl,
+      })
+    } catch {
+      return []
+    }
+  })
+
+  const flat = settled.flatMap((result) =>
+    result.status === 'fulfilled' && Array.isArray(result.value)
+      ? result.value
+      : [],
   )
-
-  const flat = nested.flat()
   flat.sort((a, b) => {
     const ap = a.source === 'disclosure' ? 2 : 1
     const bp = b.source === 'disclosure' ? 2 : 1

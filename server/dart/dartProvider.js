@@ -11,9 +11,15 @@ import {
   ensureDartCorpCodeMap,
   lookupCorpCodeFromMap,
 } from './corpCodeMap.js'
+import { fetchWithTimeout } from '../utils/fetchTimeout.js'
 
 const DART_LIST_URL = 'https://opendart.fss.or.kr/api/list.json'
-const CACHE_TTL_MS = 10 * 60 * 1000
+/** 공시 list cache — 전체 동기화마다 재호출 방지 */
+export const DART_CACHE_TTL_MS = 20 * 60 * 1000
+const CACHE_TTL_MS = DART_CACHE_TTL_MS
+/** 최근 동기화가 있으면 증분 조회 일수 */
+export const DART_INCREMENTAL_LOOKBACK_DAYS = 14
+const PROVIDER_TIMEOUT_MS = 15_000
 
 /** 브리핑 기본 공시 조회 기간 */
 export const DART_LOOKBACK_DAYS = 90
@@ -25,6 +31,9 @@ const MSG_EMPTY = '최근 90일 내 공시가 없습니다.'
 
 /** @type {Map<string, { expiresAt: number, payload: unknown }>} */
 const disclosureCache = new Map()
+
+/** @type {Map<string, number>} corpCode → last successful sync ms */
+const lastSyncAtByCorp = new Map()
 
 /**
  * @param {NodeJS.ProcessEnv} [env]
@@ -144,15 +153,20 @@ export async function fetchDartDisclosures(symbol, options = {}) {
   }
 
   const pageCount = Math.min(Math.max(Number(options.pageCount) || 10, 1), 30)
+  const hadPrior = lastSyncAtByCorp.has(corp.corpCode)
   const lookbackDays = Math.max(
     1,
-    Number(options.lookbackDays) || DART_LOOKBACK_DAYS,
+    Number(options.lookbackDays) ||
+      (hadPrior ? DART_INCREMENTAL_LOOKBACK_DAYS : DART_LOOKBACK_DAYS),
   )
-  const cacheKey = `dart:${corp.corpCode}:${pageCount}:${lookbackDays}`
+  const cacheKey = `dart:${corp.corpCode}:${pageCount}`
   const cached = disclosureCache.get(cacheKey)
-  if (cached && cached.expiresAt > Date.now()) {
+  if (cached && cached.expiresAt > Date.now() && !options.forceRefresh) {
     return { ...cached.payload, cached: true }
   }
+
+  // stale cache 유지용 (timeout/실패 시)
+  const stale = cached?.payload || null
 
   const { bgnDe, endDe } = buildDartDateRange(new Date(), lookbackDays)
 
@@ -166,8 +180,14 @@ export async function fetchDartDisclosures(symbol, options = {}) {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch
   let response
   try {
-    response = await fetchImpl(url.toString(), { method: 'GET' })
+    response = await fetchWithTimeout(
+      fetchImpl,
+      url.toString(),
+      { method: 'GET' },
+      { timeoutMs: options.timeoutMs ?? PROVIDER_TIMEOUT_MS },
+    )
   } catch {
+    if (stale) return { ...stale, cached: true, stale: true }
     return {
       ok: false,
       configured: true,
@@ -179,6 +199,7 @@ export async function fetchDartDisclosures(symbol, options = {}) {
   }
 
   if (!response.ok) {
+    if (stale) return { ...stale, cached: true, stale: true }
     return {
       ok: false,
       configured: true,
@@ -193,6 +214,7 @@ export async function fetchDartDisclosures(symbol, options = {}) {
   try {
     payload = await response.json()
   } catch {
+    if (stale) return { ...stale, cached: true, stale: true }
     return {
       ok: false,
       configured: true,
@@ -206,6 +228,7 @@ export async function fetchDartDisclosures(symbol, options = {}) {
   const status = String(payload?.status || '')
   // 000: 정상, 013: 조회 결과 없음
   if (status && status !== '000' && status !== '013') {
+    if (stale) return { ...stale, cached: true, stale: true }
     return {
       ok: false,
       configured: true,
@@ -217,7 +240,22 @@ export async function fetchDartDisclosures(symbol, options = {}) {
   }
 
   const rows = Array.isArray(payload?.list) ? payload.list : []
-  const items = rows.map((row) => normalizeDartDisclosure(row))
+  let items = rows.map((row) => normalizeDartDisclosure(row))
+
+  // 증분 조회 시 stale 항목과 merge (제목+제출일 기준)
+  if (lookbackDays < DART_LOOKBACK_DAYS && stale?.items?.length) {
+    const seen = new Set(items.map((i) => `${i.title}|${i.submittedAt}`))
+    for (const prev of stale.items) {
+      const key = `${prev.title}|${prev.submittedAt}`
+      if (!seen.has(key)) {
+        items.push(prev)
+        seen.add(key)
+      }
+    }
+    items.sort((a, b) =>
+      String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')),
+    )
+  }
 
   const result = {
     ok: true,
@@ -235,9 +273,11 @@ export async function fetchDartDisclosures(symbol, options = {}) {
     expiresAt: Date.now() + CACHE_TTL_MS,
     payload: result,
   })
+  lastSyncAtByCorp.set(corp.corpCode, Date.now())
   return result
 }
 
 export function clearDartCache() {
   disclosureCache.clear()
+  lastSyncAtByCorp.clear()
 }

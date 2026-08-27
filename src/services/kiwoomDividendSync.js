@@ -8,6 +8,11 @@ import {
 } from './dividendStorage.js'
 import { persistDividendEvents } from './dividendPersistence.js'
 import { apiFetch } from './apiClient.js'
+import {
+  formatYmdDaysAgo,
+  resolveDividendSyncFrom,
+  writeDividendSyncCursor,
+} from './dividendSyncCursor.js'
 
 /**
  * @param {{ fetchImpl?: typeof fetch, from?: string, to?: string }} [options]
@@ -21,7 +26,7 @@ export async function fetchKiwoomDividendPayments(options = {}) {
   const query = params.toString()
   const url = query
     ? `/api/kiwoom/dividends?${query}`
-    : '/api/kiwoom/dividends?from=2026-08-01'
+    : `/api/kiwoom/dividends?from=${encodeURIComponent(resolveDividendSyncFrom().from)}`
 
   let response
   try {
@@ -132,11 +137,23 @@ export function upsertKiwoomDividendEvents(dividends) {
 }
 
 /**
- * 키움 배당 조회 + local/서버 upsert
+ * 키움 배당 조회 + local/서버 upsert (증분 from 기본)
  */
 export async function syncKiwoomDividends(options = {}) {
   const fetchImpl = options.fetchImpl ?? apiFetch
-  const result = await fetchKiwoomDividendPayments({ ...options, fetchImpl })
+  const resolved =
+    options.from != null
+      ? { from: options.from, mode: 'explicit' }
+      : resolveDividendSyncFrom({ storage: options.storage })
+  const from = resolved.from
+  const to = options.to || formatYmdDaysAgo(options.now || new Date(), 0)
+
+  const result = await fetchKiwoomDividendPayments({
+    ...options,
+    from,
+    to,
+    fetchImpl,
+  })
   if (!result.ok) {
     return {
       ok: false,
@@ -145,6 +162,8 @@ export async function syncKiwoomDividends(options = {}) {
       total: getDividendEvents().length,
       dividends: [],
       additions: [],
+      from,
+      mode: resolved.mode,
     }
   }
 
@@ -170,6 +189,8 @@ export async function syncKiwoomDividends(options = {}) {
     }
   }
 
+  writeDividendSyncCursor(to, options.storage)
+
   return {
     ok: true,
     added: upsert.added,
@@ -177,5 +198,7 @@ export async function syncKiwoomDividends(options = {}) {
     total: getDividendEvents().length,
     dividends: result.dividends,
     additions: upsert.additions,
+    from,
+    mode: resolved.mode,
   }
 }

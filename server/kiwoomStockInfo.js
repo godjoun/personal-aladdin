@@ -8,9 +8,20 @@ import {
   toKiwoomNumericField,
   normalizeKiwoomSymbol,
 } from './kiwoomClient.js'
+import { fetchWithTimeout } from './utils/fetchTimeout.js'
 
 const KIWOOM_STKINFO_URL = 'https://api.kiwoom.com/api/dostk/stkinfo'
 const KIWOOM_STOCK_INFO_API_ID = 'ka10001'
+/** ka10001 응답 캐시 (브리핑용) */
+export const STOCK_INFO_CACHE_TTL_MS = 7 * 60 * 1000
+const STOCK_INFO_TIMEOUT_MS = 12_000
+
+/** @type {Map<string, { expiresAt: number, result: { ok: boolean, info: object | null, message?: string } }>} */
+const stockInfoCache = new Map()
+
+export function clearStockInfoCache() {
+  stockInfoCache.clear()
+}
 
 /**
  * @param {unknown} raw
@@ -137,6 +148,11 @@ export async function getKiwoomStockInfo(symbol, options = {}) {
     return { ok: false, message: 'Invalid symbol', info: null }
   }
 
+  const cached = stockInfoCache.get(rawSymbol)
+  if (cached && cached.expiresAt > Date.now() && !options.forceRefresh) {
+    return { ...cached.result, cached: true }
+  }
+
   const accountType = options.accountType || 'general'
   const fetchImpl = options.fetchImpl ?? globalThis.fetch
 
@@ -144,32 +160,39 @@ export async function getKiwoomStockInfo(symbol, options = {}) {
   try {
     auth = await getKiwoomAccessToken(accountType, options)
   } catch {
-    // ISA만 설정된 경우 대비
     try {
       auth = await getKiwoomAccessToken('isa', options)
     } catch {
+      if (cached) return { ...cached.result, cached: true, stale: true }
       return { ok: false, message: 'Kiwoom authentication failed', info: null }
     }
   }
 
   let response
   try {
-    response = await fetchImpl(KIWOOM_STKINFO_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json;charset=UTF-8',
-        authorization: `Bearer ${auth.token}`,
-        'api-id': KIWOOM_STOCK_INFO_API_ID,
-        'cont-yn': 'N',
-        'next-key': '',
+    response = await fetchWithTimeout(
+      fetchImpl,
+      KIWOOM_STKINFO_URL,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+          authorization: `Bearer ${auth.token}`,
+          'api-id': KIWOOM_STOCK_INFO_API_ID,
+          'cont-yn': 'N',
+          'next-key': '',
+        },
+        body: JSON.stringify({ stk_cd: rawSymbol }),
       },
-      body: JSON.stringify({ stk_cd: rawSymbol }),
-    })
+      { timeoutMs: options.timeoutMs ?? STOCK_INFO_TIMEOUT_MS },
+    )
   } catch {
+    if (cached) return { ...cached.result, cached: true, stale: true }
     return { ok: false, message: 'Kiwoom stock info request failed', info: null }
   }
 
   if (!response.ok) {
+    if (cached) return { ...cached.result, cached: true, stale: true }
     return { ok: false, message: 'Kiwoom stock info inquiry failed', info: null }
   }
 
@@ -177,17 +200,24 @@ export async function getKiwoomStockInfo(symbol, options = {}) {
   try {
     payload = await response.json()
   } catch {
+    if (cached) return { ...cached.result, cached: true, stale: true }
     return { ok: false, message: 'Kiwoom stock info inquiry failed', info: null }
   }
 
   if (!isKiwoomReturnSuccess(payload)) {
+    if (cached) return { ...cached.result, cached: true, stale: true }
     return { ok: false, message: 'Kiwoom stock info inquiry failed', info: null }
   }
 
   const info = normalizeKiwoomStockInfo(payload)
   if (!info.symbol) info.symbol = rawSymbol
 
-  return { ok: true, info }
+  const result = { ok: true, info }
+  stockInfoCache.set(rawSymbol, {
+    expiresAt: Date.now() + STOCK_INFO_CACHE_TTL_MS,
+    result,
+  })
+  return result
 }
 
 export { parseKiwoomNumber }

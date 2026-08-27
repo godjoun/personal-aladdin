@@ -2,13 +2,16 @@
  * marketSync.js — 보유 자산 기준 시세 동기화
  * ─────────────────────────────────────────────────────────
  * 1) 키움 잔고(kt00018) 현재가 — 있으면 우선
- * 2) 공공데이터 주식/ETF 시세 — 보완
+ * 2) 공공데이터 주식/ETF 시세 — 보완 (제한 병렬)
  */
 
 import { fetchMarketData } from '../api/marketApi.js'
 import { fetchStockMarketData } from '../api/stockApi.js'
 import { parseMarketPricesFromApi } from './storage.js'
 import { apiFetch } from './apiClient.js'
+import { mapWithConcurrency } from '../utils/concurrency.js'
+
+const PUBLIC_PRICE_CONCURRENCY = 3
 
 /**
  * @param {Array<Object>} assets
@@ -38,13 +41,10 @@ function todayKstYmd() {
 }
 
 /**
- * 키움 잔고 응답의 현재가를 MarketPrice 형태로 변환합니다.
- * (값 자체는 로그하지 않음)
- *
  * @param {string[]} symbols
- * @returns {Promise<Array<Object>>}
+ * @param {{ fetchImpl?: typeof fetch, balancesPayload?: object }} [options]
  */
-export async function fetchKiwoomBalancePrices(symbols = []) {
+export async function fetchKiwoomBalancePrices(symbols = [], options = {}) {
   const wanted = new Set(
     (Array.isArray(symbols) ? symbols : [])
       .map((s) => String(s).trim().replace(/^A/i, ''))
@@ -55,15 +55,18 @@ export async function fetchKiwoomBalancePrices(symbols = []) {
     return []
   }
 
-  let payload
-  try {
-    const response = await apiFetch('/api/kiwoom/balances')
-    if (!response.ok) {
+  let payload = options.balancesPayload
+  if (!payload) {
+    try {
+      const fetchImpl = options.fetchImpl ?? apiFetch
+      const response = await fetchImpl('/api/kiwoom/balances')
+      if (!response.ok) {
+        return []
+      }
+      payload = await response.json()
+    } catch {
       return []
     }
-    payload = await response.json()
-  } catch {
-    return []
   }
 
   const date = todayKstYmd()
@@ -106,10 +109,7 @@ export async function fetchKiwoomBalancePrices(symbols = []) {
 }
 
 /**
- * 한 종목코드에 대해 주식 → ETF 순으로 시세를 조회합니다.
- *
  * @param {string} symbol
- * @returns {Promise<Array<Object>>}
  */
 async function fetchPricesForSymbol(symbol) {
   try {
@@ -122,11 +122,7 @@ async function fetchPricesForSymbol(symbol) {
       parseMarketPricesFromApi(stockResult),
       symbol,
     )
-
-    if (stockPrices.length > 0) {
-      console.log(`[marketSync] 주식 ${symbol} 시세 ${stockPrices.length}건`)
-      return stockPrices
-    }
+    if (stockPrices.length > 0) return stockPrices
   } catch (error) {
     console.error(`[marketSync] 주식 API (${symbol}) 실패:`, error.message)
   }
@@ -138,50 +134,52 @@ async function fetchPricesForSymbol(symbol) {
       pageNo: '1',
     })
     const etfPrices = filterBySymbol(parseMarketPricesFromApi(etfResult), symbol)
-
-    if (etfPrices.length > 0) {
-      console.log(`[marketSync] ETF ${symbol} 시세 ${etfPrices.length}건`)
-      return etfPrices
-    }
+    if (etfPrices.length > 0) return etfPrices
   } catch (error) {
     console.error(`[marketSync] ETF API (${symbol}) 실패:`, error.message)
   }
 
-  console.warn(`[marketSync] ${symbol} — 공공 시세를 찾지 못했습니다.`)
   return []
 }
 
 /**
- * 보유 자산 종목 시세 조회 (키움 잔고 현재가 우선, 공공데이터 보완)
- *
  * @param {Array<Object>} assets
- * @returns {Promise<Array<Object>>}
+ * @param {{
+ *   skipPublic?: boolean,
+ *   skipKiwoomBalances?: boolean,
+ *   balancesPayload?: object,
+ *   concurrency?: number,
+ * }} [options]
  */
-export async function fetchPricesForAssets(assets) {
+export async function fetchPricesForAssets(assets, options = {}) {
   const symbols = getUniqueSymbols(assets)
 
   if (symbols.length === 0) {
-    console.log(
-      '[marketSync] 등록된 자산이 없습니다. AssetForm 에서 종목을 추가해 주세요.',
-    )
     return []
   }
 
-  console.log(`[marketSync] 보유 종목 ${symbols.length}개 시세 조회`)
-
-  const publicPrices = []
-  for (const symbol of symbols) {
-    const prices = await fetchPricesForSymbol(symbol)
-    publicPrices.push(...prices)
-  }
-
-  const kiwoomPrices = await fetchKiwoomBalancePrices(symbols)
-  if (kiwoomPrices.length > 0) {
-    console.log(
-      `[marketSync] 키움 잔고 현재가 보완 ${kiwoomPrices.length}종목`,
+  /** @type {Array<Object>} */
+  let publicPrices = []
+  if (!options.skipPublic) {
+    const settled = await mapWithConcurrency(
+      symbols,
+      options.concurrency ?? PUBLIC_PRICE_CONCURRENCY,
+      (symbol) => fetchPricesForSymbol(symbol),
     )
+    for (const result of settled) {
+      if (result.status === 'fulfilled' && Array.isArray(result.value)) {
+        publicPrices.push(...result.value)
+      }
+    }
   }
 
-  // 같은 symbol+date 는 뒤쪽(키움)이 upsert 시 우선
+  /** @type {Array<Object>} */
+  let kiwoomPrices = []
+  if (!options.skipKiwoomBalances) {
+    kiwoomPrices = await fetchKiwoomBalancePrices(symbols, {
+      balancesPayload: options.balancesPayload,
+    })
+  }
+
   return [...publicPrices, ...kiwoomPrices]
 }

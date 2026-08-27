@@ -1,8 +1,34 @@
 /**
- * stockBriefingApi.js — 종목 브리핑 API (서버 경유)
+ * stockBriefingApi.js — 종목 브리핑 API (서버 경유) + 클라이언트 캐시
  */
 
 import { apiFetch } from './apiClient.js'
+
+/** 브리핑 client cache TTL */
+export const BRIEFING_CLIENT_CACHE_TTL_MS = 5 * 60 * 1000
+
+/** @type {Map<string, { expiresAt: number, payload: object }>} */
+const briefingCache = new Map()
+
+export function clearBriefingClientCache() {
+  briefingCache.clear()
+}
+
+/**
+ * @param {string} symbol
+ */
+export function peekBriefingCache(symbol) {
+  const code = String(symbol || '')
+    .trim()
+    .replace(/^A/i, '')
+  const hit = briefingCache.get(code)
+  if (!hit) return null
+  return {
+    payload: hit.payload,
+    fresh: hit.expiresAt > Date.now(),
+    stale: hit.expiresAt <= Date.now(),
+  }
+}
 
 /**
  * @param {string} symbol
@@ -10,12 +36,20 @@ import { apiFetch } from './apiClient.js'
  *   name?: string,
  *   holdings?: Array<Record<string, unknown>>,
  *   fetchImpl?: typeof fetch,
+ *   forceRefresh?: boolean,
  * }} [options]
  */
 export async function fetchStockBriefing(symbol, options = {}) {
   const code = String(symbol || '')
     .trim()
     .replace(/^A/i, '')
+  if (!options.forceRefresh) {
+    const hit = briefingCache.get(code)
+    if (hit && hit.expiresAt > Date.now()) {
+      return { ...hit.payload, cached: true }
+    }
+  }
+
   const params = new URLSearchParams()
   if (options.name) params.set('name', String(options.name).slice(0, 80))
   if (Array.isArray(options.holdings) && options.holdings.length > 0) {
@@ -24,13 +58,30 @@ export async function fetchStockBriefing(symbol, options = {}) {
   const qs = params.toString()
   const url = `/api/stocks/${encodeURIComponent(code)}/briefing${qs ? `?${qs}` : ''}`
   const fetchImpl = options.fetchImpl ?? apiFetch
-  const response = await fetchImpl(url)
-  if (!response.ok) {
-    const error = new Error('Stock briefing failed')
-    error.status = response.status
+
+  let response
+  try {
+    response = await fetchImpl(url)
+  } catch (error) {
+    const stale = briefingCache.get(code)
+    if (stale) return { ...stale.payload, cached: true, stale: true }
     throw error
   }
-  return response.json()
+
+  if (!response.ok) {
+    const stale = briefingCache.get(code)
+    if (stale) return { ...stale.payload, cached: true, stale: true }
+    const err = new Error('Stock briefing failed')
+    err.status = response.status
+    throw err
+  }
+
+  const payload = await response.json()
+  briefingCache.set(code, {
+    expiresAt: Date.now() + BRIEFING_CLIENT_CACHE_TTL_MS,
+    payload,
+  })
+  return payload
 }
 
 /**
