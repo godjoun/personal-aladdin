@@ -3,9 +3,19 @@
  */
 
 import { randomBytes, timingSafeEqual } from 'crypto'
+import { isAladdinLocalMode } from '../listenConfig.js'
 
 export const CSRF_COOKIE = 'aladdin_csrf'
 export const CSRF_HEADER = 'x-csrf-token'
+
+const LOCAL_DEV_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+]
 
 /**
  * @returns {string[]}
@@ -16,18 +26,16 @@ export function getAllowedOrigins() {
     return configured.split(',').map((s) => s.trim()).filter(Boolean)
   }
 
+  // 로컬 standalone(production) + Vite dev 프록시 조합 허용
+  if (isAladdinLocalMode()) {
+    return [...LOCAL_DEV_ORIGINS]
+  }
+
   if (process.env.NODE_ENV === 'production') {
     return [] // same-origin only — Origin 없으면 통과, 있으면 거부(불일치 시)
   }
 
-  return [
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:5174',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001',
-  ]
+  return [...LOCAL_DEV_ORIGINS]
 }
 
 /**

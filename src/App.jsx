@@ -5,6 +5,10 @@
 import { useEffect, useState } from 'react'
 import Dashboard from './pages/Dashboard.jsx'
 import LoginForm from './components/LoginForm.jsx'
+import AppLayout from './components/layout/AppLayout.jsx'
+import TradingArea from './pages/trading/TradingArea.jsx'
+import { useAppRoute } from './hooks/useAppRoute.js'
+import { APP_AREAS } from './utils/appRoutes.js'
 import { getAssets } from './services/assetStorage.js'
 import { clearFinanceMemory } from './services/memoryFinanceStore.js'
 import { migrateLegacyFinanceFromLocalStorage } from './services/financeLocalMigration.js'
@@ -31,6 +35,7 @@ function clearSensitiveClientState() {
 }
 
 function App() {
+  const { route, navigate } = useAppRoute()
   const [authChecked, setAuthChecked] = useState(false)
   const [authenticated, setAuthenticated] = useState(false)
   const [marketPrices, setMarketPrices] = useState([])
@@ -228,20 +233,29 @@ function App() {
 
   return (
     <div className="app">
-      <main className="app-main">
-        <Dashboard
-          prices={marketPrices}
-          assets={assets}
-          lastUpdatedAt={lastUpdatedAt}
-          persistenceReady={persistenceReady}
-          onRefreshPrices={refreshMarketPrices}
-          onAssetsChange={handleAssetsChange}
-          onAssetAdded={handleAssetAdded}
-          onTradesChange={refreshData}
-          onKiwoomSynced={(date) => setLastUpdatedAt(date)}
-          onLogout={handleLogout}
-        />
-      </main>
+      <AppLayout activeArea={route.area} onNavigate={navigate}>
+        <main className="app-main">
+          {route.area === APP_AREAS.TRADING ? (
+            <TradingArea
+              tradingPage={route.tradingPage}
+              onNavigate={navigate}
+            />
+          ) : (
+            <Dashboard
+              prices={marketPrices}
+              assets={assets}
+              lastUpdatedAt={lastUpdatedAt}
+              persistenceReady={persistenceReady}
+              onRefreshPrices={refreshMarketPrices}
+              onAssetsChange={handleAssetsChange}
+              onAssetAdded={handleAssetAdded}
+              onTradesChange={refreshData}
+              onKiwoomSynced={(date) => setLastUpdatedAt(date)}
+              onLogout={handleLogout}
+            />
+          )}
+        </main>
+      </AppLayout>
     </div>
   )
 }

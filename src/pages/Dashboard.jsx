@@ -50,6 +50,11 @@ import {
   formatProfitLoss,
   getPnlClass,
 } from '../utils/formatters.js'
+import {
+  buildSyncFailureNotice,
+  describeSyncTransportError,
+  pickKiwoomFailureHint,
+} from '../utils/kiwoomSyncMessages.js'
 import '../styles/Dashboard.css'
 
 const REFRESH_STATUS = {
@@ -175,6 +180,7 @@ function Dashboard({
   const [syncNotice, setSyncNotice] = useState('')
   const [backgroundStatus, setBackgroundStatus] = useState(BACKGROUND_STATUS.IDLE)
   const [kiwoomStatus, setKiwoomStatus] = useState(KIWOOM_STATUS.LOADING)
+  const [kiwoomFailureHint, setKiwoomFailureHint] = useState('')
   const [kiwoomHoldings, setKiwoomHoldings] = useState([])
   const [withdrawableByAccount, setWithdrawableByAccount] = useState([
     { accountType: 'isa', withdrawableAmount: null },
@@ -216,6 +222,10 @@ function Dashboard({
     try {
       const result = await fetchKiwoomBalances()
       if (!result.ok) {
+        setKiwoomFailureHint(
+          pickKiwoomFailureHint(result.accounts) ||
+            '키움 계좌 정보를 불러오지 못했습니다.',
+        )
         if (!preserveOnFail) {
           setKiwoomHoldings([])
           setWithdrawableByAccount([
@@ -224,8 +234,9 @@ function Dashboard({
           ])
         }
         setKiwoomStatus(KIWOOM_STATUS.ERROR)
-        return { ok: false, holdings: [] }
+        return { ok: false, holdings: [], accounts: result.accounts ?? null }
       }
+      setKiwoomFailureHint('')
       setKiwoomHoldings(result.holdings)
       setWithdrawableByAccount(
         Array.isArray(result.withdrawableByAccount)
@@ -242,6 +253,10 @@ function Dashboard({
       return { ok: true, holdings: result.holdings }
     } catch (error) {
       console.error('[Dashboard] 키움 잔고 조회 실패:', error.message)
+      setKiwoomFailureHint(
+        describeSyncTransportError(error) ||
+          '키움 계좌 정보를 불러오지 못했습니다.',
+      )
       if (!preserveOnFail) {
         setKiwoomHoldings([])
         setWithdrawableByAccount([
@@ -250,7 +265,7 @@ function Dashboard({
         ])
       }
       setKiwoomStatus(KIWOOM_STATUS.ERROR)
-      return { ok: false, holdings: [] }
+      return { ok: false, holdings: [], error }
     }
   }
 
@@ -410,7 +425,9 @@ function Dashboard({
           }
         } else {
           setRefreshStatus(REFRESH_STATUS.ERROR)
-          setSyncNotice('동기화 실패 · 기존 데이터 유지')
+          setSyncNotice(
+            buildSyncFailureNotice({ balanceResult, dividendResult }),
+          )
         }
 
         // BACKGROUND: 공시/뉴스 주의 — FAST 완료 후 별도 진행 (버튼 해제)
@@ -418,7 +435,7 @@ function Dashboard({
       } catch (error) {
         console.error('[Dashboard] 전체 동기화 실패:', error)
         setRefreshStatus(REFRESH_STATUS.ERROR)
-        setSyncNotice('동기화 실패 · 기존 데이터 유지')
+        setSyncNotice(buildSyncFailureNotice({ error }))
       } finally {
         fastSyncLockRef.current = null
       }
@@ -791,7 +808,7 @@ function Dashboard({
 
           {!showKiwoomLoading && showKiwoomError && (
             <div className="simple-dash__empty-compact">
-              <p>키움 계좌 정보를 불러오지 못했습니다.</p>
+              <p>{kiwoomFailureHint || '키움 계좌 정보를 불러오지 못했습니다.'}</p>
               <button
                 type="button"
                 className="simple-dash__manage-btn simple-dash__manage-btn--primary"

@@ -21,9 +21,11 @@ function LoginForm({ onSuccess }) {
       if (!result.ok) {
         setError(
           result.message ||
-            (result.status === 429
-              ? '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.'
-              : '아이디 또는 비밀번호를 확인해주세요.'),
+            (result.status === 403
+              ? '로그인 요청이 거부되었습니다. 브라우저 주소가 http://localhost:5173 인지, API 서버가 실행 중인지 확인해주세요.'
+              : result.status === 429
+                ? '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.'
+                : '아이디 또는 비밀번호를 확인해주세요.'),
         )
         return
       }
