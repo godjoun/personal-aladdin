@@ -3,13 +3,10 @@
  */
 
 import { calculateTradeMetrics } from '../utils/tradingTradeCalculator.js'
-import {
-  TRADING_TRADE_SOURCE_PLAN,
-  isClosedPlanEligibleForTrade,
-  mapClosedPlanToTrade,
-} from '../utils/tradingPlanTradeSync.js'
 
 export const TRADING_TRADES_STORAGE_KEY = 'aladdin.tradingTrades.v1'
+
+const LEGACY_TRADE_SOURCE_PLAN = 'TRADING_PLAN'
 
 export const TRADING_TRADE_TAGS = Object.freeze([
   '계획매매',
@@ -34,15 +31,8 @@ export const TRADING_TRADE_TAGS = Object.freeze([
  * @property {string} tradedAt
  * @property {string} createdAt
  * @property {string} [updatedAt]
- * @property {'TRADING_PLAN'} [source]
+ * @property {string} [source]
  * @property {string} [sourcePlanId]
- */
-
-/**
- * @typedef {Object} TradeSyncResult
- * @property {'created' | 'skipped' | 'not_applicable' | 'failed'} status
- * @property {TradingTrade | null} trade
- * @property {string} [message]
  */
 
 /**
@@ -102,8 +92,8 @@ export function normalizeTradingTrade(value) {
       : {}),
   }
 
-  if (sourceRaw === TRADING_TRADE_SOURCE_PLAN && sourcePlanIdRaw) {
-    trade.source = TRADING_TRADE_SOURCE_PLAN
+  if (sourceRaw === LEGACY_TRADE_SOURCE_PLAN && sourcePlanIdRaw) {
+    trade.source = LEGACY_TRADE_SOURCE_PLAN
     trade.sourcePlanId = sourcePlanIdRaw
   }
 
@@ -181,66 +171,6 @@ export function addTradingTrade(input, now = new Date()) {
   const next = [trade, ...getTradingTrades()]
   saveTradingTrades(next)
   return trade
-}
-
-/**
- * @param {string} sourcePlanId
- * @returns {TradingTrade | null}
- */
-export function findTradingTradeBySourcePlanId(sourcePlanId) {
-  const key = String(sourcePlanId ?? '').trim()
-  if (!key) return null
-
-  return (
-    getTradingTrades().find(
-      (trade) =>
-        trade.source === TRADING_TRADE_SOURCE_PLAN && trade.sourcePlanId === key,
-    ) ?? null
-  )
-}
-
-/**
- * @param {import('./tradingPlanStorage.js').TradingPlan} plan
- * @param {Date} [now]
- * @returns {TradeSyncResult}
- */
-export function addTradingTradeFromClosedPlan(plan, now = new Date()) {
-  if (!isClosedPlanEligibleForTrade(plan)) {
-    return { status: 'not_applicable', trade: null }
-  }
-
-  const existing = findTradingTradeBySourcePlanId(plan.id)
-  if (existing) {
-    return { status: 'skipped', trade: existing }
-  }
-
-  const mapped = mapClosedPlanToTrade(plan)
-  if (!mapped) {
-    return { status: 'not_applicable', trade: null }
-  }
-
-  try {
-    const iso = now.toISOString()
-    /** @type {TradingTrade} */
-    const trade = {
-      id:
-        typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `trade-${Date.now()}`,
-      ...mapped,
-      createdAt: iso,
-    }
-
-    const next = [trade, ...getTradingTrades()]
-    saveTradingTrades(next)
-    return { status: 'created', trade }
-  } catch {
-    return {
-      status: 'failed',
-      trade: null,
-      message: '매매일지 생성에 실패했습니다.',
-    }
-  }
 }
 
 /**

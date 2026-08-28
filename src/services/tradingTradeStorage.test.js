@@ -280,6 +280,26 @@ describe('tradingTradeStorage', () => {
     expect(normalized?.updatedAt).toBe('2026-08-29T10:00:00.000Z')
   })
 
+  it('normalizeTradingTrade는 legacy source/sourcePlanId를 호환한다', () => {
+    const normalized = normalizeTradingTrade({
+      id: 'legacy-plan-trade',
+      symbol: 'BTC',
+      entryPrice: 100,
+      exitPrice: 110,
+      investedAmount: 1000,
+      returnRate: 10,
+      profitLoss: 100,
+      tradedAt: '2026-08-28T10:00:00.000Z',
+      createdAt: '2026-08-28T10:00:00.000Z',
+      tags: [],
+      source: 'TRADING_PLAN',
+      sourcePlanId: 'plan-legacy',
+    })
+
+    expect(normalized?.source).toBe('TRADING_PLAN')
+    expect(normalized?.sourcePlanId).toBe('plan-legacy')
+  })
+
   it('saveTradingTrades로 전체 목록을 덮어쓴다', () => {
     addTradingTrade({
       symbol: 'BTC',

@@ -13,7 +13,6 @@ import {
   formatTradeDateTime,
   validateTradeInput,
 } from '../../utils/tradingTradeCalculator.js'
-import { isTradingPlanSourceTrade } from '../../utils/tradingPlanTradeSync.js'
 import {
   formatCurrency,
   formatPercent,
@@ -207,9 +206,6 @@ export default function TradeRecordDrawer({
 
         {isView && trade ? (
           <div className="trading-drawer__detail">
-            {isTradingPlanSourceTrade(trade) ? (
-              <p className="trading-drawer__source-badge">계획에서 기록됨</p>
-            ) : null}
             <dl className="trading-drawer__detail-list">
               <div>
                 <dt>코인</dt>

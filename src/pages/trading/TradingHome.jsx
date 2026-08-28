@@ -1,14 +1,5 @@
 import { useMemo, useState } from 'react'
-import PaperTradingCard from '../../components/trading/PaperTradingCard.jsx'
-import PaperTradingDrawer from '../../components/trading/PaperTradingDrawer.jsx'
 import TradeRecordDrawer from '../../components/trading/TradeRecordDrawer.jsx'
-import TradingPlanDrawer from '../../components/trading/TradingPlanDrawer.jsx'
-import TradingAlertToast from '../../components/trading/TradingAlertToast.jsx'
-import TradingPlanSection from '../../components/trading/TradingPlanSection.jsx'
-import { useTradingPlanAlerts } from '../../hooks/useTradingPlanAlerts.js'
-import { useUpbitTicker } from '../../hooks/useUpbitTicker.js'
-import { getPaperAccount } from '../../services/paperTradingStorage.js'
-import { getTradingPlans } from '../../services/tradingPlanStorage.js'
 import { getTradingTrades } from '../../services/tradingTradeStorage.js'
 import {
   buildTradingDeskSummary,
@@ -16,8 +7,6 @@ import {
   formatTradeDateShort,
   getRecentTrades,
 } from '../../utils/tradingTradeCalculator.js'
-import { getActiveTradingPlanSymbols } from '../../utils/tradingPlanCalculator.js'
-import { isTradingPlanSourceTrade } from '../../utils/tradingPlanTradeSync.js'
 import {
   formatCurrency,
   formatPercent,
@@ -58,17 +47,6 @@ export default function TradingHome() {
     mode: 'create',
     trade: null,
   })
-  const [paperAccount, setPaperAccount] = useState(() => getPaperAccount())
-  const [paperDrawer, setPaperDrawer] = useState({
-    open: false,
-    mode: 'start',
-  })
-  const [plans, setPlans] = useState(() => getTradingPlans())
-  const [planDrawer, setPlanDrawer] = useState({
-    open: false,
-    mode: 'create',
-    plan: null,
-  })
 
   const summary = useMemo(() => buildTradingDeskSummary(trades), [trades])
   const performance = useMemo(
@@ -77,13 +55,6 @@ export default function TradingHome() {
   )
   const recentTrades = useMemo(() => getRecentTrades(trades, 5), [trades])
   const hasTrades = trades.length > 0
-  const planSymbols = useMemo(
-    () => getActiveTradingPlanSymbols(plans),
-    [plans],
-  )
-  const upbitTicker = useUpbitTicker(planSymbols)
-  const { settings: alertSettings, toasts, toggleAlerts, dismissToast } =
-    useTradingPlanAlerts(plans, upbitTicker)
 
   function openCreateDrawer() {
     setDrawerState({ open: true, mode: 'create', trade: null })
@@ -109,54 +80,6 @@ export default function TradingHome() {
   function handleDeleted() {
     closeDrawer()
     refreshTrades()
-  }
-
-  function refreshPaperAccount() {
-    setPaperAccount(getPaperAccount())
-  }
-
-  function openPaperDrawer(mode) {
-    setPaperDrawer({ open: true, mode })
-  }
-
-  function closePaperDrawer() {
-    setPaperDrawer({ open: false, mode: 'start' })
-  }
-
-  function handlePaperChanged() {
-    refreshPaperAccount()
-  }
-
-  function refreshPlans() {
-    setPlans(getTradingPlans())
-  }
-
-  function openCreatePlanDrawer() {
-    setPlanDrawer({ open: true, mode: 'create', plan: null })
-  }
-
-  function openPlanDrawer(plan) {
-    setPlanDrawer({ open: true, mode: 'view', plan })
-  }
-
-  function closePlanDrawer() {
-    setPlanDrawer({ open: false, mode: 'create', plan: null })
-  }
-
-  function handlePlanSaved(result) {
-    closePlanDrawer()
-    refreshPlans()
-    if (
-      result?.tradeSync?.status === 'created' ||
-      result?.tradeSync?.status === 'skipped'
-    ) {
-      refreshTrades()
-    }
-  }
-
-  function handlePlanDeleted() {
-    closePlanDrawer()
-    refreshPlans()
   }
 
   const summaryItems = [
@@ -207,7 +130,7 @@ export default function TradingHome() {
         <div className="trading-desk__intro">
           <h1 className="trading-desk__title">TRADING</h1>
           <p className="trading-desk__subtitle">
-            내 거래를 기록하고 전략을 시험하는 공간
+            내 거래를 기록하고 복기하는 공간
           </p>
         </div>
         <button
@@ -228,108 +151,79 @@ export default function TradingHome() {
         ))}
       </section>
 
-      <TradingPlanSection
-        plans={plans}
-        ticker={upbitTicker}
-        alertEnabled={alertSettings.enabled}
-        onToggleAlerts={toggleAlerts}
-        onCreate={openCreatePlanDrawer}
-        onOpenPlan={openPlanDrawer}
-      />
-
-      <TradingAlertToast toasts={toasts} onDismiss={dismissToast} />
-
-      <div className="trading-desk__workspace">
-        <div className="trading-desk__content">
-          <div className="trading-desk__main">
-            <section
-              className={`trading-desk__section trading-desk__section--trades${
-                hasTrades ? ' trading-desk__section--trades-filled' : ''
-              }`}
-              aria-label="최근 거래"
+      <section
+        className={`trading-desk__section trading-desk__section--trades${
+          hasTrades ? ' trading-desk__section--trades-filled' : ''
+        }`}
+        aria-label="최근 거래"
+      >
+        <h2 className="trading-desk__section-title">최근 거래</h2>
+        {!hasTrades ? (
+          <div className="trading-desk__empty trading-desk__empty--center">
+            <p className="trading-desk__empty-text">
+              아직 거래 기록이 없습니다.
+            </p>
+            <button
+              type="button"
+              className="trading-desk__cta-btn"
+              onClick={openCreateDrawer}
             >
-              <h2 className="trading-desk__section-title">최근 거래</h2>
-              {!hasTrades ? (
-                <div className="trading-desk__empty trading-desk__empty--center">
-                  <p className="trading-desk__empty-text">
-                    아직 거래 기록이 없습니다.
-                  </p>
+              첫 거래 기록
+            </button>
+          </div>
+        ) : (
+          <ul className="trading-desk__trade-list">
+            {recentTrades.map((trade) => {
+              const pnlClass = getPnlClassName(trade.profitLoss)
+              return (
+                <li key={trade.id}>
                   <button
                     type="button"
-                    className="trading-desk__cta-btn"
-                    onClick={openCreateDrawer}
+                    className="trading-desk__trade-row"
+                    onClick={() => openTradeDrawer(trade)}
                   >
-                    첫 거래 기록
+                    <span className="trading-desk__trade-symbol">
+                      {trade.symbol}
+                    </span>
+                    <span className="trading-desk__trade-date">
+                      {formatTradeDateShort(trade.tradedAt)}
+                    </span>
+                    <span className={pnlClass}>
+                      {formatPercent(trade.returnRate)}
+                    </span>
+                    <span className={pnlClass}>
+                      {formatProfitLoss(trade.profitLoss)}
+                    </span>
+                    <span className="trading-desk__trade-tag">
+                      {trade.tags[0] || '—'}
+                    </span>
                   </button>
-                </div>
-              ) : (
-                <ul className="trading-desk__trade-list">
-                  {recentTrades.map((trade) => {
-                    const pnlClass = getPnlClassName(trade.profitLoss)
-                    return (
-                      <li key={trade.id}>
-                        <button
-                          type="button"
-                          className="trading-desk__trade-row"
-                          onClick={() => openTradeDrawer(trade)}
-                        >
-                          <span className="trading-desk__trade-symbol">
-                            {trade.symbol}
-                          </span>
-                          <span className="trading-desk__trade-date">
-                            {formatTradeDateShort(trade.tradedAt)}
-                          </span>
-                          <span className={pnlClass}>
-                            {formatPercent(trade.returnRate)}
-                          </span>
-                          <span className={pnlClass}>
-                            {formatProfitLoss(trade.profitLoss)}
-                          </span>
-                          <span className="trading-desk__trade-tag">
-                            {isTradingPlanSourceTrade(trade) ? (
-                              <span className="trading-desk__trade-source">PLAN</span>
-                            ) : null}
-                            {trade.tags[0] ||
-                              (isTradingPlanSourceTrade(trade) ? null : '—')}
-                          </span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </section>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </section>
 
-            <PaperTradingCard
-              account={paperAccount}
-              onStart={() => openPaperDrawer('start')}
-              onBuy={() => openPaperDrawer('buy')}
-              onSell={() => openPaperDrawer('sell')}
-              onReset={refreshPaperAccount}
-            />
-          </div>
-
-          <section
-            className="trading-desk__section trading-desk__performance"
-            aria-label="내 매매 성적"
-          >
-            <h2 className="trading-desk__section-title trading-desk__section-title--compact">
-              내 매매 성적
-            </h2>
-            <dl className="trading-desk__perf-grid">
-              {performanceItems.map((item) => (
-                <div key={item.id}>
-                  <dt>{item.label}</dt>
-                  <dd>{item.value}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="trading-desk__empty-text trading-desk__perf-hint">
-              거래 기록이 쌓이면 매매 패턴을 확인할 수 있습니다.
-            </p>
-          </section>
-        </div>
-      </div>
+      <section
+        className="trading-desk__section trading-desk__performance"
+        aria-label="내 매매 성적"
+      >
+        <h2 className="trading-desk__section-title trading-desk__section-title--compact">
+          내 매매 성적
+        </h2>
+        <dl className="trading-desk__perf-grid">
+          {performanceItems.map((item) => (
+            <div key={item.id}>
+              <dt>{item.label}</dt>
+              <dd>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="trading-desk__empty-text trading-desk__perf-hint">
+          거래 기록이 쌓이면 매매 패턴을 확인할 수 있습니다.
+        </p>
+      </section>
 
       <TradeRecordDrawer
         open={drawerState.open}
@@ -338,23 +232,6 @@ export default function TradingHome() {
         onClose={closeDrawer}
         onSaved={handleSaved}
         onDeleted={handleDeleted}
-      />
-
-      <PaperTradingDrawer
-        open={paperDrawer.open}
-        mode={paperDrawer.mode}
-        onClose={closePaperDrawer}
-        onChanged={handlePaperChanged}
-      />
-
-      <TradingPlanDrawer
-        open={planDrawer.open}
-        mode={planDrawer.mode}
-        plan={planDrawer.plan}
-        ticker={upbitTicker}
-        onClose={closePlanDrawer}
-        onSaved={handlePlanSaved}
-        onDeleted={handlePlanDeleted}
       />
     </div>
   )
