@@ -23,6 +23,13 @@ import {
   getOutcomeLabel,
   getStructureLabel,
   isMarketDataConnected,
+  formatSignalStrength,
+  getMarketStateLabel,
+  getMarketStateModifier,
+  getMarketStateShortLabel,
+  buildMarketStateHistoryRows,
+  formatMarketStateClock,
+  MARKET_STATE_DISCLAIMER,
 } from './tradingLabView.js'
 
 describe('bias / outcome 표시', () => {
@@ -179,6 +186,40 @@ describe('formatAnalysisTimestamp', () => {
   it('잘못된 값은 빈 값으로 표시한다', () => {
     expect(formatAnalysisTimestamp(null)).toBe(NO_DATA_LABEL)
     expect(formatAnalysisTimestamp('not-a-date')).toBe(NO_DATA_LABEL)
+  })
+})
+
+describe('시장 상태 표시', () => {
+  it('상태 라벨과 신호 강도를 확률로 표현하지 않는다', () => {
+    expect(getMarketStateLabel('BULLISH_PRESSURE')).toBe('상승 압력 확대 가능성')
+    expect(getMarketStateShortLabel('MIXED')).toBe('혼조')
+    expect(getMarketStateModifier('NEW_LONG_BUILDUP')).toBe('bullish')
+    expect(formatSignalStrength(68)).toBe('신호 강도 68 / 100')
+    expect(formatSignalStrength(68).includes('%')).toBe(false)
+    expect(MARKET_STATE_DISCLAIMER).toContain('매수·매도 추천이 아닙니다')
+  })
+
+  it('최근 시장 상태 이력을 시계열 행으로 만든다', () => {
+    const rows = buildMarketStateHistoryRows([
+      {
+        id: '1',
+        primaryState: 'BULLISH_PRESSURE',
+        strengthScore: 68,
+        evaluatedAt: '2026-09-12T02:35:00.000Z',
+      },
+      {
+        id: '2',
+        primaryState: 'MIXED',
+        strengthScore: 51,
+        evaluatedAt: '2026-09-12T02:30:00.000Z',
+      },
+    ])
+    expect(rows[0].stateLabel).toBe('상승 압력')
+    expect(rows[0].strength).toBe(68)
+    expect(rows[0].timeLabel).toBe(
+      formatMarketStateClock('2026-09-12T02:35:00.000Z'),
+    )
+    expect(buildMarketStateHistoryRows(null)).toEqual([])
   })
 })
 

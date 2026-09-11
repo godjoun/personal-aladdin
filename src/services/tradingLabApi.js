@@ -167,3 +167,25 @@ export async function createLiquidationSnapshot(payload) {
 export async function fetchTradingLabStats() {
   return call(`${BASE}/stats`)
 }
+
+/**
+ * @param {string} symbol
+ */
+export async function fetchMarketState(symbol) {
+  return call(`${BASE}/market-state/${encodeURIComponent(symbol)}`)
+}
+
+/**
+ * @param {string} symbol
+ * @param {{ limit?: number }} [options]
+ */
+export async function fetchMarketStateHistory(symbol, options = {}) {
+  const params = new URLSearchParams()
+  if (options.limit) params.set('limit', String(options.limit))
+  const query = params.toString()
+  return call(
+    `${BASE}/market-state/${encodeURIComponent(symbol)}/history${
+      query ? `?${query}` : ''
+    }`,
+  )
+}

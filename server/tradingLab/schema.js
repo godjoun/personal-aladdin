@@ -170,6 +170,35 @@ export function migrateTradingLab(db) {
 
     CREATE INDEX IF NOT EXISTS idx_trade_flow_aggregate_symbol_start
       ON trade_flow_aggregate(symbol, bucketStart);
+
+    CREATE TABLE IF NOT EXISTS market_state_observation (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      evaluatedAt TEXT NOT NULL,
+      bucketStart TEXT NOT NULL,
+      primaryState TEXT NOT NULL,
+      secondaryStatesJson TEXT,
+      strengthScore INTEGER NOT NULL,
+      referencePrice REAL,
+      priceChange15m REAL,
+      priceChange1h REAL,
+      priceChange4h REAL,
+      volumeRatio REAL,
+      oiChangePct REAL,
+      fundingRate REAL,
+      cvdNotional REAL,
+      buySharePct REAL,
+      sellSharePct REAL,
+      longLiquidationNotional REAL,
+      shortLiquidationNotional REAL,
+      evidenceJson TEXT,
+      counterEvidenceJson TEXT,
+      contextJson TEXT,
+      UNIQUE (symbol, bucketStart)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_market_state_obs_symbol_eval
+      ON market_state_observation(symbol, evaluatedAt DESC);
   `)
 }
 

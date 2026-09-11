@@ -14,6 +14,34 @@ export const CVD_COLLECTING_LABEL = '수집 중 · 데이터 부족'
 export const CVD_RECONNECTING_LABEL = '연결 끊김 · 재연결 중'
 export const CVD_OK_LABEL = '정상'
 export const CVD_SOURCE_LABEL = 'Bybit 관측 체결 기준'
+export const MARKET_STATE_DISCLAIMER =
+  '시장 관찰 지표이며 매수·매도 추천이 아닙니다.'
+
+const MARKET_STATE_LABELS = {
+  BULLISH_PRESSURE: '상승 압력 확대 가능성',
+  BEARISH_PRESSURE: '하락 압력 확대 가능성',
+  NEW_LONG_BUILDUP: '신규 롱 유입 가능성',
+  NEW_SHORT_BUILDUP: '신규 숏 유입 가능성',
+  SHORT_LIQUIDATION_DRIVEN: '숏 청산 영향 상승 가능성',
+  LONG_LIQUIDATION_DRIVEN: '롱 청산 영향 하락 가능성',
+  PRICE_CVD_BEARISH_DIVERGENCE: '가격 상승 대비 매수 체결 확인 약함',
+  PRICE_CVD_BULLISH_DIVERGENCE: '가격 하락 대비 매도 체결 확인 약함',
+  MIXED: '방향 불명확',
+  DATA_INSUFFICIENT: '데이터 부족',
+}
+
+const MARKET_STATE_SHORT_LABELS = {
+  BULLISH_PRESSURE: '상승 압력',
+  BEARISH_PRESSURE: '하락 압력',
+  NEW_LONG_BUILDUP: '신규 롱 유입 가능성',
+  NEW_SHORT_BUILDUP: '신규 숏 유입 가능성',
+  SHORT_LIQUIDATION_DRIVEN: '숏 청산 영향',
+  LONG_LIQUIDATION_DRIVEN: '롱 청산 영향',
+  PRICE_CVD_BEARISH_DIVERGENCE: '가격-CVD 약세 다이버전스',
+  PRICE_CVD_BULLISH_DIVERGENCE: '가격-CVD 강세 다이버전스',
+  MIXED: '혼조',
+  DATA_INSUFFICIENT: '데이터 부족',
+}
 
 const BIAS_LABELS = {
   LONG: 'LONG BIAS',
@@ -58,6 +86,86 @@ export function getBiasModifier(bias) {
 export function getStructureLabel(state) {
   if (!state) return NOT_CONNECTED_LABEL
   return STRUCTURE_LABELS[state] || STRUCTURE_LABELS.UNKNOWN
+}
+
+/**
+ * @param {string | null | undefined} state
+ */
+export function getMarketStateLabel(state) {
+  if (!state) return NO_DATA_LABEL
+  return MARKET_STATE_LABELS[state] || NO_DATA_LABEL
+}
+
+/**
+ * @param {string | null | undefined} state
+ */
+export function getMarketStateShortLabel(state) {
+  if (!state) return NO_DATA_LABEL
+  return MARKET_STATE_SHORT_LABELS[state] || getMarketStateLabel(state)
+}
+
+/**
+ * @param {string | null | undefined} state
+ */
+export function getMarketStateModifier(state) {
+  if (
+    state === 'BULLISH_PRESSURE' ||
+    state === 'NEW_LONG_BUILDUP' ||
+    state === 'SHORT_LIQUIDATION_DRIVEN' ||
+    state === 'PRICE_CVD_BULLISH_DIVERGENCE'
+  ) {
+    return 'bullish'
+  }
+  if (
+    state === 'BEARISH_PRESSURE' ||
+    state === 'NEW_SHORT_BUILDUP' ||
+    state === 'LONG_LIQUIDATION_DRIVEN' ||
+    state === 'PRICE_CVD_BEARISH_DIVERGENCE'
+  ) {
+    return 'bearish'
+  }
+  if (state === 'MIXED') return 'mixed'
+  if (state === 'DATA_INSUFFICIENT') return 'insufficient'
+  return 'unknown'
+}
+
+/**
+ * 신호 강도. 확률이 아니므로 % 를 붙이지 않는다.
+ *
+ * @param {number | null | undefined} value
+ */
+export function formatSignalStrength(value) {
+  if (value === null || value === undefined) return NO_DATA_LABEL
+  const num = Number(value)
+  if (!Number.isFinite(num)) return NO_DATA_LABEL
+  return `신호 강도 ${Math.round(num)} / 100`
+}
+
+/**
+ * @param {string | null | undefined} iso
+ */
+export function formatMarketStateClock(iso) {
+  if (!iso) return NO_DATA_LABEL
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return NO_DATA_LABEL
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/**
+ * @param {Array<object> | null | undefined} observations
+ */
+export function buildMarketStateHistoryRows(observations) {
+  if (!Array.isArray(observations)) return []
+  return observations.map((item) => ({
+    id: item.id,
+    evaluatedAt: item.evaluatedAt,
+    timeLabel: formatMarketStateClock(item.evaluatedAt || item.bucketStart),
+    stateLabel: getMarketStateShortLabel(item.primaryState),
+    strength: Number.isFinite(Number(item.strengthScore))
+      ? Math.round(Number(item.strengthScore))
+      : null,
+  }))
 }
 
 /**

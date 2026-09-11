@@ -97,6 +97,11 @@ import {
   setTradeFlowCollector,
 } from './tradingLab/tradeFlowCollector.js'
 import {
+  createMarketStateRecorder,
+  resetMarketStateRecorder,
+  setMarketStateRecorder,
+} from './tradingLab/marketStateRecorder.js'
+import {
   LOCAL_BYPASS_USER,
   assertLocalAuthBypassSafe,
 } from './auth/localBypass.js'
@@ -190,10 +195,12 @@ function safeError(res, status = 500) {
  *   marketDataProvider?: object | null,
  *   liquidationCollector?: object | false,
  *   tradeFlowCollector?: object | false,
+ *   marketStateRecorder?: object | false,
  * }} [options]
  *   marketDataProvider 생략 시 Bybit 공개 API provider 를 등록한다.
  *   null 이면 미설정 상태로 둔다 (테스트용).
  *   liquidationCollector / tradeFlowCollector 생략 시 test 가 아니면 public WS 를 기동한다.
+ *   marketStateRecorder 생략 시 test 가 아니면 5분 판정 기록을 기동한다.
  */
 export function createApp(options = {}) {
   // 위험한 bypass 설정(외부 bind / 호스팅 / proxy 뒤)이면 여기서 기동을 중단한다.
@@ -253,6 +260,22 @@ export function createApp(options = {}) {
       createTradeFlowCollector({ autoConnect: true })
     } catch {
       console.error('[TradingLab] trade flow collector failed to start')
+    }
+  }
+
+  // Trading Lab — 시장 상태 판정 기록 (READ ONLY, 5분 bucket)
+  if (options.marketStateRecorder === false) {
+    resetMarketStateRecorder()
+  } else if (
+    options.marketStateRecorder &&
+    typeof options.marketStateRecorder.start === 'function'
+  ) {
+    setMarketStateRecorder(options.marketStateRecorder)
+  } else if (process.env.NODE_ENV !== 'test') {
+    try {
+      createMarketStateRecorder({ autoStart: true })
+    } catch {
+      console.error('[TradingLab] market state recorder failed to start')
     }
   }
 

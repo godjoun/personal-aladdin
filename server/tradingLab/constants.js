@@ -101,3 +101,52 @@ export const TRADING_LAB_DATA_STATUS_SET = new Set(TRADING_LAB_DATA_STATUSES)
 export const TRADING_LAB_SCREENSHOT_STATUS_SET = new Set(
   TRADING_LAB_SCREENSHOT_STATUSES,
 )
+
+/** 자동 시장 상태 판정. 수동 trade_analysis 와 구분한다. */
+export const MARKET_STATES = Object.freeze([
+  'BULLISH_PRESSURE',
+  'BEARISH_PRESSURE',
+  'NEW_LONG_BUILDUP',
+  'NEW_SHORT_BUILDUP',
+  'SHORT_LIQUIDATION_DRIVEN',
+  'LONG_LIQUIDATION_DRIVEN',
+  'PRICE_CVD_BEARISH_DIVERGENCE',
+  'PRICE_CVD_BULLISH_DIVERGENCE',
+  'MIXED',
+  'DATA_INSUFFICIENT',
+])
+
+export const MARKET_STATE_SET = new Set(MARKET_STATES)
+
+export const MARKET_STATE_LABELS = Object.freeze({
+  BULLISH_PRESSURE: '상승 압력 확대 가능성',
+  BEARISH_PRESSURE: '하락 압력 확대 가능성',
+  NEW_LONG_BUILDUP: '신규 롱 유입 가능성',
+  NEW_SHORT_BUILDUP: '신규 숏 유입 가능성',
+  SHORT_LIQUIDATION_DRIVEN: '숏 청산 영향 상승 가능성',
+  LONG_LIQUIDATION_DRIVEN: '롱 청산 영향 하락 가능성',
+  PRICE_CVD_BEARISH_DIVERGENCE: '가격 상승 대비 매수 체결 확인 약함',
+  PRICE_CVD_BULLISH_DIVERGENCE: '가격 하락 대비 매도 체결 확인 약함',
+  MIXED: '방향 불명확',
+  DATA_INSUFFICIENT: '데이터 부족',
+})
+
+export const MARKET_STATE_SHORT_LABELS = Object.freeze({
+  BULLISH_PRESSURE: '상승 압력',
+  BEARISH_PRESSURE: '하락 압력',
+  NEW_LONG_BUILDUP: '신규 롱 유입 가능성',
+  NEW_SHORT_BUILDUP: '신규 숏 유입 가능성',
+  SHORT_LIQUIDATION_DRIVEN: '숏 청산 영향',
+  LONG_LIQUIDATION_DRIVEN: '롱 청산 영향',
+  PRICE_CVD_BEARISH_DIVERGENCE: '가격-CVD 약세 다이버전스',
+  PRICE_CVD_BULLISH_DIVERGENCE: '가격-CVD 강세 다이버전스',
+  MIXED: '혼조',
+  DATA_INSUFFICIENT: '데이터 부족',
+})
+
+export const MARKET_STATE_DISCLAIMER =
+  '시장 관찰 지표이며 매수·매도 추천이 아닙니다.'
+
+/** 자동 판정 저장 주기. 같은 symbol + 5분 bucket 은 한 번만 기록한다. */
+export const MARKET_STATE_BUCKET_SECONDS = 5 * 60
+export const MARKET_STATE_HISTORY_LIMIT = 20

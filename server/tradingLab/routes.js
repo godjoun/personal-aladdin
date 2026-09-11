@@ -18,6 +18,8 @@ import {
   TRADING_LAB_CVD_WINDOWS,
   TRADING_LAB_SYMBOLS,
   TRADING_LAB_TIMEFRAMES,
+  MARKET_STATES,
+  MARKET_STATE_HISTORY_LIMIT,
 } from './constants.js'
 import {
   asBias,
@@ -57,6 +59,10 @@ import { isMarketDataConfigured } from './marketDataProvider.js'
 import { getLiquidationCollector } from './liquidationCollector.js'
 import { getCvdSummary } from './tradeFlowRepository.js'
 import { getTradeFlowCollector } from './tradeFlowCollector.js'
+import {
+  evaluateCurrentMarketState,
+  getMarketStateHistory,
+} from './marketStateService.js'
 
 /**
  * @param {import('express').Response} res
@@ -88,6 +94,7 @@ export function createTradingLabRouter() {
       liquidationSides: TRADING_LAB_LIQUIDATION_SIDES,
       liquidationWindows: TRADING_LAB_LIQUIDATION_WINDOWS,
       cvdWindows: TRADING_LAB_CVD_WINDOWS,
+      marketStates: MARKET_STATES,
       sourceTypes: TRADING_LAB_SOURCE_TYPES,
       marketDataConfigured: isMarketDataConfigured(),
     })
@@ -387,6 +394,46 @@ export function createTradingLabRouter() {
       res.status(200).json({ ok: true, ...summary })
     } catch {
       console.error('[TradingLab] cvd summary failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/market-state/:symbol/history', (req, res) => {
+    const symbol = asLabSymbol(req.params.symbol)
+    if (!symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+    const limit = asListLimit(req.query.limit, MARKET_STATE_HISTORY_LIMIT)
+    if (limit === null) {
+      badRequest(res, 'limit')
+      return
+    }
+
+    try {
+      res.status(200).json({
+        ok: true,
+        symbol,
+        observations: getMarketStateHistory(symbol, { limit }),
+      })
+    } catch {
+      console.error('[TradingLab] market state history failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/market-state/:symbol', async (req, res) => {
+    const symbol = asLabSymbol(req.params.symbol)
+    if (!symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+
+    try {
+      const state = await evaluateCurrentMarketState(symbol)
+      res.status(200).json({ ok: true, ...state })
+    } catch {
+      console.error('[TradingLab] market state evaluate failed')
       serverError(res)
     }
   })

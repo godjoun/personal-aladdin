@@ -25,7 +25,10 @@ import {
   resetTradeFlowCollector,
   setTradeFlowCollector,
 } from './tradingLab/tradeFlowCollector.js'
+import { resetMarketStateRecorder } from './tradingLab/marketStateRecorder.js'
 import { upsertTradeFlowBucket } from './tradingLab/tradeFlowRepository.js'
+import { evaluateAndPersistMarketStates } from './tradingLab/marketStateService.js'
+import { listMarketStateObservations } from './tradingLab/marketStateRepository.js'
 import {
   applyTradeToBucket,
   createEmptyTradeFlowBucket,
@@ -145,6 +148,7 @@ describe('Trading Lab API', () => {
     resetMarketDataProvider()
     resetLiquidationCollector()
     resetTradeFlowCollector()
+    resetMarketStateRecorder()
   })
 
   beforeEach(() => {
@@ -242,6 +246,8 @@ describe('Trading Lab API', () => {
       '/api/trading-lab/liquidations/BTCUSDT',
       '/api/trading-lab/cvd/status',
       '/api/trading-lab/cvd/BTCUSDT',
+      '/api/trading-lab/market-state/BTCUSDT',
+      '/api/trading-lab/market-state/BTCUSDT/history',
       '/api/trading-lab/stats',
     ]) {
       const res = await request('GET', urlPath)
@@ -283,6 +289,8 @@ describe('Trading Lab API', () => {
     expect(res.json.symbols).toEqual(['BTCUSDT', 'ETHUSDT'])
     expect(res.json.biases).toEqual(['LONG', 'SHORT', 'NEUTRAL'])
     expect(res.json.cvdWindows).toEqual(['5m', '15m', '1h', '4h'])
+    expect(res.json.marketStates).toContain('BULLISH_PRESSURE')
+    expect(res.json.marketStates).toContain('DATA_INSUFFICIENT')
     expect(res.json.marketDataConfigured).toBe(true)
   })
 
@@ -420,6 +428,61 @@ describe('Trading Lab API', () => {
     expect(badWindow.json.field).toBe('window')
   })
 
+  it('GET 시장 상태는 평가만 하고 observation 을 만들지 않는다', async () => {
+    await login()
+    const db = getDb()
+    const beforeBtc = listMarketStateObservations({ symbol: 'BTCUSDT', limit: 200 }, db)
+      .length
+    const beforeEth = listMarketStateObservations({ symbol: 'ETHUSDT', limit: 200 }, db)
+      .length
+
+    const first = await request('GET', '/api/trading-lab/market-state/BTCUSDT')
+    expect(first.status).toBe(200)
+    expect(first.json.symbol).toBe('BTCUSDT')
+    expect(first.json.primaryState).toBeTruthy()
+    expect(first.json.strengthScore).toBeGreaterThanOrEqual(0)
+    expect(first.json.strengthScore).toBeLessThanOrEqual(100)
+    expect(first.json.disclaimer).toContain('매수·매도 추천이 아닙니다')
+    expect(first.json.persisted).toBeUndefined()
+    expect(Array.isArray(first.json.evidence)).toBe(true)
+    expect(Array.isArray(first.json.counterEvidence)).toBe(true)
+
+    await request('GET', '/api/trading-lab/market-state/BTCUSDT')
+    await request('GET', '/api/trading-lab/market-state/ETHUSDT')
+
+    const afterGetBtc = listMarketStateObservations({ symbol: 'BTCUSDT', limit: 200 }, db)
+    const afterGetEth = listMarketStateObservations({ symbol: 'ETHUSDT', limit: 200 }, db)
+    expect(afterGetBtc).toHaveLength(beforeBtc)
+    expect(afterGetEth).toHaveLength(beforeEth)
+
+    const recorded = await evaluateAndPersistMarketStates({ db })
+    expect(recorded.map((item) => item.symbol)).toEqual(['BTCUSDT', 'ETHUSDT'])
+    expect(recorded.every((item) => item.persisted)).toBe(true)
+
+    const again = await evaluateAndPersistMarketStates({ db })
+    expect(again.every((item) => item.persisted)).toBe(false)
+
+    const btcHistory = await request(
+      'GET',
+      '/api/trading-lab/market-state/BTCUSDT/history',
+    )
+    expect(btcHistory.status).toBe(200)
+    expect(btcHistory.json.observations.length).toBe(beforeBtc + 1)
+    expect(
+      btcHistory.json.observations.every((row) => row.symbol === 'BTCUSDT'),
+    ).toBe(true)
+
+    const ethHistory = await request(
+      'GET',
+      '/api/trading-lab/market-state/ETHUSDT/history',
+    )
+    expect(ethHistory.status).toBe(200)
+    expect(ethHistory.json.observations.length).toBe(beforeEth + 1)
+    expect(
+      ethHistory.json.observations.every((row) => row.symbol === 'ETHUSDT'),
+    ).toBe(true)
+  })
+
   it('provider 미설정이면 NOT_CONFIGURED 로 정상 응답한다', async () => {
     resetMarketDataProvider()
     await login()
@@ -451,6 +514,10 @@ describe('Trading Lab API', () => {
     const cvd = await request('GET', '/api/trading-lab/cvd/SOLUSDT?window=15m')
     expect(cvd.status).toBe(400)
     expect(cvd.json.field).toBe('symbol')
+
+    const marketState = await request('GET', '/api/trading-lab/market-state/SOLUSDT')
+    expect(marketState.status).toBe(400)
+    expect(marketState.json.field).toBe('symbol')
   })
 
   it('bias / confidence 검증 실패는 400', async () => {

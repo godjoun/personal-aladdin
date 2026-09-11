@@ -309,6 +309,70 @@
   color: var(--color-text);
 }
 
+.trading-lab__strength {
+  font-family: var(--font-mono, var(--font-sans));
+  font-size: 0.88rem;
+  font-weight: 650;
+  color: var(--color-text);
+}
+
+.trading-lab__bias--bullish {
+  color: #0a7f3f;
+  border-color: #a7e0bf;
+  background: #f0fbf4;
+}
+
+.trading-lab__bias--bearish {
+  color: #cf222e;
+  border-color: #f1aeb5;
+  background: #fff5f5;
+}
+
+.trading-lab__bias--mixed,
+.trading-lab__bias--insufficient,
+.trading-lab__bias--unknown {
+  color: #57606a;
+  border-color: var(--color-border);
+  background: #f6f8fa;
+}
+
+.trading-lab__engine,
+.trading-lab__manual-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.trading-lab__manual-analysis {
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--color-border-light);
+}
+
+.trading-lab__disclaimer {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.trading-lab__state-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-family: var(--font-mono, var(--font-sans));
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.trading-lab__state-history-time {
+  display: inline-block;
+  min-width: 3.1rem;
+  color: var(--color-text-muted);
+}
+
 .trading-lab__reasons {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
