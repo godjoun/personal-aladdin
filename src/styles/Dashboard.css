@@ -587,6 +587,18 @@
   cursor: pointer;
 }
 
+/* 로컬 전용 모드 — 작은 상태 표시만 (경고창 없음) */
+.simple-dash__local-mode {
+  align-self: center;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  background: #f6f8fa;
+  border: 1px solid var(--color-border-light);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .simple-dash__manage-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;

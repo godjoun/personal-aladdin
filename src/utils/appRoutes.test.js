@@ -34,6 +34,17 @@ describe('parseAppRoute', () => {
       tradingPage: TRADING_PAGES.HOME,
     })
   })
+
+  it('parses trading lab', () => {
+    expect(parseAppRoute('#/trading-lab')).toEqual({
+      area: APP_AREAS.TRADING_LAB,
+      tradingPage: TRADING_PAGES.HOME,
+    })
+  })
+
+  it('keeps trading lab separate from trading', () => {
+    expect(parseAppRoute('#/trading-lab').area).not.toBe(APP_AREAS.TRADING)
+  })
 })
 
 describe('buildAppHash', () => {
@@ -48,5 +59,9 @@ describe('buildAppHash', () => {
         tradingPage: TRADING_PAGES.PAPER,
       }),
     ).toBe('#/trading/paper')
+  })
+
+  it('builds trading lab hash', () => {
+    expect(buildAppHash({ area: APP_AREAS.TRADING_LAB })).toBe('#/trading-lab')
   })
 })

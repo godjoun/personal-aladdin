@@ -79,6 +79,12 @@ import {
   getListenHost,
   shouldUseSecureCookies,
 } from './listenConfig.js'
+import { createTradingLabRouter } from './tradingLab/routes.js'
+import {
+  LOCAL_BYPASS_USER,
+  assertLocalAuthBypassSafe,
+} from './auth/localBypass.js'
+import { createAppHtmlProvider } from './appHtml.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 config({ path: path.join(__dirname, '..', '.env') })
@@ -124,7 +130,25 @@ function readSessionId(req) {
   return req.cookies?.[getSessionCookieName()]
 }
 
+/**
+ * 로컬 전용 bypass 상태. createApp() 에서 1회 판정한다.
+ * @type {boolean}
+ */
+let localAuthBypassActive = false
+
+/**
+ * 인증 게이트.
+ *
+ * 로컬 bypass 가 안전하다고 판정된 경우에만 세션 검사를 건너뛴다.
+ * 그 외에는 기존 세션 인증(비밀번호 해시 · 세션 · 잠금)을 그대로 수행한다.
+ */
 function requireAuth(req, res, next) {
+  if (localAuthBypassActive) {
+    req.user = { ...LOCAL_BYPASS_USER }
+    next()
+    return
+  }
+
   if (!authConfigured()) {
     res.status(503).json({ ok: false, message: 'Authentication is not configured' })
     return
@@ -146,7 +170,17 @@ function safeError(res, status = 500) {
  * Express 앱 생성 (테스트용 export)
  */
 export function createApp() {
-  if (!authConfigured() && isProd) {
+  // 위험한 bypass 설정(외부 bind / 호스팅 / proxy 뒤)이면 여기서 기동을 중단한다.
+  const bypassState = assertLocalAuthBypassSafe()
+  localAuthBypassActive = bypassState.allowed
+
+  if (bypassState.requested && !bypassState.allowed) {
+    console.warn(
+      `[Server] local auth bypass rejected (${bypassState.reason}) — login required`,
+    )
+  }
+
+  if (!authConfigured() && isProd && !localAuthBypassActive) {
     throw new Error(
       'Production requires ALADDIN_ADMIN_USERNAME, ALADDIN_ADMIN_PASSWORD_HASH, ALADDIN_SESSION_SECRET',
     )
@@ -200,6 +234,15 @@ export function createApp() {
 
   /** 로그인 상태 */
   app.get('/api/auth/me', (req, res) => {
+    if (localAuthBypassActive) {
+      res.status(200).json({
+        ok: true,
+        authenticated: true,
+        username: LOCAL_BYPASS_USER.username,
+        localBypass: true,
+      })
+      return
+    }
     if (!authConfigured()) {
       res.status(503).json({ ok: false, authenticated: false })
       return
@@ -303,6 +346,7 @@ export function createApp() {
   app.use('/api/public-data', requireAuth, requireCsrf)
   app.use('/api/stocks', requireAuth, requireCsrf)
   app.use('/api/briefing', requireAuth, requireCsrf)
+  app.use('/api/trading-lab', requireAuth, requireCsrf, createTradingLabRouter())
 
   app.get('/api/public-data', async (req, res) => {
     const service = req.query.service === 'stock' ? 'stock' : 'etf'
@@ -670,6 +714,11 @@ export function createApp() {
 
     app.use(express.static(distPath, { index: false, dotfiles: 'deny' }))
 
+    const getAppHtml = createAppHtmlProvider({
+      distPath,
+      localAuthBypass: localAuthBypassActive,
+    })
+
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) {
         next()
@@ -680,7 +729,7 @@ export function createApp() {
         res.status(404).end()
         return
       }
-      res.sendFile(path.join(distPath, 'index.html'))
+      res.type('html').send(getAppHtml())
     })
   }
 
@@ -708,7 +757,10 @@ if (isMain) {
       if (isProd) {
         console.log('[Server] Production mode — serving dist/')
       }
-      if (!authConfigured()) {
+      if (localAuthBypassActive) {
+        console.log('[Server] Local-only mode — auth bypass active (loopback bind)')
+      }
+      if (!authConfigured() && !localAuthBypassActive) {
         console.warn(
           '[Server] Auth not configured — set ALADDIN_ADMIN_* and ALADDIN_SESSION_SECRET',
         )

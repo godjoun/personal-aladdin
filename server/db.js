@@ -7,6 +7,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { resolveDbPath } from './resolveDbPath.js'
+import { migrateTradingLab } from './tradingLab/schema.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -138,6 +139,8 @@ function migrate(db) {
       locked_until INTEGER
     );
   `)
+
+  migrateTradingLab(db)
 }
 
 /**

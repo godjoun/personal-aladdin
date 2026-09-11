@@ -4,6 +4,7 @@ import '../../styles/AppLayout.css'
 const NAV_ITEMS = [
   { id: APP_AREAS.ASSETS, label: '자산', description: '투자 대시보드' },
   { id: APP_AREAS.TRADING, label: 'TRADING', description: '매매일지' },
+  { id: APP_AREAS.TRADING_LAB, label: 'Trading Lab', description: '선물 시장 분석' },
 ]
 
 export default function AppSidebar({ activeArea, onNavigate }) {

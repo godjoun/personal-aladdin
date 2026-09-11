@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import LoginForm from './components/LoginForm.jsx'
 import AppLayout from './components/layout/AppLayout.jsx'
 import TradingArea from './pages/trading/TradingArea.jsx'
+import TradingLabArea from './pages/tradingLab/TradingLabArea.jsx'
 import { useAppRoute } from './hooks/useAppRoute.js'
 import { APP_AREAS } from './utils/appRoutes.js'
 import { getAssets } from './services/assetStorage.js'
@@ -22,6 +23,7 @@ import {
 import { hydrateManualLedgerFromServer } from './services/manualPersistence.js'
 import { hydrateDividendsFromServer } from './services/dividendPersistence.js'
 import { fetchAuthMe, logout } from './services/authApi.js'
+import { readLocalAuthBypassFlag } from './services/localAuthMode.js'
 import { ensureCsrf, setCsrfToken } from './services/apiClient.js'
 import { useMarketSchedule } from './hooks/useMarketSchedule.js'
 import {
@@ -36,8 +38,11 @@ function clearSensitiveClientState() {
 
 function App() {
   const { route, navigate } = useAppRoute()
-  const [authChecked, setAuthChecked] = useState(false)
-  const [authenticated, setAuthenticated] = useState(false)
+  // 로컬 전용 모드면 서버가 첫 HTML 에 플래그를 심어 보낸다.
+  // 초기값으로 바로 인증 통과 처리해 로그인/로딩 화면 깜빡임을 없앤다.
+  const [localBypass, setLocalBypass] = useState(readLocalAuthBypassFlag)
+  const [authChecked, setAuthChecked] = useState(localBypass)
+  const [authenticated, setAuthenticated] = useState(localBypass)
   const [marketPrices, setMarketPrices] = useState([])
   const [assets, setAssets] = useState([])
   const [autoMarketRefresh] = useState(getAutoMarketRefreshEnabled)
@@ -111,6 +116,8 @@ function App() {
         await ensureCsrf()
         const me = await fetchAuthMe()
         if (cancelled) return
+        // 서버 판정이 최종 권한 — meta 플래그와 다르면 서버 쪽을 따른다.
+        setLocalBypass(Boolean(me.localBypass))
         setAuthenticated(Boolean(me.authenticated))
       } catch {
         if (!cancelled) setAuthenticated(false)
@@ -235,7 +242,9 @@ function App() {
     <div className="app">
       <AppLayout activeArea={route.area} onNavigate={navigate}>
         <main className="app-main">
-          {route.area === APP_AREAS.TRADING ? (
+          {route.area === APP_AREAS.TRADING_LAB ? (
+            <TradingLabArea area={route.area} onNavigate={navigate} />
+          ) : route.area === APP_AREAS.TRADING ? (
             <TradingArea
               tradingPage={route.tradingPage}
               onNavigate={navigate}
@@ -251,7 +260,8 @@ function App() {
               onAssetAdded={handleAssetAdded}
               onTradesChange={refreshData}
               onKiwoomSynced={(date) => setLastUpdatedAt(date)}
-              onLogout={handleLogout}
+              onLogout={localBypass ? undefined : handleLogout}
+              localMode={localBypass}
             />
           )}
         </main>

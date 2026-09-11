@@ -5,6 +5,7 @@
 export const APP_AREAS = {
   ASSETS: 'assets',
   TRADING: 'trading',
+  TRADING_LAB: 'trading-lab',
 }
 
 export const TRADING_PAGES = {
@@ -35,6 +36,13 @@ export function parseAppRoute(hash = '') {
     return { ...DEFAULT_ROUTE }
   }
 
+  if (segments[0] === APP_AREAS.TRADING_LAB) {
+    return {
+      area: APP_AREAS.TRADING_LAB,
+      tradingPage: TRADING_PAGES.HOME,
+    }
+  }
+
   if (segments[0] !== APP_AREAS.TRADING) {
     return { ...DEFAULT_ROUTE }
   }
@@ -49,6 +57,10 @@ export function parseAppRoute(hash = '') {
 }
 
 export function buildAppHash({ area, tradingPage } = {}) {
+  if (area === APP_AREAS.TRADING_LAB) {
+    return '#/trading-lab'
+  }
+
   if (area === APP_AREAS.TRADING) {
     if (!tradingPage || tradingPage === TRADING_PAGES.HOME) {
       return '#/trading'

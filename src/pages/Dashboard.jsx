@@ -174,6 +174,7 @@ function Dashboard({
   onTradesChange,
   onKiwoomSynced,
   onLogout,
+  localMode = false,
 }) {
   const [refreshStatus, setRefreshStatus] = useState(REFRESH_STATUS.IDLE)
   const [syncStep, setSyncStep] = useState(SYNC_STEPS.IDLE)
@@ -676,6 +677,9 @@ function Dashboard({
             >
               로그아웃
             </button>
+          )}
+          {localMode && (
+            <span className="simple-dash__local-mode">로컬 전용 모드</span>
           )}
         </div>
       </header>

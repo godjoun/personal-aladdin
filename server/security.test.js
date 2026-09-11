@@ -24,6 +24,8 @@ process.env.ALADDIN_ADMIN_USERNAME = 'admin'
 process.env.ALADDIN_ADMIN_PASSWORD_HASH = hashPassword('CorrectHorseBattery-99')
 process.env.ALADDIN_SESSION_SECRET = 'test-session-secret-min-32-chars!!'
 process.env.ALADDIN_ALLOWED_ORIGIN = 'http://localhost:5173'
+// 로컬 .env 의 bypass 설정과 무관하게 세션 인증 경로를 검증한다
+process.env.ALADDIN_LOCAL_AUTH_BYPASS = 'false'
 
 const { createApp } = await import('./index.js')
 

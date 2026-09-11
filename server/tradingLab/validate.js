@@ -1,0 +1,405 @@
+/**
+ * validate.js — Trading Lab API 입력 재검증
+ *
+ * 원칙
+ * - symbol / timeframe / bias / result / sourceType 은 allowlist 만 통과.
+ * - 시장 지표는 "없음(null)" 이 정상값이다. 빈 문자열/undefined → null 로 정규화.
+ * - funding, cvd, OI 변화량은 음수가 정상이므로 부호를 제한하지 않는다.
+ */
+
+import {
+  TRADING_LAB_BIAS_SET,
+  TRADING_LAB_DATA_STATUS_SET,
+  TRADING_LAB_LIQUIDATION_SIDE_SET,
+  TRADING_LAB_OUTCOME_RESULT_SET,
+  TRADING_LAB_SCREENSHOT_STATUS_SET,
+  TRADING_LAB_SOURCE_TYPE_SET,
+  TRADING_LAB_STRUCTURE_SET,
+  TRADING_LAB_SYMBOL_SET,
+  TRADING_LAB_TIMEFRAME_SET,
+} from './constants.js'
+
+const MAX_NOTE = 1000
+const MAX_REASON_ITEM = 200
+const MAX_REASON_ITEMS = 20
+const MAX_SOURCE = 40
+const MAX_IMAGE_REF = 300
+const NUMERIC_LIMIT = 1e15
+const MAX_LIST_LIMIT = 200
+
+/**
+ * @param {unknown} value
+ * @param {number} max
+ * @returns {string | null}
+ */
+function optionalText(value, max) {
+  if (value === null || value === undefined) return null
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.length > max) return null
+  return trimmed
+}
+
+/**
+ * 부호 제한 없는 nullable 수치 (funding/cvd/OI 변화량 등)
+ *
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+export function asOptionalNumber(value) {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value === 'boolean') return null
+  const n = Number(value)
+  if (!Number.isFinite(n)) return null
+  if (Math.abs(n) > NUMERIC_LIMIT) return null
+  return n
+}
+
+/**
+ * 가격류 nullable 수치 — 음수 가격은 거부
+ *
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+export function asOptionalPrice(value) {
+  const n = asOptionalNumber(value)
+  if (n === null) return null
+  if (n < 0) return null
+  return n
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asLabSymbol(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return TRADING_LAB_SYMBOL_SET.has(upper) ? upper : null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asLabTimeframe(value) {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  return TRADING_LAB_TIMEFRAME_SET.has(normalized) ? normalized : null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asBias(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return TRADING_LAB_BIAS_SET.has(upper) ? upper : null
+}
+
+/**
+ * 0~100 정수. 미입력(null) 허용.
+ *
+ * @param {unknown} value
+ * @returns {number | null | undefined} undefined = 잘못된 값
+ */
+export function asConfidence(value) {
+  if (value === null || value === undefined || value === '') return null
+  const n = Number(value)
+  if (!Number.isFinite(n)) return undefined
+  if (n < 0 || n > 100) return undefined
+  return Math.round(n)
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null | undefined} undefined = 잘못된 값
+ */
+export function asStructureState(value) {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value !== 'string') return undefined
+  const upper = value.trim().toUpperCase()
+  return TRADING_LAB_STRUCTURE_SET.has(upper) ? upper : undefined
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asOutcomeResult(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return TRADING_LAB_OUTCOME_RESULT_SET.has(upper) ? upper : null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asLiquidationSide(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return TRADING_LAB_LIQUIDATION_SIDE_SET.has(upper) ? upper : null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asSourceType(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return TRADING_LAB_SOURCE_TYPE_SET.has(upper) ? upper : null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asDataStatus(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return TRADING_LAB_DATA_STATUS_SET.has(upper) ? upper : null
+}
+
+/**
+ * 근거/주의 목록 — 문자열 배열
+ *
+ * @param {unknown} value
+ * @returns {string[] | undefined} undefined = 잘못된 값
+ */
+export function asReasonList(value) {
+  if (value === null || value === undefined || value === '') return []
+  if (!Array.isArray(value)) return undefined
+  if (value.length > MAX_REASON_ITEMS) return undefined
+
+  const out = []
+  for (const item of value) {
+    if (typeof item !== 'string') return undefined
+    const trimmed = item.trim()
+    if (!trimmed) continue
+    if (trimmed.length > MAX_REASON_ITEM) return undefined
+    out.push(trimmed)
+  }
+  return out
+}
+
+/**
+ * ISO timestamp. 미입력 허용.
+ *
+ * @param {unknown} value
+ * @returns {string | null | undefined} undefined = 잘못된 값
+ */
+export function asIsoTimestamp(value) {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  if (trimmed.length > 40) return undefined
+  const date = new Date(trimmed)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
+}
+
+/**
+ * 목록 조회 limit
+ *
+ * @param {unknown} value
+ * @param {number} fallback
+ * @returns {number | null} null = 잘못된 값
+ */
+export function asListLimit(value, fallback = 20) {
+  if (value === null || value === undefined || value === '') return fallback
+  const n = Number(value)
+  if (!Number.isInteger(n) || n < 1 || n > MAX_LIST_LIMIT) return null
+  return n
+}
+
+/**
+ * 분석 생성 입력 정규화
+ *
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: object } | { ok: false, field: string }}
+ */
+export function sanitizeAnalysisInput(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+
+  const symbol = asLabSymbol(raw.symbol)
+  if (!symbol) return { ok: false, field: 'symbol' }
+
+  const bias = asBias(raw.bias)
+  if (!bias) return { ok: false, field: 'bias' }
+
+  const confidence = asConfidence(raw.confidence)
+  if (confidence === undefined) return { ok: false, field: 'confidence' }
+
+  const timeframe15m = asStructureState(raw.timeframe15m)
+  if (timeframe15m === undefined) return { ok: false, field: 'timeframe15m' }
+  const timeframe1h = asStructureState(raw.timeframe1h)
+  if (timeframe1h === undefined) return { ok: false, field: 'timeframe1h' }
+  const timeframe4h = asStructureState(raw.timeframe4h)
+  if (timeframe4h === undefined) return { ok: false, field: 'timeframe4h' }
+
+  const reasoning = asReasonList(raw.reasoning)
+  if (reasoning === undefined) return { ok: false, field: 'reasoning' }
+  const cautions = asReasonList(raw.cautions)
+  if (cautions === undefined) return { ok: false, field: 'cautions' }
+
+  const snapshotRaw =
+    raw.marketSnapshot && typeof raw.marketSnapshot === 'object'
+      ? raw.marketSnapshot
+      : raw
+
+  const marketDataStatus = raw.marketDataStatus
+    ? asDataStatus(raw.marketDataStatus)
+    : null
+  if (raw.marketDataStatus && !marketDataStatus) {
+    return { ok: false, field: 'marketDataStatus' }
+  }
+
+  return {
+    ok: true,
+    value: {
+      symbol,
+      bias,
+      confidence,
+      referencePrice: asOptionalPrice(raw.referencePrice),
+      timeframe15m,
+      timeframe1h,
+      timeframe4h,
+      reasoning,
+      cautions,
+      invalidationPrice: asOptionalPrice(raw.invalidationPrice),
+      notes: optionalText(raw.notes, MAX_NOTE),
+      marketSnapshot: {
+        volume: asOptionalNumber(snapshotRaw.volume),
+        volumeZScore: asOptionalNumber(snapshotRaw.volumeZScore),
+        openInterest: asOptionalNumber(snapshotRaw.openInterest),
+        openInterestChange: asOptionalNumber(snapshotRaw.openInterestChange),
+        fundingRate: asOptionalNumber(snapshotRaw.fundingRate),
+        cvd: asOptionalNumber(snapshotRaw.cvd),
+        liquidationAbove: asOptionalPrice(snapshotRaw.liquidationAbove),
+        liquidationBelow: asOptionalPrice(snapshotRaw.liquidationBelow),
+      },
+      marketDataStatus,
+      marketDataSource: optionalText(raw.marketDataSource, MAX_SOURCE),
+    },
+  }
+}
+
+/**
+ * 결과 기록 입력 정규화
+ *
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: object } | { ok: false, field: string }}
+ */
+export function sanitizeOutcomeInput(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+
+  const result = raw.result == null ? 'UNRESOLVED' : asOutcomeResult(raw.result)
+  if (!result) return { ok: false, field: 'result' }
+
+  const evaluatedAt = asIsoTimestamp(raw.evaluatedAt)
+  if (evaluatedAt === undefined) return { ok: false, field: 'evaluatedAt' }
+
+  return {
+    ok: true,
+    value: {
+      result,
+      evaluatedAt,
+      price1h: asOptionalPrice(raw.price1h),
+      price4h: asOptionalPrice(raw.price4h),
+      price12h: asOptionalPrice(raw.price12h),
+      price24h: asOptionalPrice(raw.price24h),
+      maxFavorableMove: asOptionalNumber(raw.maxFavorableMove),
+      maxAdverseMove: asOptionalNumber(raw.maxAdverseMove),
+      notes: optionalText(raw.notes, MAX_NOTE),
+    },
+  }
+}
+
+/**
+ * 청산 snapshot 입력 정규화
+ *
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: object } | { ok: false, field: string }}
+ */
+export function sanitizeLiquidationInput(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+
+  const symbol = asLabSymbol(raw.symbol)
+  if (!symbol) return { ok: false, field: 'symbol' }
+
+  const side = asLiquidationSide(raw.side)
+  if (!side) return { ok: false, field: 'side' }
+
+  const sourceType = raw.sourceType == null ? 'MANUAL' : asSourceType(raw.sourceType)
+  if (!sourceType) return { ok: false, field: 'sourceType' }
+
+  const timestamp = asIsoTimestamp(raw.timestamp)
+  if (timestamp === undefined) return { ok: false, field: 'timestamp' }
+
+  return {
+    ok: true,
+    value: {
+      symbol,
+      side,
+      sourceType,
+      timestamp,
+      referencePrice: asOptionalPrice(raw.referencePrice),
+      priceLevel: asOptionalPrice(raw.priceLevel),
+      estimatedValue: asOptionalNumber(raw.estimatedValue),
+      source: optionalText(raw.source, MAX_SOURCE),
+      note: optionalText(raw.note, MAX_NOTE),
+    },
+  }
+}
+
+/**
+ * 차트 캡처 metadata 입력 정규화 (이미지 바이트는 저장하지 않는다)
+ *
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: object } | { ok: false, field: string }}
+ */
+export function sanitizeScreenshotInput(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+
+  const symbol = asLabSymbol(raw.symbol)
+  if (!symbol) return { ok: false, field: 'symbol' }
+
+  const timeframe = asLabTimeframe(raw.timeframe)
+  if (!timeframe) return { ok: false, field: 'timeframe' }
+
+  const capturedAt = asIsoTimestamp(raw.capturedAt)
+  if (capturedAt === undefined) return { ok: false, field: 'capturedAt' }
+
+  const status =
+    raw.status == null
+      ? 'PENDING'
+      : typeof raw.status === 'string' &&
+          TRADING_LAB_SCREENSHOT_STATUS_SET.has(raw.status.trim().toUpperCase())
+        ? raw.status.trim().toUpperCase()
+        : null
+  if (!status) return { ok: false, field: 'status' }
+
+  return {
+    ok: true,
+    value: {
+      symbol,
+      timeframe,
+      capturedAt,
+      status,
+      note: optionalText(raw.note, MAX_NOTE),
+      imageRef: optionalText(raw.imageRef, MAX_IMAGE_REF),
+    },
+  }
+}
