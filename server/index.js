@@ -92,6 +92,11 @@ import {
   setLiquidationCollector,
 } from './tradingLab/liquidationCollector.js'
 import {
+  createTradeFlowCollector,
+  resetTradeFlowCollector,
+  setTradeFlowCollector,
+} from './tradingLab/tradeFlowCollector.js'
+import {
   LOCAL_BYPASS_USER,
   assertLocalAuthBypassSafe,
 } from './auth/localBypass.js'
@@ -184,10 +189,11 @@ function safeError(res, status = 500) {
  * @param {{
  *   marketDataProvider?: object | null,
  *   liquidationCollector?: object | false,
+ *   tradeFlowCollector?: object | false,
  * }} [options]
  *   marketDataProvider 생략 시 Bybit 공개 API provider 를 등록한다.
  *   null 이면 미설정 상태로 둔다 (테스트용).
- *   liquidationCollector 생략 시 test 가 아니면 public WS collector 를 기동한다.
+ *   liquidationCollector / tradeFlowCollector 생략 시 test 가 아니면 public WS 를 기동한다.
  */
 export function createApp(options = {}) {
   // 위험한 bypass 설정(외부 bind / 호스팅 / proxy 뒤)이면 여기서 기동을 중단한다.
@@ -231,6 +237,22 @@ export function createApp(options = {}) {
       createLiquidationCollector({ autoConnect: true })
     } catch {
       console.error('[TradingLab] liquidation collector failed to start')
+    }
+  }
+
+  // Trading Lab — Bybit publicTrade CVD collector (READ ONLY, 독립 connection)
+  if (options.tradeFlowCollector === false) {
+    resetTradeFlowCollector()
+  } else if (
+    options.tradeFlowCollector &&
+    typeof options.tradeFlowCollector.getStatus === 'function'
+  ) {
+    setTradeFlowCollector(options.tradeFlowCollector)
+  } else if (process.env.NODE_ENV !== 'test') {
+    try {
+      createTradeFlowCollector({ autoConnect: true })
+    } catch {
+      console.error('[TradingLab] trade flow collector failed to start')
     }
   }
 

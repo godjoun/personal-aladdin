@@ -13,6 +13,7 @@ import {
   TRADING_LAB_LIQUIDATION_SIDE_SET,
   TRADING_LAB_OUTCOME_RESULT_SET,
   TRADING_LAB_SCREENSHOT_STATUS_SET,
+  TRADING_LAB_CVD_WINDOW_SET,
   TRADING_LAB_LIQUIDATION_WINDOW_SET,
   TRADING_LAB_SOURCE_TYPE_SET,
   TRADING_LAB_STRUCTURE_SET,
@@ -214,6 +215,19 @@ export function asLiquidationWindow(value) {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toLowerCase()
   return TRADING_LAB_LIQUIDATION_WINDOW_SET.has(normalized) ? normalized : null
+}
+
+/**
+ * CVD 집계 window (5m / 15m / 1h / 4h)
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asCvdWindow(value) {
+  if (value === null || value === undefined || value === '') return '15m'
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  return TRADING_LAB_CVD_WINDOW_SET.has(normalized) ? normalized : null
 }
 
 /**

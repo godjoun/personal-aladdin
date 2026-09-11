@@ -11,9 +11,13 @@ import {
   formatMetric,
   formatObservedLiquidationSide,
   formatRelativeUpdatedAt,
+  formatSharePct,
+  formatSignedCompactUsd,
   formatSignedValue,
   formatVolumeRatio,
   getBiasLabel,
+  getCvdCollectorStatus,
+  getCvdInterpretation,
   getMarketStatusLabel,
   getObservedLiquidationStatus,
   getOutcomeLabel,
@@ -135,6 +139,35 @@ describe('formatSignedValue', () => {
     expect(getObservedLiquidationStatus({ connected: false }, { long: { count: 2 } })).toBe(
       'HAS_DATA',
     )
+  })
+
+  it('CVD 금액/비중/상태와 해석을 표시한다', () => {
+    expect(formatSignedCompactUsd(12_400_000)).toBe('+$12.4M')
+    expect(formatSignedCompactUsd(-12_400_000)).toBe('-$12.4M')
+    expect(formatSharePct(58.4)).toBe('58%')
+    expect(getCvdCollectorStatus({ connected: true }, { tradeCount: 0 })).toBe(
+      'COLLECTING',
+    )
+    expect(getCvdCollectorStatus({ connected: false }, { tradeCount: 0 })).toBe(
+      'RECONNECTING',
+    )
+    expect(getCvdCollectorStatus({ connected: true }, { tradeCount: 3 })).toBe(
+      'HAS_DATA',
+    )
+    expect(getCvdInterpretation({ cvd: 100 }).label).toBe(
+      '공격적 매수 체결 우세 가능성',
+    )
+    expect(getCvdInterpretation({ cvd: -100 }).label).toBe(
+      '공격적 매도 체결 우세 가능성',
+    )
+    expect(getCvdInterpretation({ cvd: 100, priceChange: 1 }).label).toBe(
+      '가격 상승과 매수 체결이 함께 증가',
+    )
+    expect(getCvdInterpretation({ cvd: -100, priceChange: 1 }).label).toBe(
+      '가격 상승 대비 매수 체결 확인 약함',
+    )
+    expect(getCvdInterpretation({ cvd: 100 }).label).not.toContain('고래')
+    expect(getCvdInterpretation({ cvd: 100 }).label).not.toContain('무조건')
   })
 })
 

@@ -127,6 +127,23 @@ export async function fetchLiquidationCollectorStatus() {
 }
 
 /**
+ * @param {string} symbol
+ * @param {{ window?: string }} [options]
+ */
+export async function fetchCvdSummary(symbol, options = {}) {
+  const params = new URLSearchParams()
+  if (options.window) params.set('window', options.window)
+  const query = params.toString()
+  return call(
+    `${BASE}/cvd/${encodeURIComponent(symbol)}${query ? `?${query}` : ''}`,
+  )
+}
+
+export async function fetchTradeFlowCollectorStatus() {
+  return call(`${BASE}/cvd/status`)
+}
+
+/**
  * @param {{ symbol?: string, limit?: number }} [filter]
  */
 export async function fetchLiquidationSnapshots(filter = {}) {

@@ -134,6 +134,42 @@ export function migrateTradingLab(db) {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_liquidation_snapshot_source_key
       ON liquidation_snapshot(sourceKey)
       WHERE sourceKey IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS trade_flow_bucket (
+      symbol TEXT NOT NULL,
+      bucketStart TEXT NOT NULL,
+      intervalSeconds INTEGER NOT NULL,
+      buyVolume REAL NOT NULL DEFAULT 0,
+      sellVolume REAL NOT NULL DEFAULT 0,
+      buyNotional REAL NOT NULL DEFAULT 0,
+      sellNotional REAL NOT NULL DEFAULT 0,
+      tradeCount INTEGER NOT NULL DEFAULT 0,
+      deltaVolume REAL NOT NULL DEFAULT 0,
+      deltaNotional REAL NOT NULL DEFAULT 0,
+      updatedAt TEXT NOT NULL,
+      PRIMARY KEY (symbol, bucketStart, intervalSeconds)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_trade_flow_bucket_symbol_start
+      ON trade_flow_bucket(symbol, bucketStart);
+
+    CREATE TABLE IF NOT EXISTS trade_flow_aggregate (
+      symbol TEXT NOT NULL,
+      bucketStart TEXT NOT NULL,
+      intervalSeconds INTEGER NOT NULL,
+      buyVolume REAL NOT NULL DEFAULT 0,
+      sellVolume REAL NOT NULL DEFAULT 0,
+      buyNotional REAL NOT NULL DEFAULT 0,
+      sellNotional REAL NOT NULL DEFAULT 0,
+      tradeCount INTEGER NOT NULL DEFAULT 0,
+      deltaVolume REAL NOT NULL DEFAULT 0,
+      deltaNotional REAL NOT NULL DEFAULT 0,
+      updatedAt TEXT NOT NULL,
+      PRIMARY KEY (symbol, bucketStart, intervalSeconds)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_trade_flow_aggregate_symbol_start
+      ON trade_flow_aggregate(symbol, bucketStart);
   `)
 }
 

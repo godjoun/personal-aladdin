@@ -7,11 +7,14 @@ import AnalysisDetailDrawer from '../../components/tradingLab/AnalysisDetailDraw
 import ChartCaptureSlot from '../../components/tradingLab/ChartCaptureSlot.jsx'
 import {
   fetchAnalyses,
+  fetchCvdSummary,
   fetchLiquidationCollectorStatus,
   fetchMarketSnapshot,
   fetchObservedLiquidations,
+  fetchTradeFlowCollectorStatus,
   fetchTradingLabStats,
 } from '../../services/tradingLabApi.js'
+import { getCvdInterpretation } from '../../utils/tradingLabView.js'
 import '../../styles/TradingLab.css'
 
 /** MVP 대상 — 서버 allowlist 와 동일 */
@@ -23,6 +26,8 @@ export default function TradingLabHome() {
   const [marketLoading, setMarketLoading] = useState(false)
   const [observedLiquidations, setObservedLiquidations] = useState(null)
   const [liquidationCollector, setLiquidationCollector] = useState(null)
+  const [cvdSummary, setCvdSummary] = useState(null)
+  const [tradeFlowCollector, setTradeFlowCollector] = useState(null)
   const [analyses, setAnalyses] = useState([])
   const [analysesLoading, setAnalysesLoading] = useState(false)
   const [stats, setStats] = useState(null)
@@ -33,19 +38,26 @@ export default function TradingLabHome() {
   const loadMarket = useCallback(async () => {
     setMarketLoading(true)
     try {
-      const [payload, liqPayload, liqStatus] = await Promise.all([
-        fetchMarketSnapshot(symbol),
-        fetchObservedLiquidations(symbol, { window: '15m' }).catch(() => null),
-        fetchLiquidationCollectorStatus().catch(() => null),
-      ])
+      const [payload, liqPayload, liqStatus, cvdPayload, cvdStatus] =
+        await Promise.all([
+          fetchMarketSnapshot(symbol),
+          fetchObservedLiquidations(symbol, { window: '15m' }).catch(() => null),
+          fetchLiquidationCollectorStatus().catch(() => null),
+          fetchCvdSummary(symbol, { window: '15m' }).catch(() => null),
+          fetchTradeFlowCollectorStatus().catch(() => null),
+        ])
       setMarket(payload.market)
       setObservedLiquidations(liqPayload)
       setLiquidationCollector(liqStatus?.collector || null)
+      setCvdSummary(cvdPayload)
+      setTradeFlowCollector(cvdStatus?.collector || null)
     } catch {
       // provider 미연결과 조회 실패를 화면에서 구분해 보여준다
       setMarket({ symbol, configured: false, status: 'ERROR', metrics: {} })
       setObservedLiquidations(null)
       setLiquidationCollector(null)
+      setCvdSummary(null)
+      setTradeFlowCollector(null)
     } finally {
       setMarketLoading(false)
     }
@@ -77,15 +89,19 @@ export default function TradingLabHome() {
     let cancelled = false
     const timer = setInterval(async () => {
       try {
-        const [liqPayload, liqStatus] = await Promise.all([
+        const [liqPayload, liqStatus, cvdPayload, cvdStatus] = await Promise.all([
           fetchObservedLiquidations(symbol, { window: '15m' }),
           fetchLiquidationCollectorStatus(),
+          fetchCvdSummary(symbol, { window: '15m' }),
+          fetchTradeFlowCollectorStatus(),
         ])
         if (cancelled) return
         setObservedLiquidations(liqPayload)
         setLiquidationCollector(liqStatus?.collector || null)
+        setCvdSummary(cvdPayload)
+        setTradeFlowCollector(cvdStatus?.collector || null)
       } catch {
-        // 청산 폴링 실패가 화면 전체를 막지 않는다
+        // 청산/CVD 폴링 실패가 화면 전체를 막지 않는다
       }
     }, 15_000)
     return () => {
@@ -99,6 +115,23 @@ export default function TradingLabHome() {
   }, [loadAnalyses])
 
   const latestAnalysis = analyses[0] || null
+  const priceChange15m = market?.structure?.find(
+    (item) => item.timeframe === '15m',
+  )?.changePct
+  const cvdObservation =
+    cvdSummary && (Number(cvdSummary.tradeCount) || 0) > 0
+      ? getCvdInterpretation({
+          cvd: cvdSummary.cvdNotional,
+          priceChange:
+            typeof priceChange15m === 'number' ? priceChange15m : null,
+        })
+      : null
+  const observations = [
+    ...(Array.isArray(market?.observations) ? market.observations : []),
+    ...(cvdObservation && cvdObservation.code !== 'CVD_INSUFFICIENT_DATA'
+      ? [cvdObservation]
+      : []),
+  ]
 
   function handleSaved() {
     setComposerOpen(false)
@@ -146,11 +179,13 @@ export default function TradingLabHome() {
         loading={marketLoading}
         observedLiquidations={observedLiquidations}
         liquidationCollector={liquidationCollector}
+        cvdSummary={cvdSummary}
+        tradeFlowCollector={tradeFlowCollector}
       />
 
       <AnalysisPanel
         analysis={latestAnalysis}
-        observations={market?.observations}
+        observations={observations}
         onRecord={() => setComposerOpen(true)}
       />
 

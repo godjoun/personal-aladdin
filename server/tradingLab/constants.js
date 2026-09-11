@@ -77,6 +77,26 @@ export const TRADING_LAB_SOURCE_TYPE_SET = new Set(TRADING_LAB_SOURCE_TYPES)
 export const TRADING_LAB_LIQUIDATION_WINDOW_SET = new Set(
   TRADING_LAB_LIQUIDATION_WINDOWS,
 )
+
+export const TRADING_LAB_CVD_WINDOWS = Object.freeze(['5m', '15m', '1h', '4h'])
+
+/** @type {Readonly<Record<string, number>>} */
+export const TRADING_LAB_CVD_WINDOW_MS = Object.freeze({
+  '5m': 5 * 60 * 1000,
+  '15m': 15 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
+  '4h': 4 * 60 * 60 * 1000,
+})
+
+export const TRADE_FLOW_SOURCE = 'BYBIT'
+export const TRADE_FLOW_BUCKET_INTERVAL_SECONDS = 60
+/** 장기 연구용 15분 요약. 자동 삭제하지 않는다. */
+export const TRADE_FLOW_AGGREGATE_INTERVAL_SECONDS = 15 * 60
+/** 1분 bucket 보존 기간. prune 전에 15분 aggregate 로 올린다. */
+export const TRADE_FLOW_RETENTION_MS = 48 * 60 * 60 * 1000
+export const TRADE_FLOW_STALE_MS = 90 * 1000
+
+export const TRADING_LAB_CVD_WINDOW_SET = new Set(TRADING_LAB_CVD_WINDOWS)
 export const TRADING_LAB_DATA_STATUS_SET = new Set(TRADING_LAB_DATA_STATUSES)
 export const TRADING_LAB_SCREENSHOT_STATUS_SET = new Set(
   TRADING_LAB_SCREENSHOT_STATUSES,

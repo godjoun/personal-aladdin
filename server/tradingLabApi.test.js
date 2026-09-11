@@ -21,6 +21,16 @@ import {
   resetLiquidationCollector,
   setLiquidationCollector,
 } from './tradingLab/liquidationCollector.js'
+import {
+  resetTradeFlowCollector,
+  setTradeFlowCollector,
+} from './tradingLab/tradeFlowCollector.js'
+import { upsertTradeFlowBucket } from './tradingLab/tradeFlowRepository.js'
+import {
+  applyTradeToBucket,
+  createEmptyTradeFlowBucket,
+  normalizeBybitPublicTrade,
+} from './tradingLab/tradeEvent.js'
 
 const TEMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aladdin-lab-api-'))
 const DB_PATH = path.join(TEMP_DIR, 'lab-api.sqlite')
@@ -134,6 +144,7 @@ describe('Trading Lab API', () => {
     closeDb()
     resetMarketDataProvider()
     resetLiquidationCollector()
+    resetTradeFlowCollector()
   })
 
   beforeEach(() => {
@@ -142,6 +153,7 @@ describe('Trading Lab API', () => {
     resetAccountLoginLockouts(getDb())
     resetMarketDataProvider()
     resetLiquidationCollector()
+    resetTradeFlowCollector()
     registerMarketDataProvider(
       createBybitMarketDataProvider({
         fetchImpl: createMockBybitFetch(),
@@ -228,6 +240,8 @@ describe('Trading Lab API', () => {
       '/api/trading-lab/liquidations',
       '/api/trading-lab/liquidations/status',
       '/api/trading-lab/liquidations/BTCUSDT',
+      '/api/trading-lab/cvd/status',
+      '/api/trading-lab/cvd/BTCUSDT',
       '/api/trading-lab/stats',
     ]) {
       const res = await request('GET', urlPath)
@@ -268,6 +282,7 @@ describe('Trading Lab API', () => {
     expect(res.status).toBe(200)
     expect(res.json.symbols).toEqual(['BTCUSDT', 'ETHUSDT'])
     expect(res.json.biases).toEqual(['LONG', 'SHORT', 'NEUTRAL'])
+    expect(res.json.cvdWindows).toEqual(['5m', '15m', '1h', '4h'])
     expect(res.json.marketDataConfigured).toBe(true)
   })
 
@@ -339,6 +354,72 @@ describe('Trading Lab API', () => {
     expect(badWindow.json.field).toBe('window')
   })
 
+  it('CVD status / window API 를 제공한다', async () => {
+    setTradeFlowCollector({
+      getStatus() {
+        return {
+          provider: 'BYBIT',
+          connected: true,
+          subscribedSymbols: ['BTCUSDT', 'ETHUSDT'],
+          lastTradeAt: '2026-01-01T00:00:00.000Z',
+          lastMessageAt: '2026-01-01T00:00:00.000Z',
+          reconnectCount: 0,
+        }
+      },
+    })
+    await login()
+
+    const status = await request('GET', '/api/trading-lab/cvd/status')
+    expect(status.status).toBe(200)
+    expect(status.json.collector).toEqual({
+      provider: 'BYBIT',
+      connected: true,
+      subscribedSymbols: ['BTCUSDT', 'ETHUSDT'],
+      lastTradeAt: '2026-01-01T00:00:00.000Z',
+      lastMessageAt: '2026-01-01T00:00:00.000Z',
+      reconnectCount: 0,
+    })
+
+    const empty = await request('GET', '/api/trading-lab/cvd/ETHUSDT?window=5m')
+    expect(empty.status).toBe(200)
+    expect(empty.json.symbol).toBe('ETHUSDT')
+    expect(empty.json.provider).toBe('BYBIT')
+    expect(empty.json.window).toBe('5m')
+    expect(empty.json.cvd).toBe(0)
+    expect(empty.json.buySharePct).toBeNull()
+
+    const bucketStartMs = Math.floor(Date.now() / 60_000) * 60_000
+    const bucket = createEmptyTradeFlowBucket({
+      symbol: 'BTCUSDT',
+      bucketStart: new Date(bucketStartMs).toISOString(),
+    })
+    applyTradeToBucket(
+      bucket,
+      normalizeBybitPublicTrade({
+        T: bucketStartMs + 1_000,
+        s: 'BTCUSDT',
+        S: 'Buy',
+        v: '2',
+        p: '100',
+        i: 'api-cvd-1',
+      }).value,
+    )
+    upsertTradeFlowBucket(bucket, getDb())
+
+    const summary = await request('GET', '/api/trading-lab/cvd/BTCUSDT?window=15m')
+    expect(summary.status).toBe(200)
+    expect(summary.json.buyVolume).toBe(2)
+    expect(summary.json.cvdNotional).toBe(200)
+    expect(summary.json.buySharePct).toBe(100)
+
+    const badWindow = await request(
+      'GET',
+      '/api/trading-lab/cvd/BTCUSDT?window=24h',
+    )
+    expect(badWindow.status).toBe(400)
+    expect(badWindow.json.field).toBe('window')
+  })
+
   it('provider 미설정이면 NOT_CONFIGURED 로 정상 응답한다', async () => {
     resetMarketDataProvider()
     await login()
@@ -366,6 +447,10 @@ describe('Trading Lab API', () => {
     )
     expect(created.status).toBe(400)
     expect(created.json.field).toBe('symbol')
+
+    const cvd = await request('GET', '/api/trading-lab/cvd/SOLUSDT?window=15m')
+    expect(cvd.status).toBe(400)
+    expect(cvd.json.field).toBe('symbol')
   })
 
   it('bias / confidence 검증 실패는 400', async () => {

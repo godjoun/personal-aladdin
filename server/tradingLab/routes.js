@@ -15,11 +15,13 @@ import {
   TRADING_LAB_OUTCOME_RESULTS,
   TRADING_LAB_SOURCE_TYPES,
   TRADING_LAB_STRUCTURE_STATES,
+  TRADING_LAB_CVD_WINDOWS,
   TRADING_LAB_SYMBOLS,
   TRADING_LAB_TIMEFRAMES,
 } from './constants.js'
 import {
   asBias,
+  asCvdWindow,
   asLabSymbol,
   asLiquidationSide,
   asLiquidationWindow,
@@ -53,6 +55,8 @@ import {
 import { getMarketSnapshot } from './marketSnapshotService.js'
 import { isMarketDataConfigured } from './marketDataProvider.js'
 import { getLiquidationCollector } from './liquidationCollector.js'
+import { getCvdSummary } from './tradeFlowRepository.js'
+import { getTradeFlowCollector } from './tradeFlowCollector.js'
 
 /**
  * @param {import('express').Response} res
@@ -83,6 +87,7 @@ export function createTradingLabRouter() {
       structureStates: TRADING_LAB_STRUCTURE_STATES,
       liquidationSides: TRADING_LAB_LIQUIDATION_SIDES,
       liquidationWindows: TRADING_LAB_LIQUIDATION_WINDOWS,
+      cvdWindows: TRADING_LAB_CVD_WINDOWS,
       sourceTypes: TRADING_LAB_SOURCE_TYPES,
       marketDataConfigured: isMarketDataConfigured(),
     })
@@ -344,6 +349,44 @@ export function createTradingLabRouter() {
       res.status(201).json({ ok: true, snapshot })
     } catch {
       console.error('[TradingLab] create liquidation snapshot failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/cvd/status', (_req, res) => {
+    const collector = getTradeFlowCollector()
+    res.status(200).json({
+      ok: true,
+      collector: collector?.getStatus
+        ? collector.getStatus()
+        : {
+            provider: 'BYBIT',
+            connected: false,
+            subscribedSymbols: [],
+            lastTradeAt: null,
+            lastMessageAt: null,
+            reconnectCount: 0,
+          },
+    })
+  })
+
+  router.get('/cvd/:symbol', (req, res) => {
+    const symbol = asLabSymbol(req.params.symbol)
+    if (!symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+    const window = asCvdWindow(req.query.window)
+    if (!window) {
+      badRequest(res, 'window')
+      return
+    }
+
+    try {
+      const summary = getCvdSummary({ symbol, window })
+      res.status(200).json({ ok: true, ...summary })
+    } catch {
+      console.error('[TradingLab] cvd summary failed')
       serverError(res)
     }
   })

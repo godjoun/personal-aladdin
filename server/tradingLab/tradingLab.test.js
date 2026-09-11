@@ -26,6 +26,7 @@ import {
 import {
   asBias,
   asConfidence,
+  asCvdWindow,
   asLabSymbol,
   asLabTimeframe,
   asListLimit,
@@ -46,8 +47,10 @@ import {
 } from './marketDataProvider.js'
 import { getMarketSnapshot } from './marketSnapshotService.js'
 import {
+  CVD_SIGNALS,
   PRICE_OI_SIGNALS,
   buildMarketObservations,
+  describeCvdFlow,
   describeFundingTilt,
   describeLiquidationProximity,
   describePriceOpenInterestRelation,
@@ -92,6 +95,14 @@ describe('Trading Lab 입력 검증', () => {
     expect(asLabTimeframe('4H')).toBe('4h')
     expect(asLabTimeframe('3m')).toBeNull()
     expect(asLabTimeframe('1w')).toBeNull()
+  })
+
+  it('CVD window 는 5m/15m/1h/4h 만 허용한다', () => {
+    expect(asCvdWindow(undefined)).toBe('15m')
+    expect(asCvdWindow('5m')).toBe('5m')
+    expect(asCvdWindow('1H')).toBe('1h')
+    expect(asCvdWindow('24h')).toBeNull()
+    expect(asCvdWindow('3m')).toBeNull()
   })
 
   it('bias 는 LONG/SHORT/NEUTRAL 만 허용한다', () => {
@@ -651,6 +662,8 @@ describe('price/OI 해석 domain model', () => {
         referencePrice: 65000,
         liquidationAbove: 65100,
       }),
+      describeCvdFlow({ cvd: 1200 }),
+      describeCvdFlow({ cvd: -800, priceChange: 1 }),
     ]
 
     for (const observation of observations) {
@@ -707,5 +720,18 @@ describe('price/OI 해석 domain model', () => {
     ])
 
     expect(buildMarketObservations({}, { includeInsufficient: true })).toHaveLength(4)
+  })
+
+  it('CVD 해석은 가능성만 말하고 방향을 추천하지 않는다', () => {
+    expect(describeCvdFlow({ cvd: 10 }).code).toBe(CVD_SIGNALS.BUY_PRESSURE)
+    expect(describeCvdFlow({ cvd: -10 }).code).toBe(CVD_SIGNALS.SELL_PRESSURE)
+    expect(describeCvdFlow({ cvd: 10, priceChange: 1 }).code).toBe(
+      CVD_SIGNALS.PRICE_UP_WITH_BUY,
+    )
+    expect(describeCvdFlow({ cvd: -10, priceChange: 1 }).code).toBe(
+      CVD_SIGNALS.PRICE_UP_WEAK_BUY,
+    )
+    expect(describeCvdFlow({ cvd: 10 }).leaning).toBe('NONE')
+    expect(describeCvdFlow({}).code).toBe(CVD_SIGNALS.INSUFFICIENT_DATA)
   })
 })

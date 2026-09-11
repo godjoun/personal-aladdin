@@ -1,7 +1,10 @@
 import {
+  CVD_COLLECTING_LABEL,
+  CVD_OK_LABEL,
+  CVD_RECONNECTING_LABEL,
+  CVD_SOURCE_LABEL,
   LIQUIDATION_COLLECTING_LABEL,
   LIQUIDATION_RECONNECTING_LABEL,
-  NOT_COLLECTED_LABEL,
   NOT_CONNECTED_LABEL,
   NO_DATA_LABEL,
   formatFundingClock,
@@ -9,9 +12,13 @@ import {
   formatMetric,
   formatObservedLiquidationSide,
   formatRelativeUpdatedAt,
+  formatSharePct,
+  formatSignedCompactUsd,
   formatSignedValue,
   formatUsdValue,
   formatVolumeRatio,
+  getCvdCollectorStatus,
+  getCvdInterpretation,
   getMarketStatusLabel,
   getObservedLiquidationStatus,
   getStructureLabel,
@@ -44,6 +51,8 @@ export default function MarketStatePanel({
   loading,
   observedLiquidations,
   liquidationCollector,
+  cvdSummary,
+  tradeFlowCollector,
 }) {
   const connected = isMarketDataConnected(market)
   const metrics = market?.metrics || {}
@@ -107,17 +116,22 @@ export default function MarketStatePanel({
         ? `Next ${formatFundingClock(funding.nextFundingTime)}`
         : undefined,
     },
-    {
-      id: 'cvd',
-      label: 'CVD',
-      value: NOT_COLLECTED_LABEL,
-    },
   ]
 
   const liqStatus = getObservedLiquidationStatus(
     liquidationCollector,
     observedLiquidations,
   )
+  const cvdStatus = getCvdCollectorStatus(tradeFlowCollector, cvdSummary)
+  const cvdWindow = cvdSummary?.window || '15m'
+  const priceChange15m = structureByTimeframe.get('15m')?.changePct
+  const cvdInterpretation =
+    cvdStatus === 'HAS_DATA'
+      ? getCvdInterpretation({
+          cvd: cvdSummary?.cvdNotional,
+          priceChange: typeof priceChange15m === 'number' ? priceChange15m : null,
+        })
+      : null
   const largestLong = observedLiquidations?.long?.largestEvent
   const largestShort = observedLiquidations?.short?.largestEvent
   const largest =
@@ -195,6 +209,42 @@ export default function MarketStatePanel({
             </div>
           ))}
         </dl>
+
+        <div className="trading-lab__liq" aria-label="CVD">
+          <p className="trading-lab__liq-title">CVD ({cvdWindow})</p>
+          {cvdStatus === 'RECONNECTING' ? (
+            <p className="trading-lab__notice">{CVD_RECONNECTING_LABEL}</p>
+          ) : null}
+          {cvdStatus === 'COLLECTING' ? (
+            <p className="trading-lab__notice">{CVD_COLLECTING_LABEL}</p>
+          ) : null}
+          {cvdStatus === 'HAS_DATA' ? (
+            <>
+              <p className="trading-lab__metric-value">
+                {formatSignedCompactUsd(cvdSummary?.cvdNotional)}
+              </p>
+              <div className="trading-lab__liq-sides">
+                <p>
+                  <span className="trading-lab__liq-side">Buy</span>
+                  {formatSharePct(cvdSummary?.buySharePct)}
+                </p>
+                <p>
+                  <span className="trading-lab__liq-side">Sell</span>
+                  {formatSharePct(cvdSummary?.sellSharePct)}
+                </p>
+              </div>
+              {cvdInterpretation ? (
+                <p className="trading-lab__liq-large">{cvdInterpretation.label}</p>
+              ) : null}
+              <p className="trading-lab__data-hint">{CVD_SOURCE_LABEL}</p>
+              <p className="trading-lab__notice">
+                {tradeFlowCollector?.connected ? CVD_OK_LABEL : CVD_RECONNECTING_LABEL}
+              </p>
+            </>
+          ) : (
+            <p className="trading-lab__data-hint">{CVD_SOURCE_LABEL}</p>
+          )}
+        </div>
 
         <div className="trading-lab__liq" aria-label="최근 관측된 청산">
           <p className="trading-lab__liq-title">최근 15분 관측된 청산</p>

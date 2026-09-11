@@ -176,6 +176,10 @@
   color: var(--color-text);
 }
 
+.trading-lab__liq .trading-lab__metric-value {
+  margin: 0;
+}
+
 .trading-lab__metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

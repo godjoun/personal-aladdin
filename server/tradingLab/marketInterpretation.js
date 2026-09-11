@@ -288,6 +288,77 @@ export function describeLiquidationProximity(input = {}) {
   }
 }
 
+export const CVD_SIGNALS = Object.freeze({
+  BUY_PRESSURE: 'CVD_BUY_PRESSURE',
+  SELL_PRESSURE: 'CVD_SELL_PRESSURE',
+  PRICE_UP_WITH_BUY: 'CVD_PRICE_UP_WITH_BUY',
+  PRICE_UP_WEAK_BUY: 'CVD_PRICE_UP_WEAK_BUY',
+  NEUTRAL: 'CVD_NEUTRAL',
+  INSUFFICIENT_DATA: 'CVD_INSUFFICIENT_DATA',
+})
+
+const CVD_DESCRIPTORS = Object.freeze({
+  [CVD_SIGNALS.BUY_PRESSURE]: {
+    label: '공격적 매수 체결 우세 가능성',
+    detail: 'Bybit 관측 체결 기준 CVD가 상승했습니다.',
+  },
+  [CVD_SIGNALS.SELL_PRESSURE]: {
+    label: '공격적 매도 체결 우세 가능성',
+    detail: 'Bybit 관측 체결 기준 CVD가 하락했습니다.',
+  },
+  [CVD_SIGNALS.PRICE_UP_WITH_BUY]: {
+    label: '가격 상승과 매수 체결이 함께 증가',
+    detail: '가격과 Bybit 관측 CVD가 함께 올랐습니다.',
+  },
+  [CVD_SIGNALS.PRICE_UP_WEAK_BUY]: {
+    label: '가격 상승 대비 매수 체결 확인 약함',
+    detail: '가격은 올랐지만 Bybit 관측 CVD는 하락했습니다.',
+  },
+  [CVD_SIGNALS.NEUTRAL]: {
+    label: 'CVD 방향 확인 어려움',
+    detail: 'Bybit 관측 체결 기준 CVD 변화가 작습니다.',
+  },
+  [CVD_SIGNALS.INSUFFICIENT_DATA]: {
+    label: '데이터 부족',
+    detail: 'Bybit 관측 체결 기준 CVD 데이터가 없습니다.',
+  },
+})
+
+/**
+ * CVD 해석. LONG/SHORT 추천이 아니라 체결 우세 가능성만 표현한다.
+ *
+ * @param {{ cvd?: number | null, priceChange?: number | null }} input
+ */
+export function describeCvdFlow(input = {}) {
+  const { cvd, priceChange } = input
+  if (!isUsableNumber(cvd)) {
+    return {
+      code: CVD_SIGNALS.INSUFFICIENT_DATA,
+      label: CVD_DESCRIPTORS[CVD_SIGNALS.INSUFFICIENT_DATA].label,
+      detail: CVD_DESCRIPTORS[CVD_SIGNALS.INSUFFICIENT_DATA].detail,
+      leaning: 'NONE',
+      certainty: OBSERVATION_CERTAINTY,
+    }
+  }
+
+  const priceUp = isUsableNumber(priceChange) && priceChange > 0
+  let code = CVD_SIGNALS.NEUTRAL
+  if (cvd > 0) {
+    code = priceUp ? CVD_SIGNALS.PRICE_UP_WITH_BUY : CVD_SIGNALS.BUY_PRESSURE
+  } else if (cvd < 0) {
+    code = priceUp ? CVD_SIGNALS.PRICE_UP_WEAK_BUY : CVD_SIGNALS.SELL_PRESSURE
+  }
+
+  const descriptor = CVD_DESCRIPTORS[code]
+  return {
+    code,
+    label: descriptor.label,
+    detail: descriptor.detail,
+    leaning: 'NONE',
+    certainty: OBSERVATION_CERTAINTY,
+  }
+}
+
 /**
  * 사용 가능한 지표만으로 관찰 목록을 구성한다.
  * 데이터가 없는 항목은 INSUFFICIENT_DATA 로 남겨 UI 가 "데이터 연결 전"을 표현할 수 있게 한다.

@@ -10,6 +10,10 @@ export const NOT_COLLECTED_LABEL = '데이터 수집 전'
 export const NO_DATA_LABEL = '—'
 export const LIQUIDATION_COLLECTING_LABEL = '수집 중 · 아직 관측된 청산 없음'
 export const LIQUIDATION_RECONNECTING_LABEL = '청산 스트림 재연결 중'
+export const CVD_COLLECTING_LABEL = '수집 중 · 데이터 부족'
+export const CVD_RECONNECTING_LABEL = '연결 끊김 · 재연결 중'
+export const CVD_OK_LABEL = '정상'
+export const CVD_SOURCE_LABEL = 'Bybit 관측 체결 기준'
 
 const BIAS_LABELS = {
   LONG: 'LONG BIAS',
@@ -135,6 +139,93 @@ export function getObservedLiquidationStatus(collector, summary) {
   if (eventCount > 0) return 'HAS_DATA'
   if (collector?.connected) return 'COLLECTING'
   return 'RECONNECTING'
+}
+
+/**
+ * @param {number | null | undefined} value
+ */
+export function formatSignedCompactUsd(value) {
+  if (value === null || value === undefined || value === '') return NO_DATA_LABEL
+  const num = Number(value)
+  if (!Number.isFinite(num)) return NO_DATA_LABEL
+  if (num > 0) return `+${formatCompactUsd(num)}`
+  return formatCompactUsd(num)
+}
+
+/**
+ * @param {number | null | undefined} value
+ */
+export function formatSharePct(value) {
+  if (value === null || value === undefined || value === '') return NO_DATA_LABEL
+  const num = Number(value)
+  if (!Number.isFinite(num)) return NO_DATA_LABEL
+  return `${Math.round(num)}%`
+}
+
+/**
+ * @param {object | null | undefined} collector
+ * @param {{ tradeCount?: number, buyVolume?: number, sellVolume?: number } | null | undefined} summary
+ */
+export function getCvdCollectorStatus(collector, summary) {
+  const tradeCount = Number(summary?.tradeCount) || 0
+  const volume = (Number(summary?.buyVolume) || 0) + (Number(summary?.sellVolume) || 0)
+  if (tradeCount > 0 || volume > 0) return 'HAS_DATA'
+  if (collector?.connected) return 'COLLECTING'
+  return 'RECONNECTING'
+}
+
+/**
+ * CVD 해석. LONG/SHORT 추천이 아니다.
+ *
+ * @param {{ cvd?: number | null, priceChange?: number | null }} input
+ */
+export function getCvdInterpretation(input = {}) {
+  const cvd = Number(input.cvd)
+  const priceChange = Number(input.priceChange)
+  const hasCvd = typeof input.cvd === 'number' && Number.isFinite(cvd)
+  const hasPrice =
+    typeof input.priceChange === 'number' && Number.isFinite(priceChange)
+
+  if (!hasCvd) {
+    return {
+      code: 'CVD_INSUFFICIENT_DATA',
+      label: '데이터 부족',
+      detail: 'Bybit 관측 체결 기준 CVD 데이터가 없습니다.',
+    }
+  }
+  if (cvd > 0 && hasPrice && priceChange > 0) {
+    return {
+      code: 'CVD_PRICE_UP_WITH_BUY',
+      label: '가격 상승과 매수 체결이 함께 증가',
+      detail: '가격과 Bybit 관측 CVD가 함께 올랐습니다.',
+    }
+  }
+  if (cvd < 0 && hasPrice && priceChange > 0) {
+    return {
+      code: 'CVD_PRICE_UP_WEAK_BUY',
+      label: '가격 상승 대비 매수 체결 확인 약함',
+      detail: '가격은 올랐지만 Bybit 관측 CVD는 하락했습니다.',
+    }
+  }
+  if (cvd > 0) {
+    return {
+      code: 'CVD_BUY_PRESSURE',
+      label: '공격적 매수 체결 우세 가능성',
+      detail: 'Bybit 관측 체결 기준 CVD가 상승했습니다.',
+    }
+  }
+  if (cvd < 0) {
+    return {
+      code: 'CVD_SELL_PRESSURE',
+      label: '공격적 매도 체결 우세 가능성',
+      detail: 'Bybit 관측 체결 기준 CVD가 하락했습니다.',
+    }
+  }
+  return {
+    code: 'CVD_NEUTRAL',
+    label: 'CVD 방향 확인 어려움',
+    detail: 'Bybit 관측 체결 기준 CVD 변화가 작습니다.',
+  }
 }
 
 /**
