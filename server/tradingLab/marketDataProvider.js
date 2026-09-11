@@ -2,8 +2,8 @@
  * marketDataProvider.js — 거래소 provider 추상화
  *
  * Trading Lab UI/DB 가 특정 거래소에 종속되지 않도록 하는 경계.
- * 이번 단계에서는 실제 구현체(Binance/Bybit 등)를 연결하지 않으며,
  * provider 미설정 시 모든 호출이 NOT_CONFIGURED 를 정상 반환한다.
+ * 실제 구현체(Bybit 공개 API)는 createBybitMarketDataProvider 로 등록한다.
  *
  * 조회 전용 interface 다. 주문/포지션/레버리지 메서드는 정의하지 않는다.
  */
@@ -110,7 +110,7 @@ const notConfiguredProvider = createNotConfiguredProvider()
 
 /**
  * 거래소 구현체 등록 지점.
- * 다음 단계에서 Binance/Bybit adapter 를 만들면 여기에 등록한다.
+ * 다음 단계에서 다른 거래소 adapter 를 추가하면 여기에 등록한다.
  *
  * @param {object} provider
  */

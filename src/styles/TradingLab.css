@@ -107,6 +107,31 @@
   background: #f0fbf4;
 }
 
+.trading-lab__badge--stale {
+  color: #9a6700;
+  border-color: #f2cc60;
+  background: #fff8c5;
+}
+
+.trading-lab__metric-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.trading-lab__provider-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.trading-lab__notice--stale {
+  color: #9a6700;
+  background: #fff8c5;
+  border-color: #f2cc60;
+}
+
 .trading-lab__metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

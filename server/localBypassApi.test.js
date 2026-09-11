@@ -15,6 +15,11 @@ import { closeDb } from './db.js'
 import { CSRF_COOKIE, CSRF_HEADER } from './security/csrf.js'
 import { getSessionCookieName } from './auth/sessionStore.js'
 import { LOCAL_BYPASS_USER } from './auth/localBypass.js'
+import {
+  registerMarketDataProvider,
+  resetMarketDataProvider,
+} from './tradingLab/marketDataProvider.js'
+import { createBybitMarketDataProvider } from './tradingLab/bybitMarketDataProvider.js'
 
 const TEMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aladdin-bypass-'))
 
@@ -43,11 +48,89 @@ describe('로컬 bypass 활성 서버', () => {
     server = http.createServer(createApp())
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     port = /** @type {import('net').AddressInfo} */ (server.address()).port
+
+    resetMarketDataProvider()
+    registerMarketDataProvider(
+      createBybitMarketDataProvider({
+        fetchImpl: async (url) => {
+          const href = String(url)
+          if (href.includes('/tickers')) {
+            return {
+              ok: true,
+              status: 200,
+              async json() {
+                return {
+                  retCode: 0,
+                  result: {
+                    list: [
+                      {
+                        symbol: 'BTCUSDT',
+                        lastPrice: '65000',
+                        markPrice: '65010',
+                        indexPrice: '64990',
+                        price24hPcnt: '0.01',
+                        highPrice24h: '66000',
+                        lowPrice24h: '64000',
+                        volume24h: '1000',
+                        turnover24h: '65000000',
+                        openInterest: '50000',
+                        openInterestValue: '3250000000',
+                        fundingRate: '0.0001',
+                        nextFundingTime: '1700000000000',
+                        bid1Price: '64999',
+                        ask1Price: '65001',
+                      },
+                    ],
+                  },
+                }
+              },
+            }
+          }
+          if (href.includes('/kline')) {
+            return {
+              ok: true,
+              status: 200,
+              async json() {
+                return {
+                  retCode: 0,
+                  result: {
+                    list: [
+                      ['1700000900000', '3', '4', '2', '3.5', '30', '300'],
+                      ['1700000000000', '1', '2', '0.5', '1.5', '10', '100'],
+                    ],
+                  },
+                }
+              },
+            }
+          }
+          if (href.includes('/open-interest')) {
+            return {
+              ok: true,
+              status: 200,
+              async json() {
+                return {
+                  retCode: 0,
+                  result: {
+                    list: [
+                      { openInterest: '110', timestamp: '2' },
+                      { openInterest: '100', timestamp: '1' },
+                    ],
+                  },
+                }
+              },
+            }
+          }
+          return { ok: false, status: 500, async json() { return {} } }
+        },
+        now: () => 1_700_001_000_000,
+      }),
+    )
   })
 
   afterAll(async () => {
     await new Promise((resolve) => server.close(resolve))
     closeDb()
+    resetMarketDataProvider()
   })
 
   async function request(method, urlPath, { body, headers = {}, origin } = {}) {
@@ -111,10 +194,13 @@ describe('로컬 bypass 활성 서버', () => {
     const config = await request('GET', '/api/trading-lab/config')
     expect(config.status).toBe(200)
     expect(config.json.symbols).toEqual(['BTCUSDT', 'ETHUSDT'])
+    expect(config.json.marketDataConfigured).toBe(true)
 
     const market = await request('GET', '/api/trading-lab/market/BTCUSDT')
     expect(market.status).toBe(200)
-    expect(market.json.market.status).toBe('NOT_CONFIGURED')
+    expect(market.json.market.configured).toBe(true)
+    expect(market.json.market.provider).toBe('BYBIT')
+    expect(market.json.market.metrics.price.value).toBe(65000)
 
     const stats = await request('GET', '/api/trading-lab/stats')
     expect(stats.status).toBe(200)

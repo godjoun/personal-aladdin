@@ -5,8 +5,12 @@ import {
   buildRecentAnalysisRows,
   formatAnalysisTimestamp,
   formatConfidence,
+  formatFundingClock,
+  formatFundingMetric,
   formatMetric,
+  formatRelativeUpdatedAt,
   formatSignedValue,
+  formatVolumeRatio,
   getBiasLabel,
   getMarketStatusLabel,
   getOutcomeLabel,
@@ -59,8 +63,29 @@ describe('시장 데이터 미연결 표시', () => {
 
   it('구조 판정 미연결은 데이터 연결 전으로 표시한다', () => {
     expect(getStructureLabel(null)).toBe(NOT_CONNECTED_LABEL)
-    expect(getStructureLabel('BULLISH')).toBe('상승 구조')
-    expect(getStructureLabel('RANGE')).toBe('횡보')
+    expect(getStructureLabel('BULLISH')).toBe('상승 구조 가능성')
+    expect(getStructureLabel('RANGE')).toBe('혼조')
+    expect(getStructureLabel('BEARISH')).toBe('하락 구조 가능성')
+  })
+
+  it('USD 값과 funding percent 를 포맷한다', () => {
+    expect(formatMetric({ status: 'OK', value: 65000 }, { usd: true })).toBe('$65,000')
+    expect(formatFundingMetric({ status: 'OK', value: 0.0001 })).toBe('+0.0100%')
+  })
+
+  it('funding rate 를 퍼센트로 표시한다', () => {
+    expect(formatFundingMetric({ status: 'OK', value: 0.0001 })).toBe('+0.0100%')
+    expect(formatFundingMetric({ status: 'OK', value: -0.0001 })).toBe('-0.0100%')
+    expect(formatFundingMetric({ status: 'NOT_CONFIGURED', value: null })).toBe(
+      NOT_CONNECTED_LABEL,
+    )
+  })
+
+  it('상대 시각과 volume ratio 를 표시한다', () => {
+    const now = Date.parse('2026-09-12T12:00:10.000Z')
+    expect(formatRelativeUpdatedAt('2026-09-12T12:00:05.000Z', now)).toBe('방금 전')
+    expect(formatVolumeRatio(1.8)).toBe('평균 대비 1.8배')
+    expect(formatFundingClock('2026-09-12T08:00:00.000Z')).toMatch(/^\d{2}:\d{2}$/)
   })
 
   it('provider 미설정 상태를 연결 안 됨으로 판정한다', () => {
@@ -73,6 +98,9 @@ describe('시장 데이터 미연결 표시', () => {
     expect(getMarketStatusLabel({ status: 'NOT_CONFIGURED' })).toBe(NOT_CONNECTED_LABEL)
     expect(getMarketStatusLabel({ status: 'PARTIAL' })).toBe('일부 연결')
     expect(getMarketStatusLabel({ status: 'OK' })).toBe('연결됨')
+    expect(getMarketStatusLabel({ status: 'OK', stale: true })).toBe(
+      '시장 데이터 일시 지연',
+    )
   })
 })
 
@@ -83,6 +111,12 @@ describe('formatSignedValue', () => {
     expect(formatSignedValue(0)).toBe('0.00')
     expect(formatSignedValue(null)).toBe(NO_DATA_LABEL)
     expect(formatSignedValue(2, { suffix: '%' })).toBe('+2.00%')
+  })
+
+  it('반올림하면 0이 되는 값은 -0.0% 대신 0.0% 로 표시한다', () => {
+    expect(formatSignedValue(-0.04, { digits: 1, suffix: '%' })).toBe('0.0%')
+    expect(formatSignedValue(0.04, { digits: 1, suffix: '%' })).toBe('0.0%')
+    expect(formatSignedValue(-0.05, { digits: 1, suffix: '%' })).toBe('-0.1%')
   })
 })
 

@@ -572,6 +572,10 @@ describe('MarketDataProvider 추상화', () => {
     expect(snapshot.metrics.fundingRate.value).toBeNull()
     expect(snapshot.structure).toHaveLength(3)
     expect(snapshot.structure.every((item) => item.state === null)).toBe(true)
+    expect(snapshot.timeframes['15m'].candleCount).toBe(0)
+    expect(snapshot.timeframes['1h'].candleCount).toBe(0)
+    expect(snapshot.timeframes['4h'].candleCount).toBe(0)
+    expect(snapshot.funding.rate).toBeNull()
     // fake 데이터를 만들지 않으므로 관찰도 비어 있다
     expect(snapshot.observations).toEqual([])
   })

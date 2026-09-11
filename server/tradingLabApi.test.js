@@ -12,6 +12,11 @@ import { resetLoginRateLimit } from './auth/rateLimit.js'
 import { resetAccountLoginLockouts } from './auth/loginLockout.js'
 import { closeDb, getDb } from './db.js'
 import { CSRF_COOKIE, CSRF_HEADER } from './security/csrf.js'
+import {
+  registerMarketDataProvider,
+  resetMarketDataProvider,
+} from './tradingLab/marketDataProvider.js'
+import { createBybitMarketDataProvider } from './tradingLab/bybitMarketDataProvider.js'
 
 const TEMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aladdin-lab-api-'))
 const DB_PATH = path.join(TEMP_DIR, 'lab-api.sqlite')
@@ -28,6 +33,77 @@ process.env.ALADDIN_LOCAL_AUTH_BYPASS = 'false'
 const ORIGIN = 'http://localhost:5173'
 const { createApp } = await import('./index.js')
 
+function jsonResponse(payload, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    async json() {
+      return payload
+    },
+  }
+}
+
+function createMockBybitFetch() {
+  return async (url) => {
+    const href = String(url)
+    if (href.includes('/v5/market/tickers')) {
+      const symbol = href.includes('ETHUSDT') ? 'ETHUSDT' : 'BTCUSDT'
+      return jsonResponse({
+        retCode: 0,
+        retMsg: 'OK',
+        result: {
+          category: 'linear',
+          list: [
+            {
+              symbol,
+              lastPrice: symbol === 'ETHUSDT' ? '3500' : '65000',
+              markPrice: symbol === 'ETHUSDT' ? '3501' : '65010',
+              indexPrice: symbol === 'ETHUSDT' ? '3499' : '64990',
+              price24hPcnt: '0.01',
+              highPrice24h: '66000',
+              lowPrice24h: '64000',
+              volume24h: '1000',
+              turnover24h: '65000000',
+              openInterest: '50000',
+              openInterestValue: '3250000000',
+              fundingRate: '0.0001',
+              nextFundingTime: '1700000000000',
+              bid1Price: '64999',
+              ask1Price: '65001',
+            },
+          ],
+        },
+      })
+    }
+    if (href.includes('/v5/market/kline')) {
+      return jsonResponse({
+        retCode: 0,
+        retMsg: 'OK',
+        result: {
+          list: [
+            ['1700000900000', '3', '4', '2', '3.5', '30', '300'],
+            ['1700000000000', '1', '2', '0.5', '1.5', '10', '100'],
+            ['1700000450000', '2', '3', '1', '2.5', '20', '200'],
+          ],
+        },
+      })
+    }
+    if (href.includes('/v5/market/open-interest')) {
+      return jsonResponse({
+        retCode: 0,
+        retMsg: 'OK',
+        result: {
+          list: [
+            { openInterest: '110', timestamp: '2' },
+            { openInterest: '100', timestamp: '1' },
+          ],
+        },
+      })
+    }
+    return jsonResponse({ retCode: 1, retMsg: 'unexpected' }, 500)
+  }
+}
+
 describe('Trading Lab API', () => {
   /** @type {http.Server} */
   let server
@@ -38,7 +114,12 @@ describe('Trading Lab API', () => {
 
   beforeAll(async () => {
     closeDb()
-    const app = createApp()
+    const app = createApp({
+      marketDataProvider: createBybitMarketDataProvider({
+        fetchImpl: createMockBybitFetch(),
+        now: () => 1_700_001_000_000,
+      }),
+    })
     server = http.createServer(app)
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
     port = /** @type {import('net').AddressInfo} */ (server.address()).port
@@ -47,12 +128,20 @@ describe('Trading Lab API', () => {
   afterAll(async () => {
     await new Promise((resolve) => server.close(resolve))
     closeDb()
+    resetMarketDataProvider()
   })
 
   beforeEach(() => {
     jar = {}
     resetLoginRateLimit()
     resetAccountLoginLockouts(getDb())
+    resetMarketDataProvider()
+    registerMarketDataProvider(
+      createBybitMarketDataProvider({
+        fetchImpl: createMockBybitFetch(),
+        now: () => 1_700_001_000_000,
+      }),
+    )
   })
 
   async function request(method, urlPath, { body, headers = {}, origin } = {}) {
@@ -171,10 +260,34 @@ describe('Trading Lab API', () => {
     expect(res.status).toBe(200)
     expect(res.json.symbols).toEqual(['BTCUSDT', 'ETHUSDT'])
     expect(res.json.biases).toEqual(['LONG', 'SHORT', 'NEUTRAL'])
-    expect(res.json.marketDataConfigured).toBe(false)
+    expect(res.json.marketDataConfigured).toBe(true)
   })
 
-  it('시장 데이터 미연결은 NOT_CONFIGURED 로 정상 응답한다', async () => {
+  it('시장 데이터는 Bybit provider 로 조회한다', async () => {
+    await login()
+    const res = await request('GET', '/api/trading-lab/market/BTCUSDT')
+    expect(res.status).toBe(200)
+    expect(res.json.market.configured).toBe(true)
+    expect(res.json.market.provider).toBe('BYBIT')
+    expect(res.json.market.metrics.price.value).toBe(65000)
+    expect(res.json.market.metrics.markPrice.value).toBe(65010)
+    expect(res.json.market.metrics.fundingRate.value).toBe(0.0001)
+    expect(res.json.market.funding.ratePercent).toBe('+0.0100%')
+    expect(res.json.market.timeframes['15m'].candleCount).toBeGreaterThan(0)
+    expect(res.json.market.timeframes['1h'].candleCount).toBeGreaterThan(0)
+    expect(res.json.market.timeframes['4h'].candleCount).toBeGreaterThan(0)
+    expect(res.json.market.openInterest.changePct).toBe(10)
+    expect(res.json.market.metrics.liquidationAbove.value).toBeNull()
+    expect(res.json.market.metrics.cvd.value).toBeNull()
+
+    const eth = await request('GET', '/api/trading-lab/market/ETHUSDT')
+    expect(eth.status).toBe(200)
+    expect(eth.json.market.symbol).toBe('ETHUSDT')
+    expect(eth.json.market.metrics.price.value).toBe(3500)
+  })
+
+  it('provider 미설정이면 NOT_CONFIGURED 로 정상 응답한다', async () => {
+    resetMarketDataProvider()
     await login()
     const res = await request('GET', '/api/trading-lab/market/BTCUSDT')
     expect(res.status).toBe(200)

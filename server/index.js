@@ -82,6 +82,11 @@ import {
 } from './listenConfig.js'
 import { createTradingLabRouter } from './tradingLab/routes.js'
 import {
+  registerMarketDataProvider,
+  resetMarketDataProvider,
+} from './tradingLab/marketDataProvider.js'
+import { createBybitMarketDataProvider } from './tradingLab/bybitMarketDataProvider.js'
+import {
   LOCAL_BYPASS_USER,
   assertLocalAuthBypassSafe,
 } from './auth/localBypass.js'
@@ -170,8 +175,12 @@ function safeError(res, status = 500) {
 
 /**
  * Express 앱 생성 (테스트용 export)
+ *
+ * @param {{ marketDataProvider?: object | null }} [options]
+ *   marketDataProvider 생략 시 Bybit 공개 API provider 를 등록한다.
+ *   null 이면 미설정 상태로 둔다 (테스트용).
  */
-export function createApp() {
+export function createApp(options = {}) {
   // 위험한 bypass 설정(외부 bind / 호스팅 / proxy 뒤)이면 여기서 기동을 중단한다.
   const bypassState = assertLocalAuthBypassSafe()
   localAuthBypassActive = bypassState.allowed
@@ -190,6 +199,15 @@ export function createApp() {
 
   // DB 초기화 (production은 persistent path 필수)
   getDb({ isProd })
+
+  // Trading Lab — Bybit V5 공개 시장 데이터 (READ ONLY, API key 없음)
+  if (options.marketDataProvider === null) {
+    resetMarketDataProvider()
+  } else {
+    registerMarketDataProvider(
+      options.marketDataProvider ?? createBybitMarketDataProvider(),
+    )
+  }
 
   const app = express()
 
