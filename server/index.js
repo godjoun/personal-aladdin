@@ -87,6 +87,11 @@ import {
 } from './tradingLab/marketDataProvider.js'
 import { createBybitMarketDataProvider } from './tradingLab/bybitMarketDataProvider.js'
 import {
+  createLiquidationCollector,
+  resetLiquidationCollector,
+  setLiquidationCollector,
+} from './tradingLab/liquidationCollector.js'
+import {
   LOCAL_BYPASS_USER,
   assertLocalAuthBypassSafe,
 } from './auth/localBypass.js'
@@ -176,9 +181,13 @@ function safeError(res, status = 500) {
 /**
  * Express 앱 생성 (테스트용 export)
  *
- * @param {{ marketDataProvider?: object | null }} [options]
+ * @param {{
+ *   marketDataProvider?: object | null,
+ *   liquidationCollector?: object | false,
+ * }} [options]
  *   marketDataProvider 생략 시 Bybit 공개 API provider 를 등록한다.
  *   null 이면 미설정 상태로 둔다 (테스트용).
+ *   liquidationCollector 생략 시 test 가 아니면 public WS collector 를 기동한다.
  */
 export function createApp(options = {}) {
   // 위험한 bypass 설정(외부 bind / 호스팅 / proxy 뒤)이면 여기서 기동을 중단한다.
@@ -207,6 +216,22 @@ export function createApp(options = {}) {
     registerMarketDataProvider(
       options.marketDataProvider ?? createBybitMarketDataProvider(),
     )
+  }
+
+  // Trading Lab — Bybit public liquidation collector (READ ONLY)
+  if (options.liquidationCollector === false) {
+    resetLiquidationCollector()
+  } else if (
+    options.liquidationCollector &&
+    typeof options.liquidationCollector.getStatus === 'function'
+  ) {
+    setLiquidationCollector(options.liquidationCollector)
+  } else if (process.env.NODE_ENV !== 'test') {
+    try {
+      createLiquidationCollector({ autoConnect: true })
+    } catch {
+      console.error('[TradingLab] liquidation collector failed to start')
+    }
   }
 
   const app = express()

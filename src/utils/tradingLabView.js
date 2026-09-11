@@ -8,6 +8,8 @@
 export const NOT_CONNECTED_LABEL = '데이터 연결 전'
 export const NOT_COLLECTED_LABEL = '데이터 수집 전'
 export const NO_DATA_LABEL = '—'
+export const LIQUIDATION_COLLECTING_LABEL = '수집 중 · 아직 관측된 청산 없음'
+export const LIQUIDATION_RECONNECTING_LABEL = '청산 스트림 재연결 중'
 
 const BIAS_LABELS = {
   LONG: 'LONG BIAS',
@@ -96,6 +98,43 @@ export function formatUsdValue(value, options = {}) {
   const formatted = formatPriceValue(value, { digits })
   if (formatted === NO_DATA_LABEL) return NO_DATA_LABEL
   return `${prefix}${formatted}`
+}
+
+/**
+ * 추정 청산 금액 표시. 실제 계좌 손실이 아니다.
+ *
+ * @param {number | null | undefined} value
+ */
+export function formatCompactUsd(value) {
+  if (value === null || value === undefined || value === '') return NO_DATA_LABEL
+  const num = Number(value)
+  if (!Number.isFinite(num)) return NO_DATA_LABEL
+  const abs = Math.abs(num)
+  const sign = num < 0 ? '-' : ''
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`
+  return formatUsdValue(num)
+}
+
+/**
+ * @param {{ count?: number, estimatedNotional?: number } | null | undefined} side
+ */
+export function formatObservedLiquidationSide(side) {
+  const count = Number(side?.count) || 0
+  const notional = Number(side?.estimatedNotional) || 0
+  return `${formatCompactUsd(notional)} · ${count}건`
+}
+
+/**
+ * @param {object | null | undefined} collector
+ * @param {{ long?: { count?: number }, short?: { count?: number } } | null | undefined} summary
+ */
+export function getObservedLiquidationStatus(collector, summary) {
+  const eventCount =
+    (Number(summary?.long?.count) || 0) + (Number(summary?.short?.count) || 0)
+  if (eventCount > 0) return 'HAS_DATA'
+  if (collector?.connected) return 'COLLECTING'
+  return 'RECONNECTING'
 }
 
 /**

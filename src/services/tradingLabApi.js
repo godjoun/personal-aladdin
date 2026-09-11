@@ -110,6 +110,23 @@ export async function createAnalysisScreenshot(analysisId, payload) {
 }
 
 /**
+ * @param {string} symbol
+ * @param {{ window?: string }} [options]
+ */
+export async function fetchObservedLiquidations(symbol, options = {}) {
+  const params = new URLSearchParams()
+  if (options.window) params.set('window', options.window)
+  const query = params.toString()
+  return call(
+    `${BASE}/liquidations/${encodeURIComponent(symbol)}${query ? `?${query}` : ''}`,
+  )
+}
+
+export async function fetchLiquidationCollectorStatus() {
+  return call(`${BASE}/liquidations/status`)
+}
+
+/**
  * @param {{ symbol?: string, limit?: number }} [filter]
  */
 export async function fetchLiquidationSnapshots(filter = {}) {

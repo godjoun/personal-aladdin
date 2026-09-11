@@ -4,15 +4,18 @@ import {
   NO_DATA_LABEL,
   buildRecentAnalysisRows,
   formatAnalysisTimestamp,
+  formatCompactUsd,
   formatConfidence,
   formatFundingClock,
   formatFundingMetric,
   formatMetric,
+  formatObservedLiquidationSide,
   formatRelativeUpdatedAt,
   formatSignedValue,
   formatVolumeRatio,
   getBiasLabel,
   getMarketStatusLabel,
+  getObservedLiquidationStatus,
   getOutcomeLabel,
   getStructureLabel,
   isMarketDataConnected,
@@ -117,6 +120,21 @@ describe('formatSignedValue', () => {
     expect(formatSignedValue(-0.04, { digits: 1, suffix: '%' })).toBe('0.0%')
     expect(formatSignedValue(0.04, { digits: 1, suffix: '%' })).toBe('0.0%')
     expect(formatSignedValue(-0.05, { digits: 1, suffix: '%' })).toBe('-0.1%')
+  })
+
+  it('관측 청산 금액과 상태를 표시한다', () => {
+    expect(formatCompactUsd(1_200_000)).toBe('$1.2M')
+    expect(formatCompactUsd(800)).toBe('$800')
+    expect(formatObservedLiquidationSide({ count: 14, estimatedNotional: 1_200_000 })).toBe(
+      '$1.2M · 14건',
+    )
+    expect(getObservedLiquidationStatus({ connected: true }, { long: { count: 0 }, short: { count: 0 } })).toBe(
+      'COLLECTING',
+    )
+    expect(getObservedLiquidationStatus({ connected: false }, null)).toBe('RECONNECTING')
+    expect(getObservedLiquidationStatus({ connected: false }, { long: { count: 2 } })).toBe(
+      'HAS_DATA',
+    )
   })
 })
 

@@ -204,6 +204,15 @@ describe('로컬 bypass 활성 서버', () => {
 
     const stats = await request('GET', '/api/trading-lab/stats')
     expect(stats.status).toBe(200)
+
+    const status = await request('GET', '/api/trading-lab/liquidations/status')
+    expect(status.status).toBe(200)
+    expect(status.json.collector.provider).toBe('BYBIT')
+
+    const liquidations = await request('GET', '/api/trading-lab/liquidations/BTCUSDT?window=15m')
+    expect(liquidations.status).toBe(200)
+    expect(liquidations.json.symbol).toBe('BTCUSDT')
+    expect(liquidations.json.window).toBe('15m')
   })
 
   it('bypass 상태에서도 CSRF 는 계속 요구한다', async () => {

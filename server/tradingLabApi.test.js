@@ -17,6 +17,10 @@ import {
   resetMarketDataProvider,
 } from './tradingLab/marketDataProvider.js'
 import { createBybitMarketDataProvider } from './tradingLab/bybitMarketDataProvider.js'
+import {
+  resetLiquidationCollector,
+  setLiquidationCollector,
+} from './tradingLab/liquidationCollector.js'
 
 const TEMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'aladdin-lab-api-'))
 const DB_PATH = path.join(TEMP_DIR, 'lab-api.sqlite')
@@ -129,6 +133,7 @@ describe('Trading Lab API', () => {
     await new Promise((resolve) => server.close(resolve))
     closeDb()
     resetMarketDataProvider()
+    resetLiquidationCollector()
   })
 
   beforeEach(() => {
@@ -136,6 +141,7 @@ describe('Trading Lab API', () => {
     resetLoginRateLimit()
     resetAccountLoginLockouts(getDb())
     resetMarketDataProvider()
+    resetLiquidationCollector()
     registerMarketDataProvider(
       createBybitMarketDataProvider({
         fetchImpl: createMockBybitFetch(),
@@ -220,6 +226,8 @@ describe('Trading Lab API', () => {
       '/api/trading-lab/market/BTCUSDT',
       '/api/trading-lab/analyses',
       '/api/trading-lab/liquidations',
+      '/api/trading-lab/liquidations/status',
+      '/api/trading-lab/liquidations/BTCUSDT',
       '/api/trading-lab/stats',
     ]) {
       const res = await request('GET', urlPath)
@@ -284,6 +292,51 @@ describe('Trading Lab API', () => {
     expect(eth.status).toBe(200)
     expect(eth.json.market.symbol).toBe('ETHUSDT')
     expect(eth.json.market.metrics.price.value).toBe(3500)
+  })
+
+  it('관측 청산 status / window API 를 제공한다', async () => {
+    setLiquidationCollector({
+      getStatus() {
+        return {
+          provider: 'BYBIT',
+          connected: true,
+          subscribedSymbols: ['BTCUSDT', 'ETHUSDT'],
+          lastEventAt: null,
+          lastMessageAt: '2026-01-01T00:00:00.000Z',
+          reconnectCount: 0,
+        }
+      },
+    })
+    await login()
+
+    const status = await request('GET', '/api/trading-lab/liquidations/status')
+    expect(status.status).toBe(200)
+    expect(status.json.collector).toEqual({
+      provider: 'BYBIT',
+      connected: true,
+      subscribedSymbols: ['BTCUSDT', 'ETHUSDT'],
+      lastEventAt: null,
+      lastMessageAt: '2026-01-01T00:00:00.000Z',
+      reconnectCount: 0,
+    })
+
+    const summary = await request(
+      'GET',
+      '/api/trading-lab/liquidations/ETHUSDT?window=5m',
+    )
+    expect(summary.status).toBe(200)
+    expect(summary.json.symbol).toBe('ETHUSDT')
+    expect(summary.json.window).toBe('5m')
+    expect(summary.json.observed).toBe(true)
+    expect(summary.json.long.count).toBe(0)
+    expect(summary.json.short.count).toBe(0)
+
+    const badWindow = await request(
+      'GET',
+      '/api/trading-lab/liquidations/BTCUSDT?window=3m',
+    )
+    expect(badWindow.status).toBe(400)
+    expect(badWindow.json.field).toBe('window')
   })
 
   it('provider 미설정이면 NOT_CONFIGURED 로 정상 응답한다', async () => {

@@ -7,7 +7,9 @@ import AnalysisDetailDrawer from '../../components/tradingLab/AnalysisDetailDraw
 import ChartCaptureSlot from '../../components/tradingLab/ChartCaptureSlot.jsx'
 import {
   fetchAnalyses,
+  fetchLiquidationCollectorStatus,
   fetchMarketSnapshot,
+  fetchObservedLiquidations,
   fetchTradingLabStats,
 } from '../../services/tradingLabApi.js'
 import '../../styles/TradingLab.css'
@@ -19,6 +21,8 @@ export default function TradingLabHome() {
   const [symbol, setSymbol] = useState(SYMBOLS[0])
   const [market, setMarket] = useState(null)
   const [marketLoading, setMarketLoading] = useState(false)
+  const [observedLiquidations, setObservedLiquidations] = useState(null)
+  const [liquidationCollector, setLiquidationCollector] = useState(null)
   const [analyses, setAnalyses] = useState([])
   const [analysesLoading, setAnalysesLoading] = useState(false)
   const [stats, setStats] = useState(null)
@@ -29,11 +33,19 @@ export default function TradingLabHome() {
   const loadMarket = useCallback(async () => {
     setMarketLoading(true)
     try {
-      const payload = await fetchMarketSnapshot(symbol)
+      const [payload, liqPayload, liqStatus] = await Promise.all([
+        fetchMarketSnapshot(symbol),
+        fetchObservedLiquidations(symbol, { window: '15m' }).catch(() => null),
+        fetchLiquidationCollectorStatus().catch(() => null),
+      ])
       setMarket(payload.market)
+      setObservedLiquidations(liqPayload)
+      setLiquidationCollector(liqStatus?.collector || null)
     } catch {
       // provider 미연결과 조회 실패를 화면에서 구분해 보여준다
       setMarket({ symbol, configured: false, status: 'ERROR', metrics: {} })
+      setObservedLiquidations(null)
+      setLiquidationCollector(null)
     } finally {
       setMarketLoading(false)
     }
@@ -60,6 +72,27 @@ export default function TradingLabHome() {
   useEffect(() => {
     loadMarket()
   }, [loadMarket])
+
+  useEffect(() => {
+    let cancelled = false
+    const timer = setInterval(async () => {
+      try {
+        const [liqPayload, liqStatus] = await Promise.all([
+          fetchObservedLiquidations(symbol, { window: '15m' }),
+          fetchLiquidationCollectorStatus(),
+        ])
+        if (cancelled) return
+        setObservedLiquidations(liqPayload)
+        setLiquidationCollector(liqStatus?.collector || null)
+      } catch {
+        // 청산 폴링 실패가 화면 전체를 막지 않는다
+      }
+    }, 15_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [symbol])
 
   useEffect(() => {
     loadAnalyses()
@@ -108,7 +141,12 @@ export default function TradingLabHome() {
 
       {error ? <p className="trading-lab__error">{error}</p> : null}
 
-      <MarketStatePanel market={market} loading={marketLoading} />
+      <MarketStatePanel
+        market={market}
+        loading={marketLoading}
+        observedLiquidations={observedLiquidations}
+        liquidationCollector={liquidationCollector}
+      />
 
       <AnalysisPanel
         analysis={latestAnalysis}

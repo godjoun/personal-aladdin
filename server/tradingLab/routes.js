@@ -11,6 +11,7 @@ import { asId } from '../security/validate.js'
 import {
   TRADING_LAB_BIASES,
   TRADING_LAB_LIQUIDATION_SIDES,
+  TRADING_LAB_LIQUIDATION_WINDOWS,
   TRADING_LAB_OUTCOME_RESULTS,
   TRADING_LAB_SOURCE_TYPES,
   TRADING_LAB_STRUCTURE_STATES,
@@ -21,6 +22,7 @@ import {
   asBias,
   asLabSymbol,
   asLiquidationSide,
+  asLiquidationWindow,
   asListLimit,
   sanitizeAnalysisInput,
   sanitizeLiquidationInput,
@@ -41,6 +43,7 @@ import {
 } from './outcomeRepository.js'
 import {
   createLiquidationSnapshot,
+  getObservedLiquidationSummary,
   listLiquidationSnapshots,
 } from './liquidationRepository.js'
 import {
@@ -49,6 +52,7 @@ import {
 } from './screenshotRepository.js'
 import { getMarketSnapshot } from './marketSnapshotService.js'
 import { isMarketDataConfigured } from './marketDataProvider.js'
+import { getLiquidationCollector } from './liquidationCollector.js'
 
 /**
  * @param {import('express').Response} res
@@ -78,6 +82,7 @@ export function createTradingLabRouter() {
       outcomeResults: TRADING_LAB_OUTCOME_RESULTS,
       structureStates: TRADING_LAB_STRUCTURE_STATES,
       liquidationSides: TRADING_LAB_LIQUIDATION_SIDES,
+      liquidationWindows: TRADING_LAB_LIQUIDATION_WINDOWS,
       sourceTypes: TRADING_LAB_SOURCE_TYPES,
       marketDataConfigured: isMarketDataConfigured(),
     })
@@ -258,6 +263,44 @@ export function createTradingLabRouter() {
   })
 
   /** 청산 추정 구간 기록 — 전부 추정치로 취급한다 */
+  router.get('/liquidations/status', (_req, res) => {
+    const collector = getLiquidationCollector()
+    res.status(200).json({
+      ok: true,
+      collector: collector?.getStatus
+        ? collector.getStatus()
+        : {
+            provider: 'BYBIT',
+            connected: false,
+            subscribedSymbols: [],
+            lastEventAt: null,
+            lastMessageAt: null,
+            reconnectCount: 0,
+          },
+    })
+  })
+
+  router.get('/liquidations/:symbol', (req, res) => {
+    const symbol = asLabSymbol(req.params.symbol)
+    if (!symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+    const window = asLiquidationWindow(req.query.window)
+    if (!window) {
+      badRequest(res, 'window')
+      return
+    }
+
+    try {
+      const summary = getObservedLiquidationSummary({ symbol, window })
+      res.status(200).json({ ok: true, ...summary })
+    } catch {
+      console.error('[TradingLab] observed liquidations failed')
+      serverError(res)
+    }
+  })
+
   router.get('/liquidations', (req, res) => {
     const symbol = req.query.symbol != null ? asLabSymbol(req.query.symbol) : null
     if (req.query.symbol != null && !symbol) {

@@ -32,6 +32,27 @@ export const TRADING_LAB_SOURCE_TYPES = Object.freeze([
   'MANUAL',
 ])
 
+/** Bybit public stream 에서 관측된 실제 청산. 수동 POST allowlist 에는 넣지 않는다. */
+export const OBSERVED_LIQUIDATION_SOURCE_TYPE = 'OBSERVED_LIQUIDATION'
+export const OBSERVED_LIQUIDATION_SOURCE = 'BYBIT'
+
+export const TRADING_LAB_LIQUIDATION_WINDOWS = Object.freeze([
+  '5m',
+  '15m',
+  '1h',
+  '4h',
+  '24h',
+])
+
+/** @type {Readonly<Record<string, number>>} */
+export const TRADING_LAB_LIQUIDATION_WINDOW_MS = Object.freeze({
+  '5m': 5 * 60 * 1000,
+  '15m': 15 * 60 * 1000,
+  '1h': 60 * 60 * 1000,
+  '4h': 4 * 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+})
+
 /** 시장 데이터 연결 상태 — provider 미설정 시 NOT_CONFIGURED */
 export const TRADING_LAB_DATA_STATUSES = Object.freeze([
   'OK',
@@ -53,6 +74,9 @@ export const TRADING_LAB_TIMEFRAME_SET = new Set(TRADING_LAB_TIMEFRAMES)
 export const TRADING_LAB_STRUCTURE_SET = new Set(TRADING_LAB_STRUCTURE_STATES)
 export const TRADING_LAB_LIQUIDATION_SIDE_SET = new Set(TRADING_LAB_LIQUIDATION_SIDES)
 export const TRADING_LAB_SOURCE_TYPE_SET = new Set(TRADING_LAB_SOURCE_TYPES)
+export const TRADING_LAB_LIQUIDATION_WINDOW_SET = new Set(
+  TRADING_LAB_LIQUIDATION_WINDOWS,
+)
 export const TRADING_LAB_DATA_STATUS_SET = new Set(TRADING_LAB_DATA_STATUSES)
 export const TRADING_LAB_SCREENSHOT_STATUS_SET = new Set(
   TRADING_LAB_SCREENSHOT_STATUSES,

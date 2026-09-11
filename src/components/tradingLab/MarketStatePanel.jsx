@@ -1,14 +1,19 @@
 import {
+  LIQUIDATION_COLLECTING_LABEL,
+  LIQUIDATION_RECONNECTING_LABEL,
   NOT_COLLECTED_LABEL,
   NOT_CONNECTED_LABEL,
   NO_DATA_LABEL,
   formatFundingClock,
   formatFundingMetric,
   formatMetric,
+  formatObservedLiquidationSide,
   formatRelativeUpdatedAt,
   formatSignedValue,
+  formatUsdValue,
   formatVolumeRatio,
   getMarketStatusLabel,
+  getObservedLiquidationStatus,
   getStructureLabel,
   isMarketDataConnected,
 } from '../../utils/tradingLabView.js'
@@ -34,7 +39,12 @@ function formatStructureDetail(item) {
  * 시장 상태 + Market Data.
  * Bybit 공개 시세를 표시하고, 없는 지표는 가짜 값 없이 상태를 명시한다.
  */
-export default function MarketStatePanel({ market, loading }) {
+export default function MarketStatePanel({
+  market,
+  loading,
+  observedLiquidations,
+  liquidationCollector,
+}) {
   const connected = isMarketDataConnected(market)
   const metrics = market?.metrics || {}
   const funding = market?.funding || {}
@@ -98,17 +108,28 @@ export default function MarketStatePanel({ market, loading }) {
         : undefined,
     },
     {
-      id: 'liquidation',
-      label: 'Liquidation',
-      value: NOT_COLLECTED_LABEL,
-      hint: '추정 구간',
-    },
-    {
       id: 'cvd',
       label: 'CVD',
       value: NOT_COLLECTED_LABEL,
     },
   ]
+
+  const liqStatus = getObservedLiquidationStatus(
+    liquidationCollector,
+    observedLiquidations,
+  )
+  const largestLong = observedLiquidations?.long?.largestEvent
+  const largestShort = observedLiquidations?.short?.largestEvent
+  const largest =
+    (largestLong?.estimatedNotional || 0) >= (largestShort?.estimatedNotional || 0)
+      ? largestLong
+      : largestShort
+  const largestSide =
+    largest && largest === largestLong
+      ? 'LONG'
+      : largest && largest === largestShort
+        ? 'SHORT'
+        : null
 
   const providerLabel =
     market?.providerDisplayName ||
@@ -174,6 +195,40 @@ export default function MarketStatePanel({ market, loading }) {
             </div>
           ))}
         </dl>
+
+        <div className="trading-lab__liq" aria-label="최근 관측된 청산">
+          <p className="trading-lab__liq-title">최근 15분 관측된 청산</p>
+          {liqStatus === 'RECONNECTING' ? (
+            <p className="trading-lab__notice">{LIQUIDATION_RECONNECTING_LABEL}</p>
+          ) : null}
+          {liqStatus === 'COLLECTING' ? (
+            <p className="trading-lab__notice">{LIQUIDATION_COLLECTING_LABEL}</p>
+          ) : null}
+          {liqStatus === 'HAS_DATA' ? (
+            <>
+              <div className="trading-lab__liq-sides">
+                <p>
+                  <span className="trading-lab__liq-side">LONG</span>
+                  {formatObservedLiquidationSide(observedLiquidations?.long)}
+                </p>
+                <p>
+                  <span className="trading-lab__liq-side">SHORT</span>
+                  {formatObservedLiquidationSide(observedLiquidations?.short)}
+                </p>
+              </div>
+              {largest && largestSide ? (
+                <p className="trading-lab__liq-large">
+                  최근 큰 청산 {observedLiquidations?.symbol || ''} {largestSide}{' '}
+                  {formatUsdValue(largest.estimatedNotional)} ·{' '}
+                  {formatUsdValue(largest.price)}
+                </p>
+              ) : null}
+              {liquidationCollector && !liquidationCollector.connected ? (
+                <p className="trading-lab__notice">{LIQUIDATION_RECONNECTING_LABEL}</p>
+              ) : null}
+            </>
+          ) : null}
+        </div>
 
         {connected ? (
           <p className="trading-lab__provider-meta">

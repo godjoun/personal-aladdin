@@ -13,6 +13,7 @@ import {
   TRADING_LAB_LIQUIDATION_SIDE_SET,
   TRADING_LAB_OUTCOME_RESULT_SET,
   TRADING_LAB_SCREENSHOT_STATUS_SET,
+  TRADING_LAB_LIQUIDATION_WINDOW_SET,
   TRADING_LAB_SOURCE_TYPE_SET,
   TRADING_LAB_STRUCTURE_SET,
   TRADING_LAB_SYMBOL_SET,
@@ -203,8 +204,19 @@ export function asIsoTimestamp(value) {
 }
 
 /**
- * 목록 조회 limit
+ * 관측 청산 집계 window
  *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asLiquidationWindow(value) {
+  if (value === null || value === undefined || value === '') return '15m'
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  return TRADING_LAB_LIQUIDATION_WINDOW_SET.has(normalized) ? normalized : null
+}
+
+/**
  * @param {unknown} value
  * @param {number} fallback
  * @returns {number | null} null = 잘못된 값

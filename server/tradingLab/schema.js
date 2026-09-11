@@ -91,7 +91,11 @@ export function migrateTradingLab(db) {
       sourceType TEXT NOT NULL,
       note TEXT,
 
-      createdAt TEXT NOT NULL
+      createdAt TEXT NOT NULL,
+      receivedAt TEXT,
+      quantity REAL,
+      rawSide TEXT,
+      sourceKey TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_liquidation_snapshot_symbol_ts
@@ -117,4 +121,32 @@ export function migrateTradingLab(db) {
     CREATE INDEX IF NOT EXISTS idx_trade_analysis_screenshot_analysis
       ON trade_analysis_screenshot(analysisId);
   `)
+
+  addColumnIfMissing(db, 'liquidation_snapshot', 'receivedAt', 'TEXT')
+  addColumnIfMissing(db, 'liquidation_snapshot', 'quantity', 'REAL')
+  addColumnIfMissing(db, 'liquidation_snapshot', 'rawSide', 'TEXT')
+  addColumnIfMissing(db, 'liquidation_snapshot', 'sourceKey', 'TEXT')
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_liquidation_snapshot_symbol_type_ts
+      ON liquidation_snapshot(symbol, sourceType, timestamp DESC);
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_liquidation_snapshot_source_key
+      ON liquidation_snapshot(sourceKey)
+      WHERE sourceKey IS NOT NULL;
+  `)
+}
+
+/**
+ * 기존 DB 에 additive column 만 추가한다.
+ *
+ * @param {import('better-sqlite3').Database} db
+ * @param {string} table
+ * @param {string} column
+ * @param {string} sqlType
+ */
+function addColumnIfMissing(db, table, column, sqlType) {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all()
+  if (rows.some((row) => row.name === column)) return
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${sqlType}`)
 }
