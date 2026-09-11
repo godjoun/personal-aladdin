@@ -77,6 +77,7 @@ import {
 } from './security/validate.js'
 import {
   getListenHost,
+  isAladdinLocalMode,
   shouldUseSecureCookies,
 } from './listenConfig.js'
 import { createTradingLabRouter } from './tradingLab/routes.js'
@@ -93,6 +94,7 @@ const isProd = process.env.NODE_ENV === 'production'
 const PORT = Number(process.env.PORT || process.env.CENTRAL_PORT) || 3001
 const distPath = path.join(__dirname, '..', 'dist')
 const LISTEN_HOST = getListenHost()
+const shouldServeFrontend = isProd || isAladdinLocalMode()
 
 function authConfigured() {
   const user = process.env.ALADDIN_ADMIN_USERNAME?.trim()
@@ -705,7 +707,8 @@ export function createApp() {
   })
 
   // SQLite / server/data 경로 정적 제공 금지 — dist만
-  if (isProd) {
+  // production 배포와 로컬 standalone(ALADDIN_LOCAL=1) 모두 SPA 를 제공한다.
+  if (shouldServeFrontend) {
     if (!fs.existsSync(distPath) || !fs.existsSync(path.join(distPath, 'index.html'))) {
       throw new Error(
         'Production requires dist/ (run npm run build before npm start)',
@@ -719,7 +722,11 @@ export function createApp() {
       localAuthBypass: localAuthBypassActive,
     })
 
-    app.get('*', (req, res, next) => {
+    const sendSpaIndex = (req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        next()
+        return
+      }
       if (req.path.startsWith('/api')) {
         next()
         return
@@ -730,7 +737,10 @@ export function createApp() {
         return
       }
       res.type('html').send(getAppHtml())
-    })
+    }
+
+    app.get('/', sendSpaIndex)
+    app.get('*', sendSpaIndex)
   }
 
   app.use((err, _req, res, _next) => {
@@ -754,7 +764,7 @@ if (isMain) {
     const app = createApp()
     app.listen(PORT, LISTEN_HOST, () => {
       console.log(`[Server] ALADDIN listening on http://${LISTEN_HOST}:${PORT}`)
-      if (isProd) {
+      if (shouldServeFrontend) {
         console.log('[Server] Production mode — serving dist/')
       }
       if (localAuthBypassActive) {

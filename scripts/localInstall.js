@@ -13,6 +13,7 @@ import {
   assertPlistHasNoSecrets,
   buildPlistXml,
   getGuiDomain,
+  getLaunchdLogPaths,
   getPlistPath,
   resolveNodePath,
 } from './localLaunchAgent.js'
@@ -57,8 +58,7 @@ if (!fs.existsSync(distIndex)) {
 const plistPath = getPlistPath()
 fs.mkdirSync(path.dirname(plistPath), { recursive: true })
 
-const outLog = path.join(ROOT, 'logs', 'launchd.out.log')
-const errLog = path.join(ROOT, 'logs', 'launchd.err.log')
+const { outLog, errLog } = getLaunchdLogPaths()
 ensureParentDir(outLog)
 ensureParentDir(errLog)
 rotateLogFileIfNeeded(outLog)
