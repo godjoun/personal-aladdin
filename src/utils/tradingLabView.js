@@ -18,6 +18,22 @@ export const MARKET_STATE_DISCLAIMER =
   '시장 관찰 지표이며 매수·매도 추천이 아닙니다.'
 export const SHADOW_TRADE_DISCLAIMER =
   '가상 계산이며 실제 체결과 다를 수 있습니다. 실제 주문은 없습니다.'
+export const SHADOW_QUICK_SECTION_HINT =
+  '실제 주문 없이 현재 시장 상태를 기준으로 가상 진입만 기록합니다.'
+export const SHADOW_QUICK_HINT =
+  '먼저 1초 기록하고, 이유는 나중에 보강해도 됩니다.'
+export const SHADOW_QUICK_TAGS = Object.freeze([
+  'support',
+  'resistance',
+  'support_ob',
+  'resistance_ob',
+  'fvg',
+  'trendline',
+  'fakeout',
+  'liquidity_sweep',
+  'volume_divergence',
+  'fomo',
+])
 
 const MARKET_STATE_LABELS = {
   BULLISH_PRESSURE: '상승 압력 확대 가능성',
@@ -496,6 +512,7 @@ const SHADOW_TAG_LABELS = {
   fakeout: 'fakeout',
   liquidity_sweep: 'liquidity sweep',
   volume_divergence: 'volume divergence',
+  fomo: 'FOMO',
 }
 
 const SHADOW_RESULT_LABELS = {

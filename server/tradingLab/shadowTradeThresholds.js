@@ -26,4 +26,7 @@ export const SHADOW_TRADE_THRESHOLDS = Object.freeze({
   /** 같은 방향 30분 재진입 경고. */
   REENTRY_WARN_COUNT: 3,
   REENTRY_WINDOW_MS: 30 * 60 * 1000,
+
+  /** 수동 1초 기록 중복 방지. 자동 30분 제한과 별개. */
+  QUICK_DEDUP_WINDOW_MS: 60 * 1000,
 })

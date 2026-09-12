@@ -8,6 +8,8 @@ import { randomUUID } from 'crypto'
 import { getDb } from '../db.js'
 import {
   SHADOW_DEDUP_WINDOW_MS,
+  SHADOW_QUICK_DEDUP_WINDOW_MS,
+  SHADOW_QUICK_ENTRY_REASON,
   SHADOW_STRATEGY_VERSION,
 } from './constants.js'
 import { resolveShadowDedupBucket } from './shadowTradeEngine.js'
@@ -175,6 +177,59 @@ export function getShadowTradeById(id, db = getDb()) {
 export function updateShadowTradeStatus(id, status, db = getDb()) {
   db.prepare(`UPDATE shadow_trade SET status = ? WHERE id = ?`).run(status, id)
   return getShadowTradeById(id, db)
+}
+
+/**
+ * @param {string} id
+ * @param {{ userNote?: string | null, userTags?: string[] }} patch
+ * @param {import('better-sqlite3').Database} [db]
+ */
+export function updateShadowTradeAnnotations(id, patch, db = getDb()) {
+  const current = getShadowTradeById(id, db)
+  if (!current) return null
+  const userNote =
+    Object.prototype.hasOwnProperty.call(patch, 'userNote')
+      ? patch.userNote ?? null
+      : current.userNote
+  const userTags = Array.isArray(patch.userTags)
+    ? patch.userTags
+    : current.userTags
+  db.prepare(
+    `UPDATE shadow_trade SET userNote = ?, userTagsJson = ? WHERE id = ?`,
+  ).run(userNote, JSON.stringify(userTags || []), id)
+  return getShadowTradeById(id, db)
+}
+
+/**
+ * 수동 1초 기록: 같은 symbol + direction + 60초
+ *
+ * @param {{ symbol: string, direction: string, createdAt: string }} params
+ * @param {import('better-sqlite3').Database} [db]
+ */
+export function findQuickManualInWindow(params, db = getDb()) {
+  const createdMs = Date.parse(params.createdAt)
+  if (!Number.isFinite(createdMs)) return null
+  const since = new Date(createdMs - SHADOW_QUICK_DEDUP_WINDOW_MS).toISOString()
+  const row = db
+    .prepare(
+      `SELECT * FROM shadow_trade
+       WHERE symbol = ?
+         AND direction = ?
+         AND source = 'MANUAL_USER'
+         AND entryReason = ?
+         AND createdAt >= ?
+         AND createdAt <= ?
+       ORDER BY createdAt DESC
+       LIMIT 1`,
+    )
+    .get(
+      params.symbol,
+      params.direction,
+      SHADOW_QUICK_ENTRY_REASON,
+      since,
+      params.createdAt,
+    )
+  return mapShadowTrade(row)
 }
 
 /**
@@ -560,6 +615,37 @@ export function getShadowTradeStats(params = {}, db = getDb()) {
     bucket.total += Number(row.count) || 0
   }
 
+  const taggedClosed = db
+    .prepare(
+      `SELECT t.userTagsJson AS userTagsJson, o.result AS result
+       FROM shadow_trade t
+       JOIN shadow_trade_outcome o ON o.shadowTradeId = t.id
+       WHERE t.status = 'CLOSED'${params.symbol ? ' AND t.symbol = ?' : ''}`,
+    )
+    .all(...symbolValues)
+
+  /** @type {Record<string, { WIN: number, LOSS: number, NEUTRAL: number, UNRESOLVED: number, total: number }>} */
+  const resultsByTag = {}
+  for (const row of taggedClosed) {
+    const tags = parseJson(row.userTagsJson, [])
+    if (!Array.isArray(tags)) continue
+    for (const tag of tags) {
+      if (typeof tag !== 'string' || !tag) continue
+      if (!resultsByTag[tag]) {
+        resultsByTag[tag] = {
+          WIN: 0,
+          LOSS: 0,
+          NEUTRAL: 0,
+          UNRESOLVED: 0,
+          total: 0,
+        }
+      }
+      const bucket = resultsByTag[tag]
+      if (row.result in bucket) bucket[row.result] += 1
+      bucket.total += 1
+    }
+  }
+
   return {
     total: Number(totals.total) || 0,
     open: Number(totals.openCount) || 0,
@@ -572,5 +658,6 @@ export function getShadowTradeStats(params = {}, db = getDb()) {
     resultShare,
     resultSharePct,
     resultsByState,
+    resultsByTag,
   }
 }

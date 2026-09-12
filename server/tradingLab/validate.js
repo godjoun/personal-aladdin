@@ -447,6 +447,7 @@ const SHADOW_TAG_ALIASES = Object.freeze({
   'liquidity sweep': 'liquidity_sweep',
   volume_divergence: 'volume_divergence',
   'volume divergence': 'volume_divergence',
+  fomo: 'fomo',
 })
 
 /**
@@ -538,8 +539,47 @@ export function sanitizeShadowTradeInput(raw) {
       entryPrice,
       userTags,
       userNote,
+      quick: raw.quick === true,
     },
   }
+}
+
+/**
+ * 메모/태그 보강
+ *
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: object } | { ok: false, field: string }}
+ */
+export function sanitizeShadowTradePatch(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+
+  const hasNote = Object.prototype.hasOwnProperty.call(raw, 'userNote')
+    || Object.prototype.hasOwnProperty.call(raw, 'note')
+  const hasTags =
+    Object.prototype.hasOwnProperty.call(raw, 'userTags')
+    || Object.prototype.hasOwnProperty.call(raw, 'tags')
+  if (!hasNote && !hasTags) return { ok: false, field: 'body' }
+
+  /** @type {{ userNote?: string | null, userTags?: string[] }} */
+  const value = {}
+  if (hasNote) {
+    const rawNote = raw.userNote ?? raw.note
+    if (rawNote === null || rawNote === undefined || rawNote === '') {
+      value.userNote = null
+    } else {
+      const userNote = optionalText(rawNote, MAX_NOTE)
+      if (userNote === null) return { ok: false, field: 'userNote' }
+      value.userNote = userNote
+    }
+  }
+  if (hasTags) {
+    const userTags = asShadowTags(raw.userTags ?? raw.tags)
+    if (userTags === undefined) return { ok: false, field: 'userTags' }
+    value.userTags = userTags
+  }
+  return { ok: true, value }
 }
 
 /**

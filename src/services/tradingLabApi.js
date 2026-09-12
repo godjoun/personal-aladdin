@@ -242,3 +242,14 @@ export async function saveShadowTradeSettings(payload) {
     body: JSON.stringify(payload),
   })
 }
+
+/**
+ * @param {string} id
+ * @param {{ userNote?: string | null, userTags?: string[] }} payload
+ */
+export async function patchShadowTrade(id, payload) {
+  return call(`${BASE}/shadow-trades/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}

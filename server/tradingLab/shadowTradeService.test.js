@@ -5,9 +5,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { closeDb, getDb } from '../db.js'
 import {
   createManualShadowTrade,
+  createQuickShadowTrade,
   evaluateOpenShadowTrade,
   getPresentedShadowStats,
   maybeCreateAutoShadowTrade,
+  patchShadowTradeAnnotations,
 } from './shadowTradeService.js'
 import { setShadowTradeSettings } from './shadowTradeRepository.js'
 
@@ -174,6 +176,107 @@ describe('shadowTradeService', () => {
     expect(evaluated.outcome.result).toBe('WIN')
     expect(evaluated.outcome.maxFavorableMovePct).toBeCloseTo(7)
     expect(evaluated.outcome.maxAdverseMovePct).toBeCloseTo(-3)
+  })
+
+  it('quick LONG/SHORT 를 만들고 태그와 FOMO 를 저장한다', async () => {
+    const { db } = makeTempDb()
+    const long = await createQuickShadowTrade(
+      {
+        symbol: 'ETHUSDT',
+        direction: 'LONG',
+        userTags: ['support', 'fomo'],
+      },
+      {
+        db,
+        nowMs: Date.parse('2026-09-12T03:00:00.000Z'),
+        currentPrice: 2539.99,
+        assembled: assembled(),
+        evaluation: autoEval(),
+      },
+    )
+    expect(long.ok).toBe(true)
+    expect(long.trade.entryReason).toBe('quick_manual')
+    expect(long.trade.entryPrice).toBe(2539.99)
+    expect(long.trade.userTags).toEqual(['support', 'fomo'])
+    expect(long.trade.primaryState).toBe('BULLISH_PRESSURE')
+    expect(long.trade.warnings).not.toContain('진입 이유가 비어 있습니다')
+
+    const short = await createQuickShadowTrade(
+      { symbol: 'ETHUSDT', direction: 'SHORT', userTags: [] },
+      {
+        db,
+        nowMs: Date.parse('2026-09-12T03:00:00.000Z'),
+        currentPrice: 2539.99,
+        assembled: assembled(),
+        evaluation: autoEval({ primaryState: 'BEARISH_PRESSURE' }),
+      },
+    )
+    expect(short.ok).toBe(true)
+    expect(short.trade.direction).toBe('SHORT')
+    expect(short.trade.userTags).toEqual([])
+  })
+
+  it('quick 기록은 같은 방향 60초 중복을 막는다', async () => {
+    const { db } = makeTempDb()
+    const first = await createQuickShadowTrade(
+      { symbol: 'BTCUSDT', direction: 'LONG' },
+      {
+        db,
+        nowMs: Date.parse('2026-09-12T03:00:00.000Z'),
+        currentPrice: 77000,
+        assembled: assembled({ symbol: 'BTCUSDT', referencePrice: 77000 }),
+        evaluation: autoEval(),
+      },
+    )
+    expect(first.ok).toBe(true)
+    const second = await createQuickShadowTrade(
+      { symbol: 'BTCUSDT', direction: 'LONG' },
+      {
+        db,
+        nowMs: Date.parse('2026-09-12T03:00:40.000Z'),
+        currentPrice: 77010,
+        assembled: assembled({ symbol: 'BTCUSDT', referencePrice: 77010 }),
+        evaluation: autoEval(),
+      },
+    )
+    expect(second.ok).toBe(false)
+    expect(second.duplicate).toBe(true)
+    expect(second.message).toBe('방금 같은 방향을 기록했습니다')
+    expect(second.trade.id).toBe(first.trade.id)
+
+    const later = await createQuickShadowTrade(
+      { symbol: 'BTCUSDT', direction: 'LONG' },
+      {
+        db,
+        nowMs: Date.parse('2026-09-12T03:01:01.000Z'),
+        currentPrice: 77020,
+        assembled: assembled({ symbol: 'BTCUSDT', referencePrice: 77020 }),
+        evaluation: autoEval(),
+      },
+    )
+    expect(later.ok).toBe(true)
+    expect(later.trade.id).not.toBe(first.trade.id)
+  })
+
+  it('나중에 메모와 태그를 보강할 수 있다', async () => {
+    const { db } = makeTempDb()
+    const created = await createQuickShadowTrade(
+      { symbol: 'ETHUSDT', direction: 'SHORT' },
+      {
+        db,
+        nowMs: Date.parse('2026-09-12T04:00:00.000Z'),
+        currentPrice: 2560,
+        assembled: assembled(),
+        evaluation: autoEval(),
+      },
+    )
+    const patched = await patchShadowTradeAnnotations(
+      created.trade.id,
+      { userNote: '4H 저항 관찰', userTags: ['resistance', 'fomo'] },
+      { db },
+    )
+    expect(patched.userNote).toBe('4H 저항 관찰')
+    expect(patched.userTags).toEqual(['resistance', 'fomo'])
   })
 
   it('SQLite 재시작 후에도 가상 기록이 남는다', async () => {

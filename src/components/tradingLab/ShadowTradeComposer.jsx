@@ -1,22 +1,11 @@
 import { useEffect, useState } from 'react'
 import { createShadowTrade } from '../../services/tradingLabApi.js'
 import {
+  SHADOW_QUICK_TAGS,
   SHADOW_TRADE_DISCLAIMER,
   formatShadowPrice,
   getShadowTagLabel,
 } from '../../utils/tradingLabView.js'
-
-const TAGS = [
-  'support',
-  'resistance',
-  'support_ob',
-  'resistance_ob',
-  'fvg',
-  'trendline',
-  'fakeout',
-  'liquidity_sweep',
-  'volume_divergence',
-]
 
 const SYMBOLS = ['BTCUSDT', 'ETHUSDT']
 
@@ -83,11 +72,11 @@ export default function ShadowTradeComposer({
         className="trading-lab-drawer"
         role="dialog"
         aria-modal="true"
-        aria-label="가상 포지션 기록"
+        aria-label="상세 가상 포지션 기록"
       >
         <header className="trading-lab-drawer__header">
           <h2 className="trading-lab-drawer__title">
-            가상 {formDirection} 기록
+            상세 {formDirection} 기록
           </h2>
           <button
             type="button"
@@ -139,7 +128,7 @@ export default function ShadowTradeComposer({
           <fieldset className="trading-lab-drawer__group">
             <legend>태그</legend>
             <div className="trading-lab__shadow-tags">
-              {TAGS.map((tag) => (
+              {SHADOW_QUICK_TAGS.map((tag) => (
                 <label key={tag} className="trading-lab__shadow-tag">
                   <input
                     type="checkbox"
@@ -176,7 +165,7 @@ export default function ShadowTradeComposer({
               className="trading-lab__action trading-lab__action--primary"
               disabled={saving}
             >
-              {saving ? '저장 중' : `가상 ${formDirection} 기록`}
+              {saving ? '저장 중' : `상세 ${formDirection} 기록`}
             </button>
           </div>
         </form>

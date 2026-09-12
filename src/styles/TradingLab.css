@@ -701,6 +701,98 @@
   gap: 0.45rem;
 }
 
+.trading-lab__shadow-quick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.trading-lab__shadow-quick-btn {
+  min-height: 3rem;
+  padding: 0.7rem 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.trading-lab__shadow-quick-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.trading-lab__shadow-quick-btn--long {
+  color: #fff;
+  background: #1a7f4b;
+  border-color: #1a7f4b;
+}
+
+.trading-lab__shadow-quick-btn--short {
+  color: #fff;
+  background: #b42318;
+  border-color: #b42318;
+}
+
+.trading-lab__shadow-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.trading-lab__shadow-chip {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: #f6f8fa;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.trading-lab__shadow-chip.is-active {
+  color: #fff;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.trading-lab__shadow-toast {
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #0a7f3f;
+  background: #f0fbf4;
+  border: 1px solid #a7e0bf;
+  border-radius: 8px;
+}
+
+.trading-lab__shadow-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.trading-lab__shadow-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.trading-lab__shadow-edit textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.55rem;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
 .trading-lab__shadow-warnings {
   margin: 0;
   padding: 0.5rem 0.7rem 0.5rem 1.2rem;

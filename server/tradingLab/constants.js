@@ -177,6 +177,7 @@ export const SHADOW_TRADE_TAGS = Object.freeze([
   'fakeout',
   'liquidity_sweep',
   'volume_divergence',
+  'fomo',
 ])
 export const SHADOW_TRADE_TAG_LABELS = Object.freeze({
   support: 'support',
@@ -188,6 +189,7 @@ export const SHADOW_TRADE_TAG_LABELS = Object.freeze({
   fakeout: 'fakeout',
   liquidity_sweep: 'liquidity sweep',
   volume_divergence: 'volume divergence',
+  fomo: 'FOMO',
 })
 
 export const SHADOW_TRADE_DIRECTION_SET = new Set(SHADOW_TRADE_DIRECTIONS)
@@ -197,8 +199,14 @@ export const SHADOW_TRADE_RESULT_SET = new Set(SHADOW_TRADE_RESULTS)
 export const SHADOW_TRADE_TAG_SET = new Set(SHADOW_TRADE_TAGS)
 
 export const SHADOW_STRATEGY_VERSION = 'shadow-v1'
+export const SHADOW_QUICK_ENTRY_REASON = 'quick_manual'
+export const SHADOW_QUICK_DEDUP_WINDOW_MS = 60 * 1000
 export const SHADOW_TRADE_DISCLAIMER =
   '가상 계산이며 실제 체결과 다를 수 있습니다. 실제 주문은 없습니다.'
+export const SHADOW_QUICK_HINT =
+  '먼저 1초 기록하고, 이유는 나중에 보강해도 됩니다.'
+export const SHADOW_QUICK_SECTION_HINT =
+  '실제 주문 없이 현재 시장 상태를 기준으로 가상 진입만 기록합니다.'
 export const SHADOW_ASSUMED_FEE_BPS = 5
 export const SHADOW_ASSUMED_SLIPPAGE_BPS = 3
 export const SHADOW_AUTO_STRENGTH_MIN = 65

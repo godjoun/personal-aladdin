@@ -43,6 +43,7 @@ import {
   sanitizeScreenshotInput,
   sanitizeShadowSettingsInput,
   sanitizeShadowTradeInput,
+  sanitizeShadowTradePatch,
 } from './validate.js'
 import {
   createAnalysis,
@@ -76,12 +77,14 @@ import {
 } from './marketStateService.js'
 import {
   createManualShadowTrade,
+  createQuickShadowTrade,
   evaluateOpenShadowTrades,
   getPresentedShadowSettings,
   getPresentedShadowStats,
   getPresentedShadowTrade,
   listPresentedCandidates,
   listPresentedShadowTrades,
+  patchShadowTradeAnnotations,
   processAutoShadowTrades,
   updatePresentedShadowSettings,
 } from './shadowTradeService.js'
@@ -512,7 +515,19 @@ export function createTradingLabRouter() {
     }
 
     try {
-      const created = await createManualShadowTrade(parsed.value)
+      const created = parsed.value.quick
+        ? await createQuickShadowTrade(parsed.value)
+        : await createManualShadowTrade(parsed.value)
+      if (created.duplicate) {
+        res.status(409).json({
+          ok: false,
+          duplicate: true,
+          message: created.message,
+          trade: created.trade,
+          disclaimer: SHADOW_TRADE_DISCLAIMER,
+        })
+        return
+      }
       if (!created.ok) {
         badRequest(res, created.field)
         return
@@ -608,6 +623,35 @@ export function createTradingLabRouter() {
       })
     } catch {
       console.error('[TradingLab] auto shadow trades failed')
+      serverError(res)
+    }
+  })
+
+  router.patch('/shadow-trades/:id', async (req, res) => {
+    const id = asId(req.params.id)
+    if (!id) {
+      badRequest(res, 'id')
+      return
+    }
+    const parsed = sanitizeShadowTradePatch(req.body)
+    if (!parsed.ok) {
+      badRequest(res, parsed.field)
+      return
+    }
+
+    try {
+      const trade = await patchShadowTradeAnnotations(id, parsed.value)
+      if (!trade) {
+        res.status(404).json({ ok: false, message: 'Not found' })
+        return
+      }
+      res.status(200).json({
+        ok: true,
+        trade,
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] patch shadow trade failed')
       serverError(res)
     }
   })

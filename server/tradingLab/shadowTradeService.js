@@ -4,7 +4,11 @@
  * 실제 주문 / 거래소 private API / 자동매매는 없다.
  */
 
-import { TRADING_LAB_SYMBOLS } from './constants.js'
+import {
+  SHADOW_QUICK_ENTRY_REASON,
+  SHADOW_STRATEGY_VERSION,
+  TRADING_LAB_SYMBOLS,
+} from './constants.js'
 import { callMarketData } from './marketDataProvider.js'
 import { assembleMarketStateInput } from './marketStateService.js'
 import { evaluateMarketState } from './marketStateEngine.js'
@@ -18,6 +22,7 @@ import {
 } from './shadowTradeEngine.js'
 import {
   countShadowTradesSince,
+  findQuickManualInWindow,
   findShadowTradeInDedupWindow,
   getShadowTradeById,
   getShadowTradeOutcome,
@@ -30,6 +35,7 @@ import {
   listShadowTradeCandidates,
   listShadowTrades,
   setShadowTradeSettings,
+  updateShadowTradeAnnotations,
   updateShadowTradeStatus,
   upsertShadowTradeOutcome,
 } from './shadowTradeRepository.js'
@@ -45,8 +51,8 @@ function asFinite(value) {
 export function readTickerPrice(tickerResult) {
   return (
     asFinite(tickerResult?.data?.lastPrice) ??
-    asFinite(tickerResult?.data?.price) ??
     asFinite(tickerResult?.data?.markPrice) ??
+    asFinite(tickerResult?.data?.price) ??
     null
   )
 }
@@ -94,7 +100,10 @@ export function attachShadowRiskContext(trade, db) {
   return buildShadowRiskWarnings({
     recentClosedResults,
     sameDirectionCount30m,
-    noteEmpty: trade.source === 'MANUAL_USER' && noteEmpty,
+    noteEmpty:
+      trade.source === 'MANUAL_USER'
+      && trade.entryReason !== SHADOW_QUICK_ENTRY_REASON
+      && noteEmpty,
   })
 }
 
@@ -155,6 +164,112 @@ export async function createManualShadowTrade(input, options = {}) {
     ok: true,
     trade: presentShadowTrade(trade, entryPrice, db),
   }
+}
+
+/**
+ * 모달 없는 1초 기록. 실제 주문 없음.
+ *
+ * @param {object} input
+ * @param {{
+ *   db?: import('better-sqlite3').Database,
+ *   nowMs?: number,
+ *   currentPrice?: number | null,
+ *   assembled?: object,
+ *   evaluation?: object,
+ * }} [options]
+ */
+export async function createQuickShadowTrade(input, options = {}) {
+  const db = options.db
+  const nowMs = options.nowMs ?? Date.now()
+  const createdAt = input.createdAt || new Date(nowMs).toISOString()
+  const duplicate = findQuickManualInWindow(
+    {
+      symbol: input.symbol,
+      direction: input.direction,
+      createdAt,
+    },
+    db,
+  )
+  if (duplicate) {
+    return {
+      ok: false,
+      duplicate: true,
+      message: '방금 같은 방향을 기록했습니다',
+      trade: presentShadowTrade(duplicate, duplicate.entryPrice, db),
+    }
+  }
+
+  let entryPrice = asFinite(input.entryPrice)
+  if (entryPrice == null) {
+    entryPrice =
+      options.currentPrice ?? (await fetchShadowEntryPrice(input.symbol))
+  }
+  if (entryPrice == null || entryPrice <= 0) {
+    return { ok: false, field: 'entryPrice' }
+  }
+
+  let assembled = options.assembled || null
+  let evaluation = options.evaluation || null
+  if (!assembled || !evaluation) {
+    try {
+      assembled =
+        assembled || (await assembleMarketStateInput(input.symbol, { nowMs }))
+      evaluation = evaluation || evaluateMarketState(assembled)
+    } catch {
+      assembled = assembled || {}
+      evaluation = evaluation || {}
+    }
+  }
+
+  const trade = insertShadowTrade(
+    {
+      symbol: input.symbol,
+      direction: input.direction,
+      source: 'MANUAL_USER',
+      status: 'OPEN',
+      createdAt,
+      entryPrice,
+      entryReason: SHADOW_QUICK_ENTRY_REASON,
+      strategyVersion: SHADOW_STRATEGY_VERSION,
+      marketStateObservationId: input.marketStateObservationId ?? null,
+      strengthScore: evaluation.strengthScore ?? null,
+      primaryState: evaluation.primaryState ?? null,
+      secondaryStates: evaluation.secondaryStates || [],
+      timeframe15m: evaluation.context?.timeframe15m ?? assembled.structure15m,
+      timeframe1h: evaluation.context?.timeframe1h ?? assembled.structure1h,
+      timeframe4h: evaluation.context?.timeframe4h ?? assembled.structure4h,
+      cvdNotional: assembled.cvdNotional ?? null,
+      buySharePct: assembled.buySharePct ?? null,
+      sellSharePct: assembled.sellSharePct ?? null,
+      oiChangePct: assembled.oiChangePct ?? null,
+      fundingRate: assembled.fundingRate ?? null,
+      volumeRatio: assembled.volumeRatio ?? null,
+      longLiquidationNotional: assembled.longLiquidationNotional ?? null,
+      shortLiquidationNotional: assembled.shortLiquidationNotional ?? null,
+      userTags: input.userTags || [],
+      userNote: input.userNote ?? null,
+    },
+    db,
+  )
+  return {
+    ok: true,
+    trade: presentShadowTrade(trade, entryPrice, db),
+  }
+}
+
+/**
+ * @param {string} id
+ * @param {{ userNote?: string | null, userTags?: string[] }} patch
+ * @param {{ db?: import('better-sqlite3').Database }} [options]
+ */
+export async function patchShadowTradeAnnotations(id, patch, options = {}) {
+  const db = options.db
+  const updated = updateShadowTradeAnnotations(id, patch, db)
+  if (!updated) return null
+  const currentPrice = await fetchShadowEntryPrice(updated.symbol).catch(
+    () => null,
+  )
+  return presentShadowTrade(updated, currentPrice, db)
 }
 
 /**

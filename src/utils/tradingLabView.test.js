@@ -275,6 +275,7 @@ describe('Shadow Trading 표시', () => {
   it('가상 결과 라벨과 가격을 표시한다', () => {
     expect(getShadowResultLabel('WIN')).toBe('WIN')
     expect(getShadowTagLabel('support_ob')).toBe('support OB')
+    expect(getShadowTagLabel('fomo')).toBe('FOMO')
     expect(formatShadowPrice(2560)).toBe('$2,560')
     expect(formatShadowReturnPct(0.7)).toBe('+0.7%')
     expect(formatShadowHorizon(null, '1h')).toBe('1h 대기')

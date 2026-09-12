@@ -285,6 +285,14 @@ describe('로컬 bypass 활성 서버', () => {
     expect(shadow.status).toBe(201)
     expect(shadow.json.trade.direction).toBe('SHORT')
     expect(shadow.json.trade.source).toBe('MANUAL_USER')
+
+    const quick = await request('POST', '/api/trading-lab/shadow-trades', {
+      body: { symbol: 'ETHUSDT', direction: 'LONG', quick: true },
+      headers: { [CSRF_HEADER]: jar[CSRF_COOKIE] },
+      origin: ORIGIN,
+    })
+    expect(quick.status).toBe(201)
+    expect(quick.json.trade.entryReason).toBe('quick_manual')
   })
 
   it('bypass 상태에서도 입력 검증은 그대로 적용된다', async () => {
