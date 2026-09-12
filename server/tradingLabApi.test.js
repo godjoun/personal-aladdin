@@ -127,6 +127,25 @@ function createMockBybitFetch() {
   }
 }
 
+function createChartProvider(getCandles) {
+  const ok = async () => ({
+    status: 'OK',
+    data: null,
+    provider: 'TEST',
+    fetchedAt: '2026-09-12T00:00:00.000Z',
+  })
+  return {
+    id: 'TEST',
+    configured: true,
+    getTicker: ok,
+    getCandles,
+    getOpenInterest: ok,
+    getFundingRate: ok,
+    getLiquidations: ok,
+    getOrderFlow: ok,
+  }
+}
+
 describe('Trading Lab API', () => {
   /** @type {http.Server} */
   let server
@@ -399,6 +418,72 @@ describe('Trading Lab API', () => {
     )
     expect(daily.status).toBe(400)
     expect(daily.json.field).toBe('timeframe')
+  })
+
+  it('Chart View 캔들 API 는 빈 데이터, 최근 데이터, 오류 상태를 안전하게 반환한다', async () => {
+    await login()
+
+    registerMarketDataProvider(
+      createChartProvider(async () => ({
+        status: 'OK',
+        data: { candles: [] },
+        provider: 'TEST',
+        fetchedAt: '2026-09-12T00:00:00.000Z',
+      })),
+    )
+    const empty = await request(
+      'GET',
+      '/api/trading-lab/market/BTCUSDT/candles?timeframe=1h',
+    )
+    expect(empty.status).toBe(200)
+    expect(empty.json.status).toBe('OK')
+    expect(empty.json.candles).toEqual([])
+
+    registerMarketDataProvider(
+      createChartProvider(async () => ({
+        status: 'OK',
+        stale: true,
+        data: {
+          candles: [
+            {
+              timestamp: 1_700_000_000_000,
+              open: 1,
+              high: 2,
+              low: 0.5,
+              close: 1.5,
+            },
+          ],
+        },
+        provider: 'TEST',
+        fetchedAt: '2026-09-12T00:00:00.000Z',
+      })),
+    )
+    const stale = await request(
+      'GET',
+      '/api/trading-lab/market/BTCUSDT/candles?timeframe=1h',
+    )
+    expect(stale.status).toBe(200)
+    expect(stale.json.stale).toBe(true)
+    expect(stale.json.candles).toHaveLength(1)
+
+    registerMarketDataProvider(
+      createChartProvider(async () => ({
+        status: 'ERROR',
+        data: null,
+        provider: 'TEST',
+        fetchedAt: '2026-09-12T00:00:00.000Z',
+        message: '/Users/sinjoun/.env ALADDIN_SECRET',
+      })),
+    )
+    const failed = await request(
+      'GET',
+      '/api/trading-lab/market/BTCUSDT/candles?timeframe=1h',
+    )
+    expect(failed.status).toBe(200)
+    expect(failed.json.status).toBe('ERROR')
+    expect(failed.json.message).toBe('시장 데이터를 불러오지 못했습니다.')
+    expect(failed.json.candles).toEqual([])
+    expect(JSON.stringify(failed.json)).not.toMatch(/ALADDIN_SECRET|\.env|sinjoun/)
   })
 
   it('관측 청산 status / window API 를 제공한다', async () => {

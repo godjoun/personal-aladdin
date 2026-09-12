@@ -3,6 +3,8 @@ import {
   LOCAL_LISTEN_PORT,
   NON_ALADDIN_PORT_ERROR,
   classifyPortOccupants,
+  extractDistAssetPaths,
+  hasCurrentDistAssetRefs,
   isAladdinOwnedProcess,
   isHealthOk,
   isStandaloneHtml,
@@ -173,6 +175,36 @@ describe('health / html checks', () => {
     expect(isStandaloneHtml({ status: 404, body: 'Cannot GET /' })).toBe(false)
   })
 
+  it('dist/index.html 의 현재 asset 참조를 구분한다', () => {
+    const current = [
+      '/assets/index-current.css',
+      '/assets/index-current.js',
+    ]
+    expect(
+      extractDistAssetPaths(
+        '<!doctype html><script src="/assets/index-current.js"></script><link href="/assets/index-current.css">',
+      ),
+    ).toEqual(current)
+    expect(
+      hasCurrentDistAssetRefs(
+        {
+          status: 200,
+          body: '<!doctype html><script src="/assets/index-current.js"></script><link href="/assets/index-current.css">',
+        },
+        current,
+      ),
+    ).toBe(true)
+    expect(
+      hasCurrentDistAssetRefs(
+        {
+          status: 200,
+          body: '<!doctype html><script src="/assets/index-old.js"></script><link href="/assets/index-old.css">',
+        },
+        current,
+      ),
+    ).toBe(false)
+  })
+
   it('서버가 뜰 때까지 health 와 / 를 같이 기다린다', async () => {
     let n = 0
     const result = await waitForLocalServer({
@@ -183,6 +215,30 @@ describe('health / html checks', () => {
         if (n < 3) return { status: 500, body: '' }
         if (url.endsWith('/api/health')) return { status: 200, body: '{"ok":true}' }
         return { status: 200, body: '<!doctype html><html>ALADDIN</html>' }
+      },
+    })
+    expect(result.ok).toBe(true)
+  })
+
+  it('요청 시 최신 dist asset 을 서빙할 때까지 기다린다', async () => {
+    let n = 0
+    const result = await waitForLocalServer({
+      timeoutMs: 2000,
+      expectedAssetPaths: ['/assets/current.js'],
+      sleep: async () => {},
+      get: async (url) => {
+        n += 1
+        if (url.endsWith('/api/health')) return { status: 200, body: '{"ok":true}' }
+        if (n < 4) {
+          return {
+            status: 200,
+            body: '<!doctype html><html><script src="/assets/old.js"></script></html>',
+          }
+        }
+        return {
+          status: 200,
+          body: '<!doctype html><html><script src="/assets/current.js"></script></html>',
+        }
       },
     })
     expect(result.ok).toBe(true)

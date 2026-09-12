@@ -12,6 +12,7 @@ import fs from 'fs'
 import path from 'path'
 
 export const LOCAL_BYPASS_META_NAME = 'aladdin-local-auth-bypass'
+export const SPA_INDEX_CACHE_CONTROL = 'no-store, no-cache, must-revalidate, proxy-revalidate'
 
 /**
  * @param {string} html
@@ -31,7 +32,8 @@ export function injectBootstrapMeta(html, options = {}) {
 }
 
 /**
- * index.html 을 1회 읽어 캐시한다.
+ * SPA entry HTML 은 asset hash 목록을 담고 있으므로 빌드 후 오래 들고 있으면
+ * 브라우저가 삭제된 이전 JS/CSS 를 요청할 수 있다. 파일 변경을 감지해 다시 읽는다.
  *
  * @param {{ distPath: string, localAuthBypass?: boolean }} options
  */
@@ -41,13 +43,27 @@ export function createAppHtmlProvider(options) {
 
   /** @type {string | null} */
   let cached = null
+  let cachedSignature = ''
 
   return function getAppHtml() {
-    if (cached === null) {
+    const stat = fs.statSync(indexPath)
+    const signature = `${stat.mtimeMs}:${stat.size}`
+    if (cached === null || cachedSignature !== signature) {
       cached = injectBootstrapMeta(fs.readFileSync(indexPath, 'utf8'), {
         localAuthBypass,
       })
+      cachedSignature = signature
     }
     return cached
   }
+}
+
+/**
+ * @param {{ set: (name: string, value: string) => unknown }} res
+ */
+export function setSpaIndexCacheHeaders(res) {
+  res.set('Cache-Control', SPA_INDEX_CACHE_CONTROL)
+  res.set('Pragma', 'no-cache')
+  res.set('Expires', '0')
+  res.set('Surrogate-Control', 'no-store')
 }

@@ -37,6 +37,10 @@ export const MARKET_LIQUIDATION_TITLE = '청산 확인'
 export const MARKET_ENGINE_TITLE = '시장 상태'
 export const CHART_TIMEFRAMES = Object.freeze(['15m', '1h', '4h'])
 export const CHART_VIEW_TITLE = '시장 차트'
+export const CHART_LOADING_LABEL = '불러오는 중'
+export const CHART_EMPTY_LABEL = '데이터 부족'
+export const CHART_ERROR_LABEL = '차트 데이터를 불러오지 못했습니다.'
+export const CHART_STALE_LABEL = '최근 데이터'
 export const COMMAND_CENTER_TITLE = '오늘의 ALADDIN'
 export const COMMAND_ROUTINE_TITLE = '오늘의 ALADDIN 루틴'
 export const COMMAND_ROUTINE_STEPS = Object.freeze([
@@ -60,6 +64,11 @@ export const SHADOW_RECORD_TYPE_LABELS = Object.freeze({
   STRATEGY: '기준 기록',
   IMPULSE: '충동 기록',
   OBSERVATION: '관찰 기록',
+})
+export const SHADOW_RECORD_TYPE_MARKER_LABELS = Object.freeze({
+  STRATEGY: '기준',
+  IMPULSE: '충동',
+  OBSERVATION: '관찰',
 })
 export const STRATEGY_ACTION_LABELS = Object.freeze({
   WAIT: '대기',
@@ -779,6 +788,16 @@ export function getShadowRecordTypeLabel(recordType) {
 }
 
 /**
+ * @param {string | null | undefined} recordType
+ */
+export function getShadowRecordTypeMarkerLabel(recordType) {
+  return (
+    SHADOW_RECORD_TYPE_MARKER_LABELS[recordType] ||
+    SHADOW_RECORD_TYPE_MARKER_LABELS.OBSERVATION
+  )
+}
+
+/**
  * @param {object | null | undefined} check
  */
 export function getCommandStatus(check) {
@@ -855,6 +874,79 @@ export function formatShadowResultShare(stats) {
   if (!stats) return NO_DATA_LABEL
   const share = stats.resultShare || {}
   return `완료 결과 비율 WIN ${share.WIN || 0} · LOSS ${share.LOSS || 0} · NEUTRAL ${share.NEUTRAL || 0}`
+}
+
+/**
+ * Chart View 표시 상태. API 오류 메시지는 내부 내용을 노출하지 않는다.
+ *
+ * @param {{
+ *   loading?: boolean,
+ *   status?: string | null,
+ *   candleCount?: number,
+ *   stale?: boolean,
+ * }} [input]
+ */
+export function getChartDataState(input = {}) {
+  const candleCount = Number(input.candleCount) || 0
+  const status = input.status || null
+
+  if (input.loading) {
+    return {
+      id: 'LOADING',
+      emptyLabel: CHART_LOADING_LABEL,
+      notice: null,
+      tone: 'muted',
+      hasData: false,
+    }
+  }
+
+  if (status === 'NOT_CONFIGURED') {
+    return {
+      id: 'NOT_CONFIGURED',
+      emptyLabel: NOT_CONNECTED_LABEL,
+      notice: null,
+      tone: 'muted',
+      hasData: false,
+    }
+  }
+
+  if (status === 'ERROR') {
+    return {
+      id: 'ERROR',
+      emptyLabel: CHART_ERROR_LABEL,
+      notice: 'API 오류 상태',
+      tone: 'error',
+      hasData: false,
+    }
+  }
+
+  if (candleCount <= 0) {
+    return {
+      id: 'EMPTY',
+      emptyLabel: CHART_EMPTY_LABEL,
+      notice: null,
+      tone: 'muted',
+      hasData: false,
+    }
+  }
+
+  if (input.stale) {
+    return {
+      id: 'STALE',
+      emptyLabel: null,
+      notice: CHART_STALE_LABEL,
+      tone: 'stale',
+      hasData: true,
+    }
+  }
+
+  return {
+    id: 'READY',
+    emptyLabel: null,
+    notice: null,
+    tone: 'ok',
+    hasData: true,
+  }
 }
 
 /**
@@ -950,16 +1042,18 @@ export function buildShadowEntryMarkers(trades, candles, symbol) {
     const direction = trade?.direction
     if (direction !== 'LONG' && direction !== 'SHORT') continue
     const snapped = snapUnixSecondsToCandleTime(
-      toUnixSeconds(trade.createdAt),
+      toUnixSeconds(trade.entryTime ?? trade.createdAt),
       candleTimes,
     )
     if (snapped == null) continue
+    const recordType = classifyShadowRecordType(trade)
+    const recordTypeLabel = getShadowRecordTypeMarkerLabel(recordType)
     markers.push({
       time: snapped,
       position: direction === 'LONG' ? 'belowBar' : 'aboveBar',
       color: direction === 'LONG' ? '#0a7f3f' : '#cf222e',
       shape: direction === 'LONG' ? 'arrowUp' : 'arrowDown',
-      text: direction === 'LONG' ? '가상 LONG' : '가상 SHORT',
+      text: `가상 ${direction} · ${recordTypeLabel}`,
     })
   }
 

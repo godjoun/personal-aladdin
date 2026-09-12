@@ -27,6 +27,7 @@ import {
   listAladdinPids,
   listListenPids,
   nonAladdinPortError,
+  readCurrentDistAssetPaths,
   stopProcesses,
   waitForLocalServer,
 } from './localProcess.js'
@@ -139,6 +140,10 @@ const distIndex = path.join(ROOT, 'dist', 'index.html')
 if (!fs.existsSync(distIndex)) {
   fail('dist/index.html 이 없습니다.')
 }
+const expectedAssetPaths = readCurrentDistAssetPaths(ROOT)
+if (expectedAssetPaths.length === 0) {
+  fail('dist/index.html 에 asset 참조가 없습니다.')
+}
 
 log('기존 LaunchAgent bootout …')
 bootoutAgent()
@@ -193,10 +198,13 @@ try {
 }
 
 log('health check …')
-const ready = await waitForLocalServer({ timeoutMs: 45_000 })
+const ready = await waitForLocalServer({
+  timeoutMs: 45_000,
+  expectedAssetPaths,
+})
 if (!ready.ok) {
   fail(
-    `서버가 뜨지 않았습니다. ${LOCAL_BASE_URL}/api/health 와 ${LOCAL_BASE_URL}/ 를 확인하세요.`,
+    `서버가 최신 dist 를 서빙하지 않습니다. ${LOCAL_BASE_URL}/api/health 와 ${LOCAL_BASE_URL}/ 를 확인하세요.`,
   )
 }
 

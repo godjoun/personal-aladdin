@@ -286,9 +286,51 @@ export function isStandaloneHtml(response) {
 }
 
 /**
+ * @param {string} html
+ * @returns {string[]}
+ */
+export function extractDistAssetPaths(html) {
+  const paths = new Set()
+  const pattern = /\b(?:src|href)=["']([^"']*\/assets\/[^"']+)["']/g
+  for (const match of String(html || '').matchAll(pattern)) {
+    paths.add(match[1])
+  }
+  return [...paths].sort()
+}
+
+/**
+ * @param {string} [root]
+ */
+export function readCurrentDistAssetPaths(root = ROOT) {
+  const indexPath = path.join(root, 'dist', 'index.html')
+  try {
+    return extractDistAssetPaths(fs.readFileSync(indexPath, 'utf8'))
+  } catch {
+    return []
+  }
+}
+
+/**
+ * @param {{ status?: number, body?: string } | null | undefined} response
+ * @param {string[]} expectedAssetPaths
+ */
+export function hasCurrentDistAssetRefs(response, expectedAssetPaths) {
+  if (!isStandaloneHtml(response)) return false
+  if (!Array.isArray(expectedAssetPaths) || expectedAssetPaths.length === 0) {
+    return false
+  }
+  const actual = extractDistAssetPaths(response.body || '')
+  return (
+    actual.length === expectedAssetPaths.length &&
+    expectedAssetPaths.every((item) => actual.includes(item))
+  )
+}
+
+/**
  * @param {{
  *   baseUrl?: string,
  *   timeoutMs?: number,
+ *   expectedAssetPaths?: string[] | null,
  *   sleep?: (ms: number) => Promise<void>,
  *   get?: typeof httpGet,
  * }} [options]
@@ -299,12 +341,16 @@ export async function waitForLocalServer(options = {}) {
   const sleep =
     options.sleep || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
   const get = options.get || httpGet
+  const expectedAssetPaths = options.expectedAssetPaths || null
   const started = Date.now()
 
   while (Date.now() - started < timeoutMs) {
     const health = await get(`${baseUrl}/api/health`)
     const home = await get(`${baseUrl}/`)
-    if (isHealthOk(health) && isStandaloneHtml(home)) {
+    const currentHtml =
+      expectedAssetPaths === null ||
+      hasCurrentDistAssetRefs(home, expectedAssetPaths)
+    if (isHealthOk(health) && isStandaloneHtml(home) && currentHtml) {
       return { ok: true, health, home }
     }
     await sleep(400)

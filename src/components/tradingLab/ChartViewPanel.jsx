@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   CandlestickSeries,
   ColorType,
@@ -10,8 +10,8 @@ import {
   CHART_TIMEFRAMES,
   CHART_VIEW_DISCLAIMER,
   CHART_VIEW_TITLE,
-  NOT_CONNECTED_LABEL,
   buildShadowEntryMarkers,
+  getChartDataState,
   toChartCandles,
 } from '../../utils/tradingLabView.js'
 
@@ -24,6 +24,7 @@ export default function ChartViewPanel({ symbol, trades }) {
   const [rawCandles, setRawCandles] = useState([])
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
+  const [requestStatus, setRequestStatus] = useState('NOT_CONFIGURED')
   const hostRef = useRef(null)
   const chartApiRef = useRef(null)
 
@@ -32,19 +33,34 @@ export default function ChartViewPanel({ symbol, trades }) {
     () => buildShadowEntryMarkers(trades, chartCandles, symbol),
     [trades, chartCandles, symbol],
   )
+  const chartState = useMemo(
+    () =>
+      getChartDataState({
+        loading,
+        status: requestStatus,
+        candleCount: chartCandles.length,
+        stale,
+      }),
+    [chartCandles.length, loading, requestStatus, stale],
+  )
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setRawCandles([])
+    setRequestStatus('OK')
+    setStale(false)
     fetchMarketCandles(symbol, { timeframe, limit: 150 })
       .then((payload) => {
         if (cancelled) return
         setRawCandles(payload.candles || [])
+        setRequestStatus(payload.status || 'OK')
         setStale(Boolean(payload.stale))
       })
       .catch(() => {
         if (cancelled) return
         setRawCandles([])
+        setRequestStatus('ERROR')
         setStale(false)
       })
       .finally(() => {
@@ -73,6 +89,7 @@ export default function ChartViewPanel({ symbol, trades }) {
       rightPriceScale: { borderColor: '#d0d7de' },
       timeScale: {
         borderColor: '#d0d7de',
+        rightOffset: 10,
         timeVisible: true,
         secondsVisible: false,
       },
@@ -106,7 +123,7 @@ export default function ChartViewPanel({ symbol, trades }) {
   }, [chartCandles, markers])
 
   const hasCandles = chartCandles.length > 0
-  const emptyLabel = loading ? '불러오는 중' : NOT_CONNECTED_LABEL
+  const emptyLabel = chartState.emptyLabel
 
   return (
     <section className="trading-lab__section" aria-label={CHART_VIEW_TITLE}>
@@ -135,13 +152,19 @@ export default function ChartViewPanel({ symbol, trades }) {
       </header>
 
       <p className="trading-lab__notice">{CHART_VIEW_DISCLAIMER}</p>
-      {stale ? (
-        <p className="trading-lab__notice trading-lab__notice--stale">시장 데이터 일시 지연</p>
+      {chartState.notice ? (
+        <p
+          className={`trading-lab__notice trading-lab__notice--${chartState.tone}`}
+        >
+          {chartState.notice}
+        </p>
       ) : null}
 
       <div className="trading-lab__chart-wrap">
-        {!hasCandles ? (
-          <p className="trading-lab__chart-empty">{emptyLabel}</p>
+        {emptyLabel ? (
+          <p className="trading-lab__chart-empty" role="status" aria-live="polite">
+            {emptyLabel}
+          </p>
         ) : null}
         <div
           ref={hostRef}

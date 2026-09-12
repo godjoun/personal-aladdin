@@ -65,10 +65,16 @@ import {
   CHART_TIMEFRAMES,
   CHART_VIEW_TITLE,
   CHART_VIEW_DISCLAIMER,
+  CHART_EMPTY_LABEL,
+  CHART_ERROR_LABEL,
+  CHART_LOADING_LABEL,
+  CHART_STALE_LABEL,
   toUnixSeconds,
   toChartCandles,
   snapUnixSecondsToCandleTime,
   buildShadowEntryMarkers,
+  getChartDataState,
+  getShadowRecordTypeMarkerLabel,
 } from './tradingLabView.js'
 
 describe('bias / outcome 표시', () => {
@@ -473,20 +479,24 @@ describe('Shadow Trading 표시', () => {
         {
           symbol: 'BTCUSDT',
           direction: 'LONG',
-          createdAt: '2023-11-14T22:20:50.000Z',
+          entryTime: '2023-11-14T22:20:50.000Z',
+          createdAt: '2023-11-14T22:13:20.000Z',
           entryPrice: 65000,
+          recordType: 'STRATEGY',
         },
         {
           symbol: 'ETHUSDT',
           direction: 'SHORT',
           createdAt: '2023-11-14T22:20:50.000Z',
           entryPrice: 3500,
+          recordType: 'IMPULSE',
         },
         {
           symbol: 'BTCUSDT',
           direction: 'SHORT',
           createdAt: '2023-11-14T22:28:20.000Z',
           entryPrice: 64900,
+          recordType: 'OBSERVATION',
         },
       ],
       candles,
@@ -496,13 +506,47 @@ describe('Shadow Trading 표시', () => {
     expect(markers[0]).toMatchObject({
       time: 1_700_000_450,
       shape: 'arrowUp',
-      text: '가상 LONG',
+      position: 'belowBar',
+      text: '가상 LONG · 기준',
     })
     expect(markers[1]).toMatchObject({
       time: 1_700_000_900,
       shape: 'arrowDown',
-      text: '가상 SHORT',
+      position: 'aboveBar',
+      text: '가상 SHORT · 관찰',
     })
     expect(JSON.stringify(markers)).not.toMatch(/주문|승률/)
+  })
+
+  it('Chart View 상태와 recordType 마커 라벨을 구분한다', () => {
+    expect(getChartDataState({ loading: true })).toMatchObject({
+      id: 'LOADING',
+      emptyLabel: CHART_LOADING_LABEL,
+    })
+    expect(getChartDataState({ status: 'NOT_CONFIGURED', candleCount: 0 })).toMatchObject({
+      id: 'NOT_CONFIGURED',
+      emptyLabel: NOT_CONNECTED_LABEL,
+    })
+    expect(getChartDataState({ status: 'OK', candleCount: 0 })).toMatchObject({
+      id: 'EMPTY',
+      emptyLabel: CHART_EMPTY_LABEL,
+    })
+    expect(getChartDataState({ status: 'ERROR', candleCount: 0 })).toMatchObject({
+      id: 'ERROR',
+      emptyLabel: CHART_ERROR_LABEL,
+      notice: 'API 오류 상태',
+    })
+    expect(getChartDataState({ status: 'OK', candleCount: 3, stale: true })).toMatchObject({
+      id: 'STALE',
+      notice: CHART_STALE_LABEL,
+      hasData: true,
+    })
+    expect(getChartDataState({ status: 'OK', candleCount: 3 })).toMatchObject({
+      id: 'READY',
+      hasData: true,
+    })
+    expect(getShadowRecordTypeMarkerLabel('STRATEGY')).toBe('기준')
+    expect(getShadowRecordTypeMarkerLabel('IMPULSE')).toBe('충동')
+    expect(getShadowRecordTypeMarkerLabel('OBSERVATION')).toBe('관찰')
   })
 })

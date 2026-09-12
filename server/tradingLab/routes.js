@@ -123,6 +123,21 @@ function serverError(res) {
   res.status(500).json({ ok: false, message: 'Internal server error' })
 }
 
+/**
+ * provider 구현체의 내부 오류 문자열이 UI 로 새지 않도록 상태별 문구만 쓴다.
+ *
+ * @param {string} status
+ */
+function marketDataMessage(status) {
+  if (status === PROVIDER_STATUS.NOT_CONFIGURED) return '데이터 연결 전'
+  if (status === PROVIDER_STATUS.INVALID_REQUEST) return 'Invalid request'
+  if (status === PROVIDER_STATUS.UNSUPPORTED) return 'Unsupported market data request'
+  if (status === PROVIDER_STATUS.ERROR) {
+    return '시장 데이터를 불러오지 못했습니다.'
+  }
+  return null
+}
+
 export function createTradingLabRouter() {
   const router = express.Router()
 
@@ -218,7 +233,7 @@ export function createTradingLabRouter() {
         message:
           result.status === PROVIDER_STATUS.OK
             ? null
-            : result.message || '데이터 연결 전',
+            : marketDataMessage(result.status),
       })
     } catch {
       console.error('[TradingLab] market candles failed')

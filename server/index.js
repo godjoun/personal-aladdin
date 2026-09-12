@@ -110,7 +110,7 @@ import {
   LOCAL_BYPASS_USER,
   assertLocalAuthBypassSafe,
 } from './auth/localBypass.js'
-import { createAppHtmlProvider } from './appHtml.js'
+import { createAppHtmlProvider, setSpaIndexCacheHeaders } from './appHtml.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 config({ path: path.join(__dirname, '..', '.env') })
@@ -824,8 +824,6 @@ export function createApp(options = {}) {
       )
     }
 
-    app.use(express.static(distPath, { index: false, dotfiles: 'deny' }))
-
     const getAppHtml = createAppHtmlProvider({
       distPath,
       localAuthBypass: localAuthBypassActive,
@@ -845,10 +843,13 @@ export function createApp(options = {}) {
         res.status(404).end()
         return
       }
+      setSpaIndexCacheHeaders(res)
       res.type('html').send(getAppHtml())
     }
 
     app.get('/', sendSpaIndex)
+    app.get('/index.html', sendSpaIndex)
+    app.use(express.static(distPath, { index: false, dotfiles: 'deny' }))
     app.get('*', sendSpaIndex)
   }
 
