@@ -7,7 +7,17 @@ import {
   createShadowTradeFromStrategyCheck,
   createStrategyCheck,
 } from './strategyCheckService.js'
-import { insertShadowTrade, upsertShadowTradeOutcome, updateShadowTradeStatus } from './shadowTradeRepository.js'
+import {
+  insertShadowTrade,
+  upsertShadowTradeOutcome,
+  updateShadowTradeStatus,
+  getShadowTradeById,
+} from './shadowTradeRepository.js'
+import { insertChartAnnotation } from './chartAnnotationRepository.js'
+import {
+  listPresentedShadowTrades,
+  presentShadowTrade,
+} from './shadowTradeService.js'
 
 function makeTempDb() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aladdin-strategy-'))
@@ -220,5 +230,129 @@ describe('strategyCheckService', () => {
     expect(created.check.riskWarnings).toContain(
       '최근 완료 Shadow Trade 가 연속 LOSS 입니다.',
     )
+  })
+
+  it('가상 기록 생성 시 근처 chart annotation 을 함께 저장한다', async () => {
+    const { db } = makeTempDb()
+    const annotation = insertChartAnnotation(
+      {
+        symbol: 'BTCUSDT',
+        timeframe: '1h',
+        annotationType: 'FVG',
+        topPrice: 77400,
+        bottomPrice: 77000,
+        startTime: '2026-09-12T06:00:00.000Z',
+        endTime: '2026-09-12T07:00:00.000Z',
+      },
+      db,
+    )
+    const created = await createStrategyCheck(
+      {
+        symbol: 'BTCUSDT',
+        direction: 'LONG',
+        selectedTags: ['support', 'has_stop', 'has_target'],
+      },
+      {
+        db,
+        assembled: assembled(),
+        evaluation: { primaryState: 'MIXED', strengthScore: 44 },
+      },
+    )
+    expect(created.check.linkedAnnotations).toEqual([
+      expect.objectContaining({
+        id: annotation.id,
+        annotationType: 'FVG',
+        evidence: '검토 가능 근거 · FVG 안',
+      }),
+    ])
+    expect(created.check.autoEvidence.linkedAnnotations[0].id).toBe(annotation.id)
+
+    const linked = await createShadowTradeFromStrategyCheck(created.check.id, {
+      db,
+      currentPrice: 77200,
+    })
+    expect(linked.trade.linkedAnnotations).toEqual([
+      expect.objectContaining({
+        id: annotation.id,
+        annotationType: 'FVG',
+      }),
+    ])
+    expect(linked.trade.linkedAnnotations[0].evidence).not.toMatch(/매수하세요|승률/)
+  })
+
+  it('목록 응답에도 strategy_check.linkedAnnotations 를 붙인다', async () => {
+    const { db } = makeTempDb()
+    insertChartAnnotation(
+      {
+        symbol: 'BTCUSDT',
+        timeframe: '15m',
+        annotationType: 'SUPPORT',
+        price: 77200,
+      },
+      db,
+    )
+    insertChartAnnotation(
+      {
+        symbol: 'BTCUSDT',
+        timeframe: '15m',
+        annotationType: 'FVG',
+        topPrice: 77400,
+        bottomPrice: 77000,
+        startTime: '2026-09-12T06:00:00.000Z',
+        endTime: '2026-09-12T07:00:00.000Z',
+      },
+      db,
+    )
+    insertChartAnnotation(
+      {
+        symbol: 'BTCUSDT',
+        timeframe: '15m',
+        annotationType: 'SUPPORT_OB',
+        topPrice: 77400,
+        bottomPrice: 77000,
+        startTime: '2026-09-12T06:00:00.000Z',
+        endTime: '2026-09-12T07:00:00.000Z',
+      },
+      db,
+    )
+    const created = await createStrategyCheck(
+      {
+        symbol: 'BTCUSDT',
+        direction: 'LONG',
+        selectedTags: ['support', 'has_stop', 'has_target'],
+      },
+      {
+        db,
+        assembled: assembled(),
+        evaluation: { primaryState: 'MIXED', strengthScore: 44 },
+      },
+    )
+    const linked = await createShadowTradeFromStrategyCheck(created.check.id, {
+      db,
+      currentPrice: 77200,
+    })
+    expect(linked.check.shadowTradeId).toBe(linked.trade.id)
+    expect(linked.trade.linkedAnnotations.map((item) => item.annotationType).sort()).toEqual(
+      ['FVG', 'SUPPORT', 'SUPPORT_OB'],
+    )
+
+    const listed = await listPresentedShadowTrades({
+      db,
+      symbol: 'BTCUSDT',
+      prices: { BTCUSDT: 77200 },
+    })
+    expect(listed).toHaveLength(1)
+    expect(listed[0]).toHaveProperty('linkedAnnotations')
+    expect(listed[0].linkedAnnotations).toEqual(linked.trade.linkedAnnotations)
+    expect(listed[0].linkedAnnotations.map((item) => item.label).sort()).toEqual([
+      'FVG',
+      'support',
+      'support OB',
+    ])
+
+    const raw = getShadowTradeById(linked.trade.id, db)
+    const single = presentShadowTrade(raw, 77200, db)
+    expect(single.linkedAnnotations).toEqual(listed[0].linkedAnnotations)
+    expect(single.id).toBe(listed[0].id)
   })
 })

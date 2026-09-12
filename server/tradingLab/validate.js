@@ -20,6 +20,9 @@ import {
   TRADING_LAB_SYMBOL_SET,
   TRADING_LAB_TIMEFRAME_SET,
   CHART_TIMEFRAME_SET,
+  CHART_ANNOTATION_TYPE_SET,
+  CHART_LINE_TYPE_SET,
+  CHART_BOX_TYPE_SET,
   SHADOW_TRADE_DIRECTION_SET,
   SHADOW_TRADE_SOURCE_SET,
   SHADOW_TRADE_TAG_SET,
@@ -105,6 +108,49 @@ export function asChartTimeframe(value) {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toLowerCase()
   return CHART_TIMEFRAME_SET.has(normalized) ? normalized : null
+}
+
+/**
+ * Chart Tools 전용 타입
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asChartAnnotationType(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return CHART_ANNOTATION_TYPE_SET.has(upper) ? upper : null
+}
+
+/**
+ * 양수 가격만 허용. 0/음수는 거부.
+ *
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+export function asPositivePrice(value) {
+  const n = asOptionalPrice(value)
+  if (n === null) return null
+  if (n <= 0) return null
+  return n
+}
+
+/**
+ * ISO 또는 unix seconds/ms
+ *
+ * @param {unknown} value
+ * @returns {string | null | undefined} undefined = 잘못된 값
+ */
+export function asAnnotationTime(value) {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return undefined
+    const ms = value > 1e12 ? value : value * 1000
+    const date = new Date(ms)
+    if (Number.isNaN(date.getTime())) return undefined
+    return date.toISOString()
+  }
+  return asIsoTimestamp(value)
 }
 
 /**
@@ -643,4 +689,114 @@ export function sanitizeShadowSettingsInput(raw) {
     return { ok: false, field: 'autoRecord' }
   }
   return { ok: true, value: { autoRecord: raw.autoRecord } }
+}
+
+/**
+ * @param {object} raw
+ * @param {{ partial?: boolean }} [options]
+ * @returns {{ ok: true, value: object } | { ok: false, field: string }}
+ */
+export function sanitizeChartAnnotationInput(raw, options = {}) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+
+  const partial = options.partial === true
+  /** @type {object} */
+  const value = {}
+
+  if (!partial || raw.symbol != null) {
+    const symbol = asLabSymbol(raw.symbol)
+    if (!symbol) return { ok: false, field: 'symbol' }
+    value.symbol = symbol
+  }
+
+  if (!partial || raw.timeframe != null) {
+    const timeframe = asChartTimeframe(raw.timeframe)
+    if (!timeframe) return { ok: false, field: 'timeframe' }
+    value.timeframe = timeframe
+  }
+
+  if (!partial || raw.annotationType != null) {
+    const annotationType = asChartAnnotationType(raw.annotationType)
+    if (!annotationType) return { ok: false, field: 'annotationType' }
+    value.annotationType = annotationType
+  }
+
+  if (!partial || Object.prototype.hasOwnProperty.call(raw, 'memo')) {
+    if (raw.memo === null || raw.memo === undefined || raw.memo === '') {
+      value.memo = null
+    } else {
+      const memo = optionalText(raw.memo, MAX_NOTE)
+      if (memo === null) return { ok: false, field: 'memo' }
+      value.memo = memo
+    }
+  }
+
+  if (!partial || Object.prototype.hasOwnProperty.call(raw, 'startTime')) {
+    const startTime = asAnnotationTime(raw.startTime)
+    if (startTime === undefined) return { ok: false, field: 'startTime' }
+    value.startTime = startTime
+  }
+  if (!partial || Object.prototype.hasOwnProperty.call(raw, 'endTime')) {
+    const endTime = asAnnotationTime(raw.endTime)
+    if (endTime === undefined) return { ok: false, field: 'endTime' }
+    value.endTime = endTime
+  }
+  if (value.startTime && value.endTime && value.startTime > value.endTime) {
+    return { ok: false, field: 'endTime' }
+  }
+
+  if (!partial || Object.prototype.hasOwnProperty.call(raw, 'price')) {
+    if (raw.price === null || raw.price === undefined || raw.price === '') {
+      value.price = null
+    } else {
+      const price = asPositivePrice(raw.price)
+      if (price == null) return { ok: false, field: 'price' }
+      value.price = price
+    }
+  }
+  if (!partial || Object.prototype.hasOwnProperty.call(raw, 'topPrice')) {
+    if (raw.topPrice === null || raw.topPrice === undefined || raw.topPrice === '') {
+      value.topPrice = null
+    } else {
+      const topPrice = asPositivePrice(raw.topPrice)
+      if (topPrice == null) return { ok: false, field: 'topPrice' }
+      value.topPrice = topPrice
+    }
+  }
+  if (!partial || Object.prototype.hasOwnProperty.call(raw, 'bottomPrice')) {
+    if (raw.bottomPrice === null || raw.bottomPrice === undefined || raw.bottomPrice === '') {
+      value.bottomPrice = null
+    } else {
+      const bottomPrice = asPositivePrice(raw.bottomPrice)
+      if (bottomPrice == null) return { ok: false, field: 'bottomPrice' }
+      value.bottomPrice = bottomPrice
+    }
+  }
+
+  const annotationType = value.annotationType
+  if (annotationType && CHART_LINE_TYPE_SET.has(annotationType)) {
+    if (!partial && value.price == null) return { ok: false, field: 'price' }
+    if (Object.prototype.hasOwnProperty.call(value, 'price') && value.price == null && !partial) {
+      return { ok: false, field: 'price' }
+    }
+    value.topPrice = value.topPrice ?? null
+    value.bottomPrice = value.bottomPrice ?? null
+    if (!partial) {
+      value.topPrice = null
+      value.bottomPrice = null
+    }
+  }
+  if (annotationType && CHART_BOX_TYPE_SET.has(annotationType)) {
+    if (!partial && (value.topPrice == null || value.bottomPrice == null)) {
+      return { ok: false, field: value.topPrice == null ? 'topPrice' : 'bottomPrice' }
+    }
+    if (value.topPrice != null && value.bottomPrice != null && value.topPrice <= value.bottomPrice) {
+      return { ok: false, field: 'topPrice' }
+    }
+    if (!partial) value.price = null
+  }
+
+  return { ok: true, value }
 }

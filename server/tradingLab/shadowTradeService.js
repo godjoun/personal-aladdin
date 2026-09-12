@@ -14,6 +14,7 @@ import {
   classifyShadowRecordType,
   getShadowRecordTypeLabel,
 } from './shadowRecordType.js'
+import { getStrategyCheckByShadowTradeId } from './strategyCheckRepository.js'
 import { assembleMarketStateInput } from './marketStateService.js'
 import { evaluateMarketState } from './marketStateEngine.js'
 import {
@@ -115,18 +116,30 @@ export function attachShadowRiskContext(trade, db) {
  * @param {object} trade
  * @param {number | null} currentPrice
  * @param {import('better-sqlite3').Database} [db]
+ * @param {{
+ *   outcome?: object | null,
+ *   linkedCheck?: object | null,
+ * }} [preloaded]
  */
-export function presentShadowTrade(trade, currentPrice = null, db) {
-  const outcome = getShadowTradeOutcome(trade.id, db)
+export function presentShadowTrade(trade, currentPrice = null, db, preloaded = {}) {
+  const outcome =
+    preloaded.outcome !== undefined
+      ? preloaded.outcome
+      : getShadowTradeOutcome(trade.id, db)
   const recordType =
     trade.recordType ||
     classifyShadowRecordType({
       selectedTags: trade.userTags,
     })
+  const linkedCheck =
+    preloaded.linkedCheck !== undefined
+      ? preloaded.linkedCheck
+      : getStrategyCheckByShadowTradeId(trade.id, db)
   return {
     ...trade,
     recordType,
     recordTypeLabel: getShadowRecordTypeLabel(recordType),
+    linkedAnnotations: linkedCheck?.autoEvidence?.linkedAnnotations || [],
     outcome,
     currentReturnPct: signedReturnPct(
       trade.direction,
@@ -546,25 +559,11 @@ export async function listPresentedShadowTrades(options = {}) {
       priceCache[trade.symbol] = await fetchShadowEntryPrice(trade.symbol)
     }
     const currentPrice = priceCache[trade.symbol] ?? null
-    const recordType =
-      trade.recordType ||
-      classifyShadowRecordType({
-        selectedTags: trade.userTags,
-      })
-    presented.push({
-      ...trade,
-      recordType,
-      recordTypeLabel: getShadowRecordTypeLabel(recordType),
-      outcome: outcomes.get(trade.id) || null,
-      currentReturnPct: signedReturnPct(
-        trade.direction,
-        trade.entryPrice,
-        currentPrice,
-      ),
-      currentPrice,
-      warnings: attachShadowRiskContext(trade, db),
-      disclaimer: SHADOW_TRADE_DISCLAIMER,
-    })
+    presented.push(
+      presentShadowTrade(trade, currentPrice, db, {
+        outcome: outcomes.get(trade.id) || null,
+      }),
+    )
   }
   return presented
 }

@@ -294,6 +294,46 @@ export async function createStrategyShadowTrade(id) {
 }
 
 /**
+ * @param {{ symbol: string, timeframe?: string }} filter
+ */
+export async function fetchChartAnnotations(filter) {
+  const params = new URLSearchParams()
+  params.set('symbol', filter.symbol)
+  if (filter.timeframe) params.set('timeframe', filter.timeframe)
+  return call(`${BASE}/chart-annotations?${params.toString()}`)
+}
+
+/**
+ * @param {object} payload
+ */
+export async function createChartAnnotation(payload) {
+  return call(`${BASE}/chart-annotations`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+/**
+ * @param {string} id
+ * @param {object} payload
+ */
+export async function patchChartAnnotation(id, payload) {
+  return call(`${BASE}/chart-annotations/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+/**
+ * @param {string} id
+ */
+export async function deleteChartAnnotation(id) {
+  return call(`${BASE}/chart-annotations/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+}
+
+/**
  * @param {string} id
  * @param {{ userNote?: string | null, userTags?: string[] }} payload
  */

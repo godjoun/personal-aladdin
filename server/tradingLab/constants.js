@@ -261,3 +261,36 @@ export const STRATEGY_LOCATION_TAGS = Object.freeze([
 export const STRATEGY_RISK_TAGS = Object.freeze(['has_stop', 'has_target', 'fomo'])
 export const STRATEGY_CHECK_DISCLAIMER =
   '시장 관찰 및 기준 점검 도구이며 매수·매도 추천이 아닙니다.'
+
+/** Chart Tools v1 — 사용자가 직접 표시한 구간. 자동 인식/주문 없음 */
+export const CHART_ANNOTATION_TYPES = Object.freeze([
+  'SUPPORT',
+  'RESISTANCE',
+  'SUPPORT_OB',
+  'RESISTANCE_OB',
+  'FVG',
+  'LIQUIDITY_ZONE',
+  'FAKEOUT_ZONE',
+])
+export const CHART_LINE_TYPES = Object.freeze(['SUPPORT', 'RESISTANCE'])
+export const CHART_BOX_TYPES = Object.freeze([
+  'SUPPORT_OB',
+  'RESISTANCE_OB',
+  'FVG',
+  'LIQUIDITY_ZONE',
+  'FAKEOUT_ZONE',
+])
+export const CHART_ANNOTATION_TYPE_SET = new Set(CHART_ANNOTATION_TYPES)
+export const CHART_LINE_TYPE_SET = new Set(CHART_LINE_TYPES)
+export const CHART_BOX_TYPE_SET = new Set(CHART_BOX_TYPES)
+export const CHART_ANNOTATION_LABELS = Object.freeze({
+  SUPPORT: 'support',
+  RESISTANCE: 'resistance',
+  SUPPORT_OB: 'support OB',
+  RESISTANCE_OB: 'resistance OB',
+  FVG: 'FVG',
+  LIQUIDITY_ZONE: 'liquidity',
+  FAKEOUT_ZONE: 'fakeout',
+})
+export const CHART_ANNOTATION_DISCLAIMER =
+  '직접 표시한 차트 근거이며 매수·매도 추천이 아닙니다. 실제 주문은 없습니다.'

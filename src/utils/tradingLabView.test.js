@@ -75,6 +75,13 @@ import {
   buildShadowEntryMarkers,
   getChartDataState,
   getShadowRecordTypeMarkerLabel,
+  buildChartPriceLines,
+  buildChartBoxes,
+  defaultAnnotationDraftFromCandles,
+  summarizeChartAnnotationReview,
+  formatLinkedAnnotationLabels,
+  getChartAnnotationLabel,
+  CHART_ANNOTATION_EMPTY_STATS,
 } from './tradingLabView.js'
 
 describe('bias / outcome 표시', () => {
@@ -548,5 +555,72 @@ describe('Shadow Trading 표시', () => {
     expect(getShadowRecordTypeMarkerLabel('STRATEGY')).toBe('기준')
     expect(getShadowRecordTypeMarkerLabel('IMPULSE')).toBe('충동')
     expect(getShadowRecordTypeMarkerLabel('OBSERVATION')).toBe('관찰')
+  })
+
+  it('chart annotation 오버레이와 복기 요약을 만든다', () => {
+    const candles = [
+      { timestamp: '2026-09-12T00:00:00.000Z', open: 1, high: 3, low: 1, close: 2 },
+      { timestamp: '2026-09-12T01:00:00.000Z', open: 2, high: 4, low: 2, close: 3 },
+    ]
+    expect(defaultAnnotationDraftFromCandles(candles, 20)).toMatchObject({
+      price: 3,
+      topPrice: 4,
+      bottomPrice: 1,
+    })
+    expect(
+      buildChartPriceLines([
+        { id: 's', annotationType: 'SUPPORT', price: 65000 },
+        { id: 'f', annotationType: 'FVG', topPrice: 2, bottomPrice: 1 },
+      ]),
+    ).toEqual([
+      expect.objectContaining({ price: 65000, title: 'support' }),
+    ])
+    expect(
+      buildChartBoxes([
+        {
+          id: 'ob',
+          annotationType: 'SUPPORT_OB',
+          startTime: '2026-09-12T00:00:00.000Z',
+          endTime: '2026-09-12T01:00:00.000Z',
+          topPrice: 66000,
+          bottomPrice: 65000,
+        },
+      ]),
+    ).toEqual([
+      expect.objectContaining({
+        label: 'support OB',
+        topPrice: 66000,
+        bottomPrice: 65000,
+      }),
+    ])
+    expect(getChartAnnotationLabel('LIQUIDITY_ZONE')).toBe('liquidity')
+    expect(
+      formatLinkedAnnotationLabels([
+        { annotationType: 'FVG' },
+        { annotationType: 'SUPPORT_OB' },
+        { annotationType: 'FVG' },
+      ]),
+    ).toEqual(['FVG', 'support OB'])
+
+    const empty = summarizeChartAnnotationReview([])
+    expect(empty.empty).toBe(true)
+    expect(CHART_ANNOTATION_EMPTY_STATS).toBe('데이터 쌓는 중')
+
+    const review = summarizeChartAnnotationReview([
+      {
+        linkedAnnotations: [{ annotationType: 'FVG' }, { annotationType: 'SUPPORT_OB' }],
+        outcome: { result: 'WIN' },
+      },
+      {
+        linkedAnnotations: [{ annotationType: 'FVG' }],
+        outcome: { result: 'UNRESOLVED' },
+      },
+    ])
+    expect(review.lines).toEqual([
+      'support OB 기반 기록 1개',
+      'FVG 기반 기록 2개',
+    ])
+    expect(review.outcomeLinkedCount).toBe(1)
+    expect(JSON.stringify(review)).not.toMatch(/승률|매수하세요/)
   })
 })

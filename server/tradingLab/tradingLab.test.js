@@ -29,9 +29,12 @@ import {
   asCvdWindow,
   asLabSymbol,
   asChartTimeframe,
+  asChartAnnotationType,
+  asPositivePrice,
   asLabTimeframe,
   asListLimit,
   sanitizeAnalysisInput,
+  sanitizeChartAnnotationInput,
   sanitizeLiquidationInput,
   sanitizeOutcomeInput,
   sanitizeScreenshotInput,
@@ -102,6 +105,57 @@ describe('Trading Lab 입력 검증', () => {
     expect(asChartTimeframe('12h')).toBeNull()
     expect(asChartTimeframe('1d')).toBeNull()
     expect(asChartTimeframe('3m')).toBeNull()
+  })
+
+  it('chart annotation 입력은 허용값과 양수 가격만 받는다', () => {
+    expect(asChartAnnotationType('support_ob')).toBe('SUPPORT_OB')
+    expect(asChartAnnotationType('TRENDLINE')).toBeNull()
+    expect(asPositivePrice(65000)).toBe(65000)
+    expect(asPositivePrice(0)).toBeNull()
+    expect(asPositivePrice(-12)).toBeNull()
+    expect(
+      sanitizeChartAnnotationInput({
+        symbol: 'SOLUSDT',
+        timeframe: '15m',
+        annotationType: 'SUPPORT',
+        price: 100,
+      }).field,
+    ).toBe('symbol')
+    expect(
+      sanitizeChartAnnotationInput({
+        symbol: 'BTCUSDT',
+        timeframe: '12h',
+        annotationType: 'SUPPORT',
+        price: 100,
+      }).field,
+    ).toBe('timeframe')
+    expect(
+      sanitizeChartAnnotationInput({
+        symbol: 'BTCUSDT',
+        timeframe: '15m',
+        annotationType: 'TREND',
+        price: 100,
+      }).field,
+    ).toBe('annotationType')
+    expect(
+      sanitizeChartAnnotationInput({
+        symbol: 'BTCUSDT',
+        timeframe: '15m',
+        annotationType: 'SUPPORT',
+        price: -1,
+      }).field,
+    ).toBe('price')
+    expect(
+      sanitizeChartAnnotationInput({
+        symbol: 'ETHUSDT',
+        timeframe: '1h',
+        annotationType: 'FVG',
+        topPrice: 2600,
+        bottomPrice: 2500,
+        startTime: '2026-09-12T00:00:00.000Z',
+        endTime: '2026-09-12T01:00:00.000Z',
+      }).ok,
+    ).toBe(true)
   })
 
   it('CVD window 는 5m/15m/1h/4h 만 허용한다', () => {

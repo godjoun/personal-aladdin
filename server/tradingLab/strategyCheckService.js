@@ -17,7 +17,7 @@ import {
   countShadowTradesSince,
   listRecentClosedResults,
 } from './shadowTradeRepository.js'
-import { createManualShadowTrade } from './shadowTradeService.js'
+import { createManualShadowTrade, presentShadowTrade } from './shadowTradeService.js'
 import {
   classifyShadowRecordType,
   getShadowRecordTypeLabel,
@@ -33,6 +33,7 @@ import {
   listStrategyChecks,
   updateStrategyCheckShadowTradeId,
 } from './strategyCheckRepository.js'
+import { listChartAnnotations } from './chartAnnotationRepository.js'
 
 /**
  * @param {object} row
@@ -55,6 +56,7 @@ export function presentStrategyCheck(row, evaluation = null) {
     confirmedEvidence: evaluation?.confirmedEvidence || [],
     recordType,
     recordTypeLabel: getShadowRecordTypeLabel(recordType),
+    linkedAnnotations: row.autoEvidence?.linkedAnnotations || [],
     disclaimer: STRATEGY_CHECK_DISCLAIMER,
   }
 }
@@ -105,6 +107,10 @@ export async function createStrategyCheck(input, options = {}) {
     primaryState: marketEval?.primaryState ?? null,
     sameDirectionCount30m,
     recentClosedResults,
+    annotations:
+      options.annotations
+      ?? listChartAnnotations({ symbol: input.symbol }, db),
+    referencePrice: assembled.referencePrice ?? null,
   })
 
   const row = insertStrategyCheck(
@@ -155,6 +161,8 @@ export async function createShadowTradeFromStrategyCheck(id, options = {}) {
     primaryState: snapshot.primaryState ?? check.autoEvidence?.primaryState,
     sameDirectionCount30m: check.autoEvidence?.sameDirectionCount30m,
     recentClosedResults: check.autoEvidence?.recentClosedResults,
+    linkedAnnotations: check.autoEvidence?.linkedAnnotations,
+    referencePrice: snapshot.referencePrice ?? null,
   })
   const presented = presentStrategyCheck(check, evaluation)
   const userNote = buildStrategyShadowNote(evaluation)
@@ -201,7 +209,11 @@ export async function createShadowTradeFromStrategyCheck(id, options = {}) {
   return {
     ok: true,
     check: presentStrategyCheck(linked, evaluation),
-    trade: created.trade,
+    trade: presentShadowTrade(
+      created.trade,
+      created.trade.entryPrice ?? options.currentPrice ?? snapshot.referencePrice ?? null,
+      db,
+    ),
     presented,
   }
 }
@@ -219,6 +231,8 @@ export function listPresentedStrategyChecks(params = {}, db) {
       primaryState: row.autoEvidence?.primaryState,
       sameDirectionCount30m: row.autoEvidence?.sameDirectionCount30m,
       recentClosedResults: row.autoEvidence?.recentClosedResults,
+      linkedAnnotations: row.autoEvidence?.linkedAnnotations,
+      referencePrice: row.marketStateSnapshot?.referencePrice ?? null,
     })
     return presentStrategyCheck(row, evaluation)
   })

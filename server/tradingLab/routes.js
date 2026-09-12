@@ -37,6 +37,9 @@ import {
   STRATEGY_SCORE_LABEL,
   STRATEGY_LOCATION_TAGS,
   STRATEGY_RISK_TAGS,
+  CHART_ANNOTATION_TYPES,
+  CHART_ANNOTATION_LABELS,
+  CHART_ANNOTATION_DISCLAIMER,
 } from './constants.js'
 import {
   asBias,
@@ -54,6 +57,7 @@ import {
   sanitizeShadowTradeInput,
   sanitizeShadowTradePatch,
   sanitizeStrategyCheckInput,
+  sanitizeChartAnnotationInput,
 } from './validate.js'
 import {
   createAnalysis,
@@ -107,6 +111,13 @@ import {
   createStrategyCheck,
   listPresentedStrategyChecks,
 } from './strategyCheckService.js'
+import {
+  getChartAnnotationById,
+  insertChartAnnotation,
+  listChartAnnotations,
+  softDeleteChartAnnotation,
+  updateChartAnnotation,
+} from './chartAnnotationRepository.js'
 
 /**
  * @param {import('express').Response} res
@@ -172,6 +183,9 @@ export function createTradingLabRouter() {
       strategyLocationTags: STRATEGY_LOCATION_TAGS,
       strategyRiskTags: STRATEGY_RISK_TAGS,
       strategyCheckDisclaimer: STRATEGY_CHECK_DISCLAIMER,
+      chartAnnotationTypes: CHART_ANNOTATION_TYPES,
+      chartAnnotationLabels: CHART_ANNOTATION_LABELS,
+      chartAnnotationDisclaimer: CHART_ANNOTATION_DISCLAIMER,
       marketDataConfigured: isMarketDataConfigured(),
     })
   })
@@ -237,6 +251,120 @@ export function createTradingLabRouter() {
       })
     } catch {
       console.error('[TradingLab] market candles failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/chart-annotations', (req, res) => {
+    const symbol = asLabSymbol(req.query.symbol)
+    if (!symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+    const timeframe =
+      req.query.timeframe != null && req.query.timeframe !== ''
+        ? asChartTimeframe(req.query.timeframe)
+        : null
+    if (req.query.timeframe != null && req.query.timeframe !== '' && !timeframe) {
+      badRequest(res, 'timeframe')
+      return
+    }
+
+    try {
+      res.status(200).json({
+        ok: true,
+        symbol,
+        timeframe,
+        annotations: listChartAnnotations({ symbol, timeframe }),
+        disclaimer: CHART_ANNOTATION_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] list chart annotations failed')
+      serverError(res)
+    }
+  })
+
+  router.post('/chart-annotations', (req, res) => {
+    const parsed = sanitizeChartAnnotationInput(req.body)
+    if (!parsed.ok) {
+      badRequest(res, parsed.field)
+      return
+    }
+
+    try {
+      const annotation = insertChartAnnotation(parsed.value)
+      res.status(201).json({
+        ok: true,
+        annotation,
+        disclaimer: CHART_ANNOTATION_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] create chart annotation failed')
+      serverError(res)
+    }
+  })
+
+  router.patch('/chart-annotations/:id', (req, res) => {
+    const id = asId(req.params.id)
+    if (!id) {
+      badRequest(res, 'id')
+      return
+    }
+    const parsed = sanitizeChartAnnotationInput(req.body, { partial: true })
+    if (!parsed.ok) {
+      badRequest(res, parsed.field)
+      return
+    }
+
+    try {
+      const current = getChartAnnotationById(id)
+      if (!current || current.deletedAt) {
+        res.status(404).json({ ok: false, message: 'Not found' })
+        return
+      }
+      const merged = sanitizeChartAnnotationInput(
+        { ...current, ...parsed.value },
+      )
+      if (!merged.ok) {
+        badRequest(res, merged.field)
+        return
+      }
+      const annotation = updateChartAnnotation(id, merged.value)
+      if (!annotation) {
+        res.status(404).json({ ok: false, message: 'Not found' })
+        return
+      }
+      res.status(200).json({
+        ok: true,
+        annotation,
+        disclaimer: CHART_ANNOTATION_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] patch chart annotation failed')
+      serverError(res)
+    }
+  })
+
+  router.delete('/chart-annotations/:id', (req, res) => {
+    const id = asId(req.params.id)
+    if (!id) {
+      badRequest(res, 'id')
+      return
+    }
+
+    try {
+      const annotation = softDeleteChartAnnotation(id)
+      if (!annotation) {
+        res.status(404).json({ ok: false, message: 'Not found' })
+        return
+      }
+      res.status(200).json({
+        ok: true,
+        annotation,
+        disclaimer: CHART_ANNOTATION_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] delete chart annotation failed')
       serverError(res)
     }
   })

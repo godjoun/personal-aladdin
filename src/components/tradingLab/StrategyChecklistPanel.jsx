@@ -307,6 +307,17 @@ export default function StrategyChecklistPanel({
             </div>
           ) : null}
 
+          {check.linkedAnnotations?.length ? (
+            <div className="trading-lab__strategy-block">
+              <h3>차트에서 감지된 근거</h3>
+              <ul className="trading-lab__reason-list">
+                {check.linkedAnnotations.map((item) => (
+                  <li key={item.id || item.evidence}>{item.evidence}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           {check.confirmedEvidence?.length ? (
             <div className="trading-lab__strategy-block">
               <h3>확인된 근거</h3>

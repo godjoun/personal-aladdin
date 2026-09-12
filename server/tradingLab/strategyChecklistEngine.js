@@ -13,6 +13,7 @@ import {
   SHADOW_OBSERVE_STATES,
 } from './constants.js'
 import { STRATEGY_CHECKLIST_THRESHOLDS as T } from './strategyChecklistThresholds.js'
+import { matchChartAnnotations } from './chartAnnotationMatch.js'
 
 const LONG_PRIMARY_TAGS = Object.freeze(['support', 'support_ob'])
 const SHORT_PRIMARY_TAGS = Object.freeze(['resistance', 'resistance_ob'])
@@ -59,6 +60,9 @@ function formatVolumeEvidence(volumeRatio) {
  *   primaryState?: string | null,
  *   sameDirectionCount30m?: number,
  *   recentClosedResults?: string[],
+ *   annotations?: object[],
+ *   linkedAnnotations?: object[],
+ *   referencePrice?: number | null,
  * }} input
  */
 export function evaluateStrategyChecklist(input) {
@@ -253,6 +257,20 @@ export function evaluateStrategyChecklist(input) {
     riskWarnings.push('최근 완료 Shadow Trade 가 연속 LOSS 입니다.')
   }
 
+  const linkedAnnotations =
+    Array.isArray(input.linkedAnnotations) && input.linkedAnnotations.length > 0
+      ? input.linkedAnnotations
+      : matchChartAnnotations({
+          annotations: input.annotations,
+          price: asFinite(input.referencePrice ?? assembled.referencePrice),
+          direction,
+        })
+  for (const item of linkedAnnotations) {
+    if (item?.evidence && !confirmedEvidence.includes(item.evidence)) {
+      confirmedEvidence.push(item.evidence)
+    }
+  }
+
   const score = htf + location + market + risk
   let result = 'NOT_READY'
   if (hasFomo || !hasStop || excessiveReentry || consecutiveLoss) {
@@ -297,6 +315,7 @@ export function evaluateStrategyChecklist(input) {
         ? input.recentClosedResults
         : [],
       liquidationWatch,
+      linkedAnnotations,
     },
     disclaimer: STRATEGY_CHECK_DISCLAIMER,
   }

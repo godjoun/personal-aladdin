@@ -294,6 +294,25 @@ export function migrateTradingLab(db) {
 
     CREATE INDEX IF NOT EXISTS idx_strategy_check_symbol_checked
       ON strategy_check(symbol, checkedAt DESC);
+
+    CREATE TABLE IF NOT EXISTS chart_annotation (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      timeframe TEXT NOT NULL,
+      annotationType TEXT NOT NULL,
+      startTime TEXT,
+      endTime TEXT,
+      price REAL,
+      topPrice REAL,
+      bottomPrice REAL,
+      memo TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL,
+      deletedAt TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_chart_annotation_symbol_tf
+      ON chart_annotation(symbol, timeframe, createdAt DESC);
   `)
 
   addColumnIfMissing(db, 'shadow_trade', 'recordType', 'TEXT')

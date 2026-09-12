@@ -94,6 +94,18 @@ export function updateStrategyCheckShadowTradeId(id, shadowTradeId, db = getDb()
 }
 
 /**
+ * @param {string} shadowTradeId
+ * @param {import('better-sqlite3').Database} [db]
+ */
+export function getStrategyCheckByShadowTradeId(shadowTradeId, db = getDb()) {
+  if (!shadowTradeId) return null
+  const row = db
+    .prepare(`SELECT * FROM strategy_check WHERE shadowTradeId = ?`)
+    .get(shadowTradeId)
+  return mapStrategyCheck(row)
+}
+
+/**
  * @param {{ symbol?: string, limit?: number }} [params]
  * @param {import('better-sqlite3').Database} [db]
  */

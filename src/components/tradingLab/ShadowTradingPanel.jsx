@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { patchShadowTrade } from '../../services/tradingLabApi.js'
 import {
   NO_DATA_LABEL,
@@ -17,6 +17,9 @@ import {
   getShadowTagLabel,
   splitShadowTrades,
   summarizeShadowReview,
+  summarizeChartAnnotationReview,
+  formatLinkedAnnotationLabels,
+  CHART_ANNOTATION_EMPTY_STATS,
 } from '../../utils/tradingLabView.js'
 
 /**
@@ -41,6 +44,7 @@ export default function ShadowTradingPanel({
   const autoOn = Boolean(settings?.autoRecord)
   const { open, closed } = splitShadowTrades(trades)
   const review = summarizeShadowReview(trades, stats)
+  const annotationReview = summarizeChartAnnotationReview(trades)
   const warnings = [
     ...(stats?.warnings || []),
     ...open.flatMap((trade) => trade.warnings || []),
@@ -106,6 +110,12 @@ export default function ShadowTradingPanel({
             </p>
           </>
         )}
+        {formatLinkedAnnotationLabels(trade.linkedAnnotations).length > 0 ? (
+          <p>
+            연결된 차트 근거:{' '}
+            {formatLinkedAnnotationLabels(trade.linkedAnnotations).join(' · ')}
+          </p>
+        ) : null}
         {Array.isArray(trade.userTags) && trade.userTags.length > 0 ? (
           <p>{trade.userTags.map((tag) => getShadowTagLabel(tag)).join(', ')}</p>
         ) : null}
@@ -222,6 +232,21 @@ export default function ShadowTradingPanel({
         {review.fomoCount > 0 ? (
           <p>최근 FOMO 기록 {review.fomoCount}건 결과 확인 필요</p>
         ) : null}
+        <div aria-label="차트 근거 복기">
+          <h3>차트 근거</h3>
+          {annotationReview.empty ? (
+            <p>{CHART_ANNOTATION_EMPTY_STATS}</p>
+          ) : (
+            <>
+              {annotationReview.lines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+              {annotationReview.outcomeLinkedCount > 0 ? (
+                <p>결과 연결된 차트 근거 기록 {annotationReview.outcomeLinkedCount}건</p>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
 
       {message ? <p className="trading-lab__shadow-toast">{message}</p> : null}

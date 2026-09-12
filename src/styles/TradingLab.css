@@ -1073,6 +1073,56 @@
   opacity: 0;
 }
 
+.trading-lab__chart-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.trading-lab__chart-tools h3 {
+  margin: 0.15rem 0 0;
+  font-size: 0.92rem;
+}
+
+.trading-lab__chart-tool-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.45rem 0.65rem;
+  align-items: end;
+}
+
+.trading-lab__chart-tool-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.trading-lab__chart-tool-form input {
+  min-height: 2.1rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+.trading-lab__chart-annotation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.trading-lab__chart-annotation-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.86rem;
+}
+
 .trading-lab__chart-empty {
   position: absolute;
   inset: 0;

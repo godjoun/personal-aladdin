@@ -84,6 +84,54 @@ export const COMMAND_STATUS_LABELS = Object.freeze({
 })
 export const CHART_VIEW_DISCLAIMER =
   'Bybit 공개 캔들 관측용 차트이며 실제 주문은 없습니다.'
+export const CHART_TOOLS_TITLE = '차트 도구'
+export const CHART_ANNOTATION_DISCLAIMER =
+  '직접 표시한 차트 근거이며 매수·매도 추천이 아닙니다. 실제 주문은 없습니다.'
+export const CHART_ANNOTATION_EMPTY_STATS = '데이터 쌓는 중'
+export const CHART_ANNOTATION_TYPES = Object.freeze([
+  'SUPPORT',
+  'RESISTANCE',
+  'SUPPORT_OB',
+  'RESISTANCE_OB',
+  'FVG',
+  'LIQUIDITY_ZONE',
+  'FAKEOUT_ZONE',
+])
+export const CHART_LINE_TYPES = Object.freeze(['SUPPORT', 'RESISTANCE'])
+export const CHART_BOX_TYPES = Object.freeze([
+  'SUPPORT_OB',
+  'RESISTANCE_OB',
+  'FVG',
+  'LIQUIDITY_ZONE',
+  'FAKEOUT_ZONE',
+])
+export const CHART_ANNOTATION_LABELS = Object.freeze({
+  SUPPORT: 'support',
+  RESISTANCE: 'resistance',
+  SUPPORT_OB: 'support OB',
+  RESISTANCE_OB: 'resistance OB',
+  FVG: 'FVG',
+  LIQUIDITY_ZONE: 'liquidity',
+  FAKEOUT_ZONE: 'fakeout',
+})
+export const CHART_ANNOTATION_COLORS = Object.freeze({
+  SUPPORT: '#1a7f37',
+  RESISTANCE: '#cf222e',
+  SUPPORT_OB: 'rgba(26, 127, 55, 0.16)',
+  RESISTANCE_OB: 'rgba(207, 34, 46, 0.16)',
+  FVG: 'rgba(130, 80, 223, 0.16)',
+  LIQUIDITY_ZONE: 'rgba(9, 105, 218, 0.16)',
+  FAKEOUT_ZONE: 'rgba(191, 135, 0, 0.18)',
+})
+export const CHART_ANNOTATION_LINE_COLORS = Object.freeze({
+  SUPPORT: '#1a7f37',
+  RESISTANCE: '#cf222e',
+  SUPPORT_OB: '#1a7f37',
+  RESISTANCE_OB: '#cf222e',
+  FVG: '#8250df',
+  LIQUIDITY_ZONE: '#0969da',
+  FAKEOUT_ZONE: '#9a6700',
+})
 export const STRATEGY_SCORE_LABEL = '기준 충족도'
 export const STRATEGY_LOCATION_TAGS = Object.freeze([
   'support',
@@ -1058,4 +1106,155 @@ export function buildShadowEntryMarkers(trades, candles, symbol) {
   }
 
   return markers.sort((left, right) => left.time - right.time)
+}
+
+/**
+ * @param {string | null | undefined} annotationType
+ */
+export function getChartAnnotationLabel(annotationType) {
+  return CHART_ANNOTATION_LABELS[annotationType] || annotationType || ''
+}
+
+/**
+ * @param {string | null | undefined} annotationType
+ */
+export function isChartLineType(annotationType) {
+  return CHART_LINE_TYPES.includes(annotationType)
+}
+
+/**
+ * @param {string | null | undefined} annotationType
+ */
+export function isChartBoxType(annotationType) {
+  return CHART_BOX_TYPES.includes(annotationType)
+}
+
+/**
+ * 최근 N개 캔들로 박스 초안을 만든다.
+ *
+ * @param {unknown} candles
+ * @param {number} [count]
+ */
+export function defaultAnnotationDraftFromCandles(candles, count = 20) {
+  const chartCandles = toChartCandles(candles)
+  if (chartCandles.length === 0) {
+    return {
+      price: null,
+      topPrice: null,
+      bottomPrice: null,
+      startTime: null,
+      endTime: null,
+    }
+  }
+  const slice = chartCandles.slice(-Math.max(1, count))
+  let top = slice[0].high
+  let bottom = slice[0].low
+  for (const candle of slice) {
+    if (candle.high > top) top = candle.high
+    if (candle.low < bottom) bottom = candle.low
+  }
+  const last = chartCandles[chartCandles.length - 1]
+  return {
+    price: last.close,
+    topPrice: top,
+    bottomPrice: bottom,
+    startTime: new Date(slice[0].time * 1000).toISOString(),
+    endTime: new Date(slice[slice.length - 1].time * 1000).toISOString(),
+  }
+}
+
+/**
+ * @param {unknown} annotations
+ */
+export function buildChartPriceLines(annotations) {
+  const rows = Array.isArray(annotations) ? annotations : []
+  return rows
+    .filter((item) => isChartLineType(item?.annotationType) && Number(item.price) > 0)
+    .map((item) => ({
+      id: item.id,
+      price: Number(item.price),
+      color: CHART_ANNOTATION_LINE_COLORS[item.annotationType] || '#57606a',
+      lineWidth: 2,
+      lineStyle: 2,
+      axisLabelVisible: true,
+      title: getChartAnnotationLabel(item.annotationType),
+    }))
+}
+
+/**
+ * @param {unknown} annotations
+ */
+export function buildChartBoxes(annotations) {
+  const rows = Array.isArray(annotations) ? annotations : []
+  const boxes = []
+  for (const item of rows) {
+    if (!isChartBoxType(item?.annotationType)) continue
+    const top = Number(item.topPrice)
+    const bottom = Number(item.bottomPrice)
+    const start = toUnixSeconds(item.startTime)
+    const end = toUnixSeconds(item.endTime)
+    if (!(top > 0) || !(bottom > 0) || start == null || end == null) continue
+    boxes.push({
+      id: item.id,
+      startTime: Math.min(start, end),
+      endTime: Math.max(start, end),
+      topPrice: Math.max(top, bottom),
+      bottomPrice: Math.min(top, bottom),
+      color: CHART_ANNOTATION_COLORS[item.annotationType] || 'rgba(87, 96, 106, 0.14)',
+      borderColor: CHART_ANNOTATION_LINE_COLORS[item.annotationType] || '#57606a',
+      label: getChartAnnotationLabel(item.annotationType),
+    })
+  }
+  return boxes
+}
+
+/**
+ * @param {unknown} linked
+ */
+export function formatLinkedAnnotationLabels(linked) {
+  const rows = Array.isArray(linked) ? linked : []
+  const labels = []
+  for (const item of rows) {
+    const label = item?.label || getChartAnnotationLabel(item?.annotationType)
+    if (label && !labels.includes(label)) labels.push(label)
+  }
+  return labels
+}
+
+/**
+ * annotationType 별 가상 기록 수. 승률은 계산하지 않는다.
+ *
+ * @param {unknown} trades
+ */
+export function summarizeChartAnnotationReview(trades) {
+  const rows = Array.isArray(trades) ? trades : []
+  /** @type {Record<string, number>} */
+  const counts = {}
+  let linkedTradeCount = 0
+  let outcomeLinkedCount = 0
+  for (const trade of rows) {
+    const types = new Set(
+      (Array.isArray(trade?.linkedAnnotations) ? trade.linkedAnnotations : [])
+        .map((item) => item?.annotationType)
+        .filter(Boolean),
+    )
+    if (types.size === 0) continue
+    linkedTradeCount += 1
+    if (trade?.outcome?.result && trade.outcome.result !== 'UNRESOLVED') {
+      outcomeLinkedCount += 1
+    }
+    for (const type of types) {
+      counts[type] = (counts[type] || 0) + 1
+    }
+  }
+  const lines = CHART_ANNOTATION_TYPES.filter((type) => counts[type] > 0).map(
+    (type) => `${getChartAnnotationLabel(type)} 기반 기록 ${counts[type]}개`,
+  )
+  return {
+    counts,
+    lines,
+    linkedTradeCount,
+    outcomeLinkedCount,
+    empty: lines.length === 0,
+  }
 }

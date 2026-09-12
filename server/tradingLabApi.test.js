@@ -1170,6 +1170,126 @@ describe('Trading Lab API', () => {
     expect(noStop.json.check.missingItems).toContain('손절 기준이 없습니다.')
   })
 
+  it('chart annotation 을 저장하고 잘못된 입력을 거부한다', async () => {
+    await login()
+    const created = await request(
+      'POST',
+      '/api/trading-lab/chart-annotations',
+      authed({
+        symbol: 'BTCUSDT',
+        timeframe: '15m',
+        annotationType: 'SUPPORT',
+        price: 65000,
+        memo: 'local support',
+      }),
+    )
+    expect(created.status).toBe(201)
+    expect(created.json.annotation.annotationType).toBe('SUPPORT')
+    expect(created.json.annotation.price).toBe(65000)
+    expect(created.json.disclaimer).not.toMatch(/매수하세요|자동매매/)
+
+    const listed = await request(
+      'GET',
+      '/api/trading-lab/chart-annotations?symbol=BTCUSDT&timeframe=15m',
+    )
+    expect(listed.status).toBe(200)
+    expect(listed.json.annotations).toHaveLength(1)
+    expect(listed.json.annotations[0].id).toBe(created.json.annotation.id)
+
+    const otherTf = await request(
+      'GET',
+      '/api/trading-lab/chart-annotations?symbol=BTCUSDT&timeframe=1h',
+    )
+    expect(otherTf.status).toBe(200)
+    expect(otherTf.json.annotations).toHaveLength(0)
+
+    const patched = await request(
+      'PATCH',
+      `/api/trading-lab/chart-annotations/${created.json.annotation.id}`,
+      authed({ memo: 'updated memo' }),
+    )
+    expect(patched.status).toBe(200)
+    expect(patched.json.annotation.memo).toBe('updated memo')
+
+    const badSymbol = await request(
+      'POST',
+      '/api/trading-lab/chart-annotations',
+      authed({
+        symbol: 'SOLUSDT',
+        timeframe: '15m',
+        annotationType: 'SUPPORT',
+        price: 100,
+      }),
+    )
+    expect(badSymbol.status).toBe(400)
+    expect(badSymbol.json.field).toBe('symbol')
+
+    const badTf = await request(
+      'GET',
+      '/api/trading-lab/chart-annotations?symbol=BTCUSDT&timeframe=12h',
+    )
+    expect(badTf.status).toBe(400)
+    expect(badTf.json.field).toBe('timeframe')
+
+    const badType = await request(
+      'POST',
+      '/api/trading-lab/chart-annotations',
+      authed({
+        symbol: 'ETHUSDT',
+        timeframe: '1h',
+        annotationType: 'TRENDLINE',
+        price: 2500,
+      }),
+    )
+    expect(badType.status).toBe(400)
+    expect(badType.json.field).toBe('annotationType')
+
+    const negative = await request(
+      'POST',
+      '/api/trading-lab/chart-annotations',
+      authed({
+        symbol: 'ETHUSDT',
+        timeframe: '4h',
+        annotationType: 'RESISTANCE',
+        price: -12,
+      }),
+    )
+    expect(negative.status).toBe(400)
+    expect(negative.json.field).toBe('price')
+
+    const box = await request(
+      'POST',
+      '/api/trading-lab/chart-annotations',
+      authed({
+        symbol: 'ETHUSDT',
+        timeframe: '4h',
+        annotationType: 'LIQUIDITY_ZONE',
+        topPrice: 2700,
+        bottomPrice: 2500,
+        startTime: '2026-09-12T00:00:00.000Z',
+        endTime: '2026-09-12T04:00:00.000Z',
+      }),
+    )
+    expect(box.status).toBe(201)
+    const ethList = await request(
+      'GET',
+      '/api/trading-lab/chart-annotations?symbol=ETHUSDT&timeframe=4h',
+    )
+    expect(ethList.json.annotations).toHaveLength(1)
+
+    const removed = await request(
+      'DELETE',
+      `/api/trading-lab/chart-annotations/${created.json.annotation.id}`,
+      authed({}),
+    )
+    expect(removed.status).toBe(200)
+    const afterDelete = await request(
+      'GET',
+      '/api/trading-lab/chart-annotations?symbol=BTCUSDT&timeframe=15m',
+    )
+    expect(afterDelete.json.annotations).toHaveLength(0)
+  })
+
   it('오류 응답에 내부 경로·secret 을 노출하지 않는다', async () => {
     await login()
     const res = await request('GET', '/api/trading-lab/market/SOLUSDT')

@@ -249,6 +249,13 @@ describe('로컬 bypass 활성 서버', () => {
     const shadowList = await request('GET', '/api/trading-lab/shadow-trades')
     expect(shadowList.status).toBe(200)
     expect(Array.isArray(shadowList.json.trades)).toBe(true)
+
+    const annotations = await request(
+      'GET',
+      '/api/trading-lab/chart-annotations?symbol=BTCUSDT&timeframe=1h',
+    )
+    expect(annotations.status).toBe(200)
+    expect(Array.isArray(annotations.json.annotations)).toBe(true)
   })
 
   it('bypass 상태에서도 CSRF 는 계속 요구한다', async () => {
@@ -311,6 +318,19 @@ describe('로컬 bypass 활성 서버', () => {
     })
     expect(strategy.status).toBe(201)
     expect(strategy.json.check.strategyVersion).toBe('my_strategy_v1')
+
+    const annotation = await request('POST', '/api/trading-lab/chart-annotations', {
+      body: {
+        symbol: 'BTCUSDT',
+        timeframe: '1h',
+        annotationType: 'SUPPORT',
+        price: 65000,
+      },
+      headers: { [CSRF_HEADER]: jar[CSRF_COOKIE] },
+      origin: ORIGIN,
+    })
+    expect(annotation.status).toBe(201)
+    expect(annotation.json.annotation.annotationType).toBe('SUPPORT')
   })
 
   it('bypass 상태에서도 입력 검증은 그대로 적용된다', async () => {

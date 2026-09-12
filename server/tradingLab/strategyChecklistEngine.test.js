@@ -49,6 +49,7 @@ describe('evaluateStrategyChecklist', () => {
     expect(result.scoreLabel).toBe('기준 충족도')
     expect(result.score).toBeGreaterThanOrEqual(T.READY_MIN)
     expect(result.disclaimer).not.toMatch(/승률|수익 확률/)
+    expect(result.autoEvidence.linkedAnnotations).toEqual([])
     expect(result.confirmedEvidence).toEqual(
       expect.arrayContaining([
         'support 태그 선택됨',
@@ -298,5 +299,39 @@ describe('evaluateStrategyChecklist', () => {
     expect(result.resultLabel).toBe('기준 부족')
     expect(result.score).toBeGreaterThanOrEqual(T.NOT_READY_MIN)
     expect(result.score).toBeLessThan(T.READY_MIN)
+  })
+
+  it('현재 가격이 annotation 근처면 차트 근거로 표시한다', () => {
+    const result = evaluateStrategyChecklist({
+      direction: 'LONG',
+      selectedTags: ['has_stop', 'has_target'],
+      assembled: assembled({ referencePrice: 65000 }),
+      annotations: [
+        {
+          id: 'sup',
+          annotationType: 'SUPPORT',
+          timeframe: '1h',
+          price: 64950,
+        },
+        {
+          id: 'ob',
+          annotationType: 'SUPPORT_OB',
+          timeframe: '15m',
+          topPrice: 65100,
+          bottomPrice: 64800,
+        },
+      ],
+    })
+    expect(result.autoEvidence.linkedAnnotations.map((item) => item.id)).toEqual([
+      'sup',
+      'ob',
+    ])
+    expect(result.confirmedEvidence).toEqual(
+      expect.arrayContaining([
+        '검토 가능 근거 · support 근처',
+        '검토 가능 근거 · support OB 안',
+      ]),
+    )
+    expect(JSON.stringify(result)).not.toMatch(/매수하세요|매도하세요|승률/)
   })
 })
