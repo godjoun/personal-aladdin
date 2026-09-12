@@ -20,6 +20,15 @@ import {
   TRADING_LAB_TIMEFRAMES,
   MARKET_STATES,
   MARKET_STATE_HISTORY_LIMIT,
+  SHADOW_TRADE_DIRECTIONS,
+  SHADOW_TRADE_SOURCES,
+  SHADOW_TRADE_STATUSES,
+  SHADOW_TRADE_RESULTS,
+  SHADOW_TRADE_TAGS,
+  SHADOW_TRADE_TAG_LABELS,
+  SHADOW_TRADE_DISCLAIMER,
+  SHADOW_ASSUMED_FEE_BPS,
+  SHADOW_ASSUMED_SLIPPAGE_BPS,
 } from './constants.js'
 import {
   asBias,
@@ -32,6 +41,8 @@ import {
   sanitizeLiquidationInput,
   sanitizeOutcomeInput,
   sanitizeScreenshotInput,
+  sanitizeShadowSettingsInput,
+  sanitizeShadowTradeInput,
 } from './validate.js'
 import {
   createAnalysis,
@@ -63,6 +74,17 @@ import {
   evaluateCurrentMarketState,
   getMarketStateHistory,
 } from './marketStateService.js'
+import {
+  createManualShadowTrade,
+  evaluateOpenShadowTrades,
+  getPresentedShadowSettings,
+  getPresentedShadowStats,
+  getPresentedShadowTrade,
+  listPresentedCandidates,
+  listPresentedShadowTrades,
+  processAutoShadowTrades,
+  updatePresentedShadowSettings,
+} from './shadowTradeService.js'
 
 /**
  * @param {import('express').Response} res
@@ -96,6 +118,15 @@ export function createTradingLabRouter() {
       cvdWindows: TRADING_LAB_CVD_WINDOWS,
       marketStates: MARKET_STATES,
       sourceTypes: TRADING_LAB_SOURCE_TYPES,
+      shadowDirections: SHADOW_TRADE_DIRECTIONS,
+      shadowSources: SHADOW_TRADE_SOURCES,
+      shadowStatuses: SHADOW_TRADE_STATUSES,
+      shadowResults: SHADOW_TRADE_RESULTS,
+      shadowTags: SHADOW_TRADE_TAGS,
+      shadowTagLabels: SHADOW_TRADE_TAG_LABELS,
+      shadowDisclaimer: SHADOW_TRADE_DISCLAIMER,
+      assumedFeeBps: SHADOW_ASSUMED_FEE_BPS,
+      assumedSlippageBps: SHADOW_ASSUMED_SLIPPAGE_BPS,
       marketDataConfigured: isMarketDataConfigured(),
     })
   })
@@ -434,6 +465,173 @@ export function createTradingLabRouter() {
       res.status(200).json({ ok: true, ...state })
     } catch {
       console.error('[TradingLab] market state evaluate failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/shadow-trades', async (req, res) => {
+    const symbol = req.query.symbol != null ? asLabSymbol(req.query.symbol) : null
+    if (req.query.symbol != null && !symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+    const status =
+      req.query.status != null
+        ? String(req.query.status).trim().toUpperCase()
+        : null
+    if (req.query.status != null && !SHADOW_TRADE_STATUSES.includes(status)) {
+      badRequest(res, 'status')
+      return
+    }
+    const limit = asListLimit(req.query.limit, 50)
+    if (limit === null) {
+      badRequest(res, 'limit')
+      return
+    }
+
+    try {
+      const trades = await listPresentedShadowTrades({ symbol, status, limit })
+      res.status(200).json({
+        ok: true,
+        trades,
+        settings: getPresentedShadowSettings(),
+        candidates: listPresentedCandidates({ symbol }),
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] list shadow trades failed')
+      serverError(res)
+    }
+  })
+
+  router.post('/shadow-trades', async (req, res) => {
+    const parsed = sanitizeShadowTradeInput(req.body)
+    if (!parsed.ok) {
+      badRequest(res, parsed.field)
+      return
+    }
+
+    try {
+      const created = await createManualShadowTrade(parsed.value)
+      if (!created.ok) {
+        badRequest(res, created.field)
+        return
+      }
+      res.status(201).json({
+        ok: true,
+        trade: created.trade,
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] create shadow trade failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/shadow-trades/stats', (req, res) => {
+    const symbol = req.query.symbol != null ? asLabSymbol(req.query.symbol) : null
+    if (req.query.symbol != null && !symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+
+    try {
+      res.status(200).json({
+        ok: true,
+        stats: getPresentedShadowStats({ symbol }),
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] shadow trade stats failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/shadow-trades/settings', (_req, res) => {
+    try {
+      res.status(200).json({
+        ok: true,
+        settings: getPresentedShadowSettings(),
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] shadow trade settings failed')
+      serverError(res)
+    }
+  })
+
+  router.post('/shadow-trades/settings', (req, res) => {
+    const parsed = sanitizeShadowSettingsInput(req.body)
+    if (!parsed.ok) {
+      badRequest(res, parsed.field)
+      return
+    }
+
+    try {
+      res.status(200).json({
+        ok: true,
+        settings: updatePresentedShadowSettings(parsed.value),
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] update shadow settings failed')
+      serverError(res)
+    }
+  })
+
+  router.post('/shadow-trades/evaluate', async (_req, res) => {
+    try {
+      const evaluated = await evaluateOpenShadowTrades()
+      res.status(200).json({
+        ok: true,
+        evaluated: evaluated.length,
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] evaluate shadow trades failed')
+      serverError(res)
+    }
+  })
+
+  router.post('/shadow-trades/auto', async (_req, res) => {
+    try {
+      const results = await processAutoShadowTrades()
+      res.status(200).json({
+        ok: true,
+        results: results.map((item) => ({
+          created: item.created,
+          reason: item.reason,
+          tradeId: item.trade?.id || null,
+          candidateId: item.candidate?.id || null,
+        })),
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] auto shadow trades failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/shadow-trades/:id', async (req, res) => {
+    const id = asId(req.params.id)
+    if (!id) {
+      badRequest(res, 'id')
+      return
+    }
+
+    try {
+      const trade = await getPresentedShadowTrade(id)
+      if (!trade) {
+        res.status(404).json({ ok: false, message: 'Not found' })
+        return
+      }
+      res.status(200).json({
+        ok: true,
+        trade,
+        disclaimer: SHADOW_TRADE_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] get shadow trade failed')
       serverError(res)
     }
   })

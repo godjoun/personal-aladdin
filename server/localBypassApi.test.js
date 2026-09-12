@@ -235,6 +235,14 @@ describe('로컬 bypass 활성 서버', () => {
     )
     expect(history.status).toBe(200)
     expect(Array.isArray(history.json.observations)).toBe(true)
+
+    const shadowSettings = await request('GET', '/api/trading-lab/shadow-trades/settings')
+    expect(shadowSettings.status).toBe(200)
+    expect(shadowSettings.json.settings.autoRecord).toBe(false)
+
+    const shadowList = await request('GET', '/api/trading-lab/shadow-trades')
+    expect(shadowList.status).toBe(200)
+    expect(Array.isArray(shadowList.json.trades)).toBe(true)
   })
 
   it('bypass 상태에서도 CSRF 는 계속 요구한다', async () => {
@@ -263,6 +271,20 @@ describe('로컬 bypass 활성 서버', () => {
     })
     expect(created.status).toBe(201)
     expect(created.json.analysis.bias).toBe('LONG')
+
+    const shadow = await request('POST', '/api/trading-lab/shadow-trades', {
+      body: {
+        symbol: 'ETHUSDT',
+        direction: 'SHORT',
+        entryPrice: 2560,
+        userNote: 'bypass virtual record',
+      },
+      headers: { [CSRF_HEADER]: jar[CSRF_COOKIE] },
+      origin: ORIGIN,
+    })
+    expect(shadow.status).toBe(201)
+    expect(shadow.json.trade.direction).toBe('SHORT')
+    expect(shadow.json.trade.source).toBe('MANUAL_USER')
   })
 
   it('bypass 상태에서도 입력 검증은 그대로 적용된다', async () => {

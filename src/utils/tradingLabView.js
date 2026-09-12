@@ -16,6 +16,8 @@ export const CVD_OK_LABEL = '정상'
 export const CVD_SOURCE_LABEL = 'Bybit 관측 체결 기준'
 export const MARKET_STATE_DISCLAIMER =
   '시장 관찰 지표이며 매수·매도 추천이 아닙니다.'
+export const SHADOW_TRADE_DISCLAIMER =
+  '가상 계산이며 실제 체결과 다를 수 있습니다. 실제 주문은 없습니다.'
 
 const MARKET_STATE_LABELS = {
   BULLISH_PRESSURE: '상승 압력 확대 가능성',
@@ -482,4 +484,91 @@ export function buildRecentAnalysisRows(analyses) {
     outcomeLabel: getOutcomeLabel(analysis.outcome?.result),
     hasOutcome: Boolean(analysis.outcome),
   }))
+}
+
+const SHADOW_TAG_LABELS = {
+  support: 'support',
+  resistance: 'resistance',
+  support_ob: 'support OB',
+  resistance_ob: 'resistance OB',
+  fvg: 'FVG',
+  trendline: 'trendline',
+  fakeout: 'fakeout',
+  liquidity_sweep: 'liquidity sweep',
+  volume_divergence: 'volume divergence',
+}
+
+const SHADOW_RESULT_LABELS = {
+  WIN: 'WIN',
+  LOSS: 'LOSS',
+  NEUTRAL: 'NEUTRAL',
+  UNRESOLVED: '미확정',
+}
+
+/**
+ * @param {string | null | undefined} tag
+ */
+export function getShadowTagLabel(tag) {
+  return SHADOW_TAG_LABELS[tag] || tag || NO_DATA_LABEL
+}
+
+/**
+ * @param {string | null | undefined} result
+ */
+export function getShadowResultLabel(result) {
+  return SHADOW_RESULT_LABELS[result] || SHADOW_RESULT_LABELS.UNRESOLVED
+}
+
+/**
+ * @param {number | null | undefined} value
+ */
+export function formatShadowPrice(value) {
+  if (value === null || value === undefined) return NO_DATA_LABEL
+  const num = Number(value)
+  if (!Number.isFinite(num)) return NO_DATA_LABEL
+  return `$${formatPriceValue(num)}`
+}
+
+/**
+ * @param {number | null | undefined} value
+ */
+export function formatShadowReturnPct(value, fallback = '대기') {
+  if (value === null || value === undefined) return fallback
+  return formatSignedValue(value, { digits: 1, suffix: '%' })
+}
+
+/**
+ * @param {object | null | undefined} outcome
+ * @param {'1h'|'4h'|'12h'|'24h'} horizon
+ */
+export function formatShadowHorizon(outcome, horizon) {
+  const key = {
+    '1h': 'return1hPct',
+    '4h': 'return4hPct',
+    '12h': 'return12hPct',
+    '24h': 'return24hPct',
+  }[horizon]
+  const value = outcome?.[key]
+  if (value === null || value === undefined) return `${horizon} 대기`
+  return `${horizon} ${formatSignedValue(value, { digits: 1, suffix: '%' })}`
+}
+
+/**
+ * @param {Array<object> | null | undefined} trades
+ */
+export function splitShadowTrades(trades) {
+  const list = Array.isArray(trades) ? trades : []
+  return {
+    open: list.filter((item) => item.status === 'OPEN' || item.status === 'EVALUATING'),
+    closed: list.filter((item) => item.status === 'CLOSED'),
+  }
+}
+
+/**
+ * @param {object | null | undefined} stats
+ */
+export function formatShadowResultShare(stats) {
+  if (!stats) return NO_DATA_LABEL
+  const share = stats.resultShare || {}
+  return `완료 결과 비율 WIN ${share.WIN || 0} · LOSS ${share.LOSS || 0} · NEUTRAL ${share.NEUTRAL || 0}`
 }

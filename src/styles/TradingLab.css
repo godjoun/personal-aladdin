@@ -695,6 +695,73 @@
   flex-wrap: wrap;
 }
 
+.trading-lab__shadow-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.trading-lab__shadow-warnings {
+  margin: 0;
+  padding: 0.5rem 0.7rem 0.5rem 1.2rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #9a6700;
+  background: #fff8c5;
+  border: 1px solid #f2cc60;
+  border-radius: 8px;
+}
+
+.trading-lab__shadow-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.trading-lab__shadow-card {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  background: #f9fafb;
+  border: 1px solid var(--color-border-light);
+  border-radius: 8px;
+}
+
+.trading-lab__shadow-card p {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.trading-lab__shadow-card-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.trading-lab__shadow-state-results {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.trading-lab__shadow-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.7rem;
+}
+
+.trading-lab__shadow-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+}
+
 .trading-lab-drawer__outcome {
   display: flex;
   flex-direction: column;

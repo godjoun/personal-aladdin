@@ -19,6 +19,9 @@ import {
   TRADING_LAB_STRUCTURE_SET,
   TRADING_LAB_SYMBOL_SET,
   TRADING_LAB_TIMEFRAME_SET,
+  SHADOW_TRADE_DIRECTION_SET,
+  SHADOW_TRADE_SOURCE_SET,
+  SHADOW_TRADE_TAG_SET,
 } from './constants.js'
 
 const MAX_NOTE = 1000
@@ -428,4 +431,127 @@ export function sanitizeScreenshotInput(raw) {
       imageRef: optionalText(raw.imageRef, MAX_IMAGE_REF),
     },
   }
+}
+
+const SHADOW_TAG_ALIASES = Object.freeze({
+  support: 'support',
+  resistance: 'resistance',
+  support_ob: 'support_ob',
+  'support ob': 'support_ob',
+  resistance_ob: 'resistance_ob',
+  'resistance ob': 'resistance_ob',
+  fvg: 'fvg',
+  trendline: 'trendline',
+  fakeout: 'fakeout',
+  liquidity_sweep: 'liquidity_sweep',
+  'liquidity sweep': 'liquidity_sweep',
+  volume_divergence: 'volume_divergence',
+  'volume divergence': 'volume_divergence',
+})
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asShadowDirection(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return SHADOW_TRADE_DIRECTION_SET.has(upper) ? upper : null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asShadowSource(value) {
+  if (typeof value !== 'string') return null
+  const upper = value.trim().toUpperCase()
+  return SHADOW_TRADE_SOURCE_SET.has(upper) ? upper : null
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string[] | undefined} undefined = 잘못된 값
+ */
+export function asShadowTags(value) {
+  if (value === null || value === undefined || value === '') return []
+  if (!Array.isArray(value)) return undefined
+  if (value.length > SHADOW_TRADE_TAG_SET.size) return undefined
+  const out = []
+  for (const item of value) {
+    if (typeof item !== 'string') return undefined
+    const key = item.trim().toLowerCase()
+    if (!key) continue
+    const normalized = SHADOW_TAG_ALIASES[key]
+    if (!normalized || !SHADOW_TRADE_TAG_SET.has(normalized)) return undefined
+    if (!out.includes(normalized)) out.push(normalized)
+  }
+  return out
+}
+
+/**
+ * 가상 포지션 생성 입력
+ *
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: object } | { ok: false, field: string }}
+ */
+export function sanitizeShadowTradeInput(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+
+  const symbol = asLabSymbol(raw.symbol)
+  if (!symbol) return { ok: false, field: 'symbol' }
+
+  const direction = asShadowDirection(raw.direction)
+  if (!direction) return { ok: false, field: 'direction' }
+
+  const source =
+    raw.source == null ? 'MANUAL_USER' : asShadowSource(raw.source)
+  if (!source) return { ok: false, field: 'source' }
+
+  let entryPrice = null
+  if (raw.entryPrice !== null && raw.entryPrice !== undefined && raw.entryPrice !== '') {
+    entryPrice = asOptionalPrice(raw.entryPrice)
+    if (entryPrice == null || entryPrice <= 0) {
+      return { ok: false, field: 'entryPrice' }
+    }
+  }
+
+  const userTags = asShadowTags(raw.userTags ?? raw.tags)
+  if (userTags === undefined) return { ok: false, field: 'userTags' }
+
+  const userNote = optionalText(raw.userNote ?? raw.note, MAX_NOTE)
+  if (
+    (raw.userNote != null && raw.userNote !== '' && userNote === null) ||
+    (raw.note != null && raw.note !== '' && raw.userNote == null && userNote === null)
+  ) {
+    return { ok: false, field: 'userNote' }
+  }
+
+  return {
+    ok: true,
+    value: {
+      symbol,
+      direction,
+      source,
+      entryPrice,
+      userTags,
+      userNote,
+    },
+  }
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: { autoRecord: boolean } } | { ok: false, field: string }}
+ */
+export function sanitizeShadowSettingsInput(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+  if (typeof raw.autoRecord !== 'boolean') {
+    return { ok: false, field: 'autoRecord' }
+  }
+  return { ok: true, value: { autoRecord: raw.autoRecord } }
 }

@@ -189,3 +189,56 @@ export async function fetchMarketStateHistory(symbol, options = {}) {
     }`,
   )
 }
+
+/**
+ * @param {{ symbol?: string, status?: string, limit?: number }} [filter]
+ */
+export async function fetchShadowTrades(filter = {}) {
+  const params = new URLSearchParams()
+  if (filter.symbol) params.set('symbol', filter.symbol)
+  if (filter.status) params.set('status', filter.status)
+  if (filter.limit) params.set('limit', String(filter.limit))
+  const query = params.toString()
+  return call(`${BASE}/shadow-trades${query ? `?${query}` : ''}`)
+}
+
+/**
+ * @param {string} id
+ */
+export async function fetchShadowTrade(id) {
+  return call(`${BASE}/shadow-trades/${encodeURIComponent(id)}`)
+}
+
+/**
+ * @param {object} payload
+ */
+export async function createShadowTrade(payload) {
+  return call(`${BASE}/shadow-trades`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+/**
+ * @param {{ symbol?: string }} [filter]
+ */
+export async function fetchShadowTradeStats(filter = {}) {
+  const params = new URLSearchParams()
+  if (filter.symbol) params.set('symbol', filter.symbol)
+  const query = params.toString()
+  return call(`${BASE}/shadow-trades/stats${query ? `?${query}` : ''}`)
+}
+
+export async function fetchShadowTradeSettings() {
+  return call(`${BASE}/shadow-trades/settings`)
+}
+
+/**
+ * @param {{ autoRecord: boolean }} payload
+ */
+export async function saveShadowTradeSettings(payload) {
+  return call(`${BASE}/shadow-trades/settings`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}

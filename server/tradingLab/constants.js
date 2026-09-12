@@ -150,3 +150,70 @@ export const MARKET_STATE_DISCLAIMER =
 /** 자동 판정 저장 주기. 같은 symbol + 5분 bucket 은 한 번만 기록한다. */
 export const MARKET_STATE_BUCKET_SECONDS = 5 * 60
 export const MARKET_STATE_HISTORY_LIMIT = 20
+
+export const SHADOW_TRADE_DIRECTIONS = Object.freeze(['LONG', 'SHORT'])
+export const SHADOW_TRADE_SOURCES = Object.freeze([
+  'AUTO_MARKET_STATE',
+  'MANUAL_USER',
+])
+export const SHADOW_TRADE_STATUSES = Object.freeze([
+  'OPEN',
+  'EVALUATING',
+  'CLOSED',
+])
+export const SHADOW_TRADE_RESULTS = Object.freeze([
+  'WIN',
+  'LOSS',
+  'NEUTRAL',
+  'UNRESOLVED',
+])
+export const SHADOW_TRADE_TAGS = Object.freeze([
+  'support',
+  'resistance',
+  'support_ob',
+  'resistance_ob',
+  'fvg',
+  'trendline',
+  'fakeout',
+  'liquidity_sweep',
+  'volume_divergence',
+])
+export const SHADOW_TRADE_TAG_LABELS = Object.freeze({
+  support: 'support',
+  resistance: 'resistance',
+  support_ob: 'support OB',
+  resistance_ob: 'resistance OB',
+  fvg: 'FVG',
+  trendline: 'trendline',
+  fakeout: 'fakeout',
+  liquidity_sweep: 'liquidity sweep',
+  volume_divergence: 'volume divergence',
+})
+
+export const SHADOW_TRADE_DIRECTION_SET = new Set(SHADOW_TRADE_DIRECTIONS)
+export const SHADOW_TRADE_SOURCE_SET = new Set(SHADOW_TRADE_SOURCES)
+export const SHADOW_TRADE_STATUS_SET = new Set(SHADOW_TRADE_STATUSES)
+export const SHADOW_TRADE_RESULT_SET = new Set(SHADOW_TRADE_RESULTS)
+export const SHADOW_TRADE_TAG_SET = new Set(SHADOW_TRADE_TAGS)
+
+export const SHADOW_STRATEGY_VERSION = 'shadow-v1'
+export const SHADOW_TRADE_DISCLAIMER =
+  '가상 계산이며 실제 체결과 다를 수 있습니다. 실제 주문은 없습니다.'
+export const SHADOW_ASSUMED_FEE_BPS = 5
+export const SHADOW_ASSUMED_SLIPPAGE_BPS = 3
+export const SHADOW_AUTO_STRENGTH_MIN = 65
+export const SHADOW_DEDUP_WINDOW_MS = 30 * 60 * 1000
+export const SHADOW_RESULT_DEADZONE_PCT = 0.15
+export const SHADOW_TRADE_EVAL_INTERVAL_MS = 5 * 60 * 1000
+export const SHADOW_AUTO_LONG_STATES = Object.freeze([
+  'BULLISH_PRESSURE',
+  'NEW_LONG_BUILDUP',
+])
+export const SHADOW_AUTO_SHORT_STATES = Object.freeze([
+  'BEARISH_PRESSURE',
+  'NEW_SHORT_BUILDUP',
+])
+export const SHADOW_OBSERVE_STATES = Object.freeze([
+  'SHORT_LIQUIDATION_DRIVEN',
+  'LONG_LIQUIDATION_DRIVEN',
+])

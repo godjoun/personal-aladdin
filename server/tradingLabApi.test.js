@@ -26,6 +26,12 @@ import {
   setTradeFlowCollector,
 } from './tradingLab/tradeFlowCollector.js'
 import { resetMarketStateRecorder } from './tradingLab/marketStateRecorder.js'
+import { resetShadowTradeRuntime } from './tradingLab/shadowTradeRuntime.js'
+import {
+  insertShadowTrade,
+  upsertShadowTradeOutcome,
+  updateShadowTradeStatus,
+} from './tradingLab/shadowTradeRepository.js'
 import { upsertTradeFlowBucket } from './tradingLab/tradeFlowRepository.js'
 import { evaluateAndPersistMarketStates } from './tradingLab/marketStateService.js'
 import { listMarketStateObservations } from './tradingLab/marketStateRepository.js'
@@ -149,6 +155,7 @@ describe('Trading Lab API', () => {
     resetLiquidationCollector()
     resetTradeFlowCollector()
     resetMarketStateRecorder()
+    resetShadowTradeRuntime()
   })
 
   beforeEach(() => {
@@ -248,6 +255,9 @@ describe('Trading Lab API', () => {
       '/api/trading-lab/cvd/BTCUSDT',
       '/api/trading-lab/market-state/BTCUSDT',
       '/api/trading-lab/market-state/BTCUSDT/history',
+      '/api/trading-lab/shadow-trades',
+      '/api/trading-lab/shadow-trades/stats',
+      '/api/trading-lab/shadow-trades/settings',
       '/api/trading-lab/stats',
     ]) {
       const res = await request('GET', urlPath)
@@ -260,6 +270,12 @@ describe('Trading Lab API', () => {
       origin: ORIGIN,
     })
     expect(post.status).toBe(401)
+
+    const shadowPost = await request('POST', '/api/trading-lab/shadow-trades', {
+      body: { symbol: 'BTCUSDT', direction: 'LONG', entryPrice: 1 },
+      origin: ORIGIN,
+    })
+    expect(shadowPost.status).toBe(401)
   })
 
   it('CSRF 토큰 없는 쓰기 요청은 403', async () => {
@@ -713,6 +729,145 @@ describe('Trading Lab API', () => {
       const res = await request('POST', urlPath, authed({}))
       expect([404, 403], urlPath).toContain(res.status)
     }
+  })
+
+  it('수동 shadow LONG/SHORT 를 만들고 잘못된 입력을 차단한다', async () => {
+    await login()
+    const long = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades',
+      authed({
+        symbol: 'ETHUSDT',
+        direction: 'LONG',
+        entryPrice: 2560,
+        userTags: ['support', 'FVG'],
+        userNote: '4H 흐름 관찰',
+      }),
+    )
+    expect(long.status).toBe(201)
+    expect(long.json.trade.direction).toBe('LONG')
+    expect(long.json.trade.source).toBe('MANUAL_USER')
+    expect(long.json.trade.userTags).toEqual(['support', 'fvg'])
+    expect(long.json.disclaimer).toContain('가상 계산')
+
+    const short = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades',
+      authed({
+        symbol: 'ETHUSDT',
+        direction: 'SHORT',
+        entryPrice: 2560,
+        userTags: ['resistance OB'],
+      }),
+    )
+    expect(short.status).toBe(201)
+    expect(short.json.trade.direction).toBe('SHORT')
+    expect(short.json.trade.warnings).toContain('진입 이유가 비어 있습니다')
+
+    const badSymbol = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades',
+      authed({ symbol: 'SOLUSDT', direction: 'LONG', entryPrice: 1 }),
+    )
+    expect(badSymbol.status).toBe(400)
+    expect(badSymbol.json.field).toBe('symbol')
+
+    const badDirection = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades',
+      authed({ symbol: 'BTCUSDT', direction: 'BUY', entryPrice: 1 }),
+    )
+    expect(badDirection.status).toBe(400)
+    expect(badDirection.json.field).toBe('direction')
+
+    const badTag = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades',
+      authed({ symbol: 'BTCUSDT', direction: 'LONG', entryPrice: 1, userTags: ['whale'] }),
+    )
+    expect(badTag.status).toBe(400)
+    expect(badTag.json.field).toBe('userTags')
+
+    const detail = await request(
+      'GET',
+      `/api/trading-lab/shadow-trades/${long.json.trade.id}`,
+    )
+    expect(detail.status).toBe(200)
+    expect(detail.json.trade.id).toBe(long.json.trade.id)
+  })
+
+  it('자동 기록 설정과 FOMO 경고, stats 를 반환한다', async () => {
+    await login()
+    const off = await request('GET', '/api/trading-lab/shadow-trades/settings')
+    expect(off.status).toBe(200)
+    expect(off.json.settings.autoRecord).toBe(false)
+
+    const autoOff = await request('POST', '/api/trading-lab/shadow-trades/auto', authed({}))
+    expect(autoOff.status).toBe(200)
+    expect(autoOff.json.results.every((item) => item.created === false)).toBe(true)
+
+    const on = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades/settings',
+      authed({ autoRecord: true }),
+    )
+    expect(on.status).toBe(200)
+    expect(on.json.settings.autoRecord).toBe(true)
+
+    await request(
+      'POST',
+      '/api/trading-lab/shadow-trades/settings',
+      authed({ autoRecord: false }),
+    )
+
+    const now = Date.now()
+    for (let i = 0; i < 3; i += 1) {
+      const trade = insertShadowTrade({
+        symbol: 'BTCUSDT',
+        direction: 'LONG',
+        source: 'MANUAL_USER',
+        status: 'CLOSED',
+        createdAt: new Date(now - (3 - i) * 60_000).toISOString(),
+        entryPrice: 65000,
+        userNote: `loss-${i}`,
+      })
+      upsertShadowTradeOutcome(trade.id, {
+        result: 'LOSS',
+        feeAdjustedReturnPct: -1,
+        assumedFeeBps: 5,
+        assumedSlippageBps: 3,
+      })
+      updateShadowTradeStatus(trade.id, 'CLOSED')
+    }
+
+    const first = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades',
+      authed({ symbol: 'BTCUSDT', direction: 'LONG', entryPrice: 65000, userNote: 'a' }),
+    )
+    const second = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades',
+      authed({ symbol: 'BTCUSDT', direction: 'LONG', entryPrice: 65000, userNote: 'b' }),
+    )
+    const third = await request(
+      'POST',
+      '/api/trading-lab/shadow-trades',
+      authed({ symbol: 'BTCUSDT', direction: 'LONG', entryPrice: 65000, userNote: 'c' }),
+    )
+    expect(third.status).toBe(201)
+    expect(third.json.trade.warnings).toContain('과도한 재진입 패턴 가능성')
+    expect(third.json.trade.warnings).toContain(
+      '연속 실패 구간입니다. 실전 진입 검토를 멈추고 복기하세요.',
+    )
+    expect(first.status).toBe(201)
+    expect(second.status).toBe(201)
+
+    const stats = await request('GET', '/api/trading-lab/shadow-trades/stats?symbol=BTCUSDT')
+    expect(stats.status).toBe(200)
+    expect(stats.json.stats.total).toBeGreaterThanOrEqual(6)
+    expect(stats.json.stats.long).toBeGreaterThanOrEqual(6)
+    expect(stats.json.disclaimer).not.toMatch(/승률/)
   })
 
   it('오류 응답에 내부 경로·secret 을 노출하지 않는다', async () => {

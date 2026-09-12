@@ -102,6 +102,11 @@ import {
   setMarketStateRecorder,
 } from './tradingLab/marketStateRecorder.js'
 import {
+  createShadowTradeRuntime,
+  resetShadowTradeRuntime,
+  setShadowTradeRuntime,
+} from './tradingLab/shadowTradeRuntime.js'
+import {
   LOCAL_BYPASS_USER,
   assertLocalAuthBypassSafe,
 } from './auth/localBypass.js'
@@ -276,6 +281,22 @@ export function createApp(options = {}) {
       createMarketStateRecorder({ autoStart: true })
     } catch {
       console.error('[TradingLab] market state recorder failed to start')
+    }
+  }
+
+  // Trading Lab — Shadow Trading 가상 기록 (실제 주문 없음)
+  if (options.shadowTradeRuntime === false) {
+    resetShadowTradeRuntime()
+  } else if (
+    options.shadowTradeRuntime &&
+    typeof options.shadowTradeRuntime.start === 'function'
+  ) {
+    setShadowTradeRuntime(options.shadowTradeRuntime)
+  } else if (process.env.NODE_ENV !== 'test') {
+    try {
+      createShadowTradeRuntime({ autoStart: true })
+    } catch {
+      console.error('[TradingLab] shadow trade runtime failed to start')
     }
   }
 

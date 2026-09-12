@@ -30,6 +30,14 @@ import {
   buildMarketStateHistoryRows,
   formatMarketStateClock,
   MARKET_STATE_DISCLAIMER,
+  SHADOW_TRADE_DISCLAIMER,
+  formatShadowHorizon,
+  formatShadowPrice,
+  formatShadowResultShare,
+  formatShadowReturnPct,
+  getShadowResultLabel,
+  getShadowTagLabel,
+  splitShadowTrades,
 } from './tradingLabView.js'
 
 describe('bias / outcome 표시', () => {
@@ -260,5 +268,34 @@ describe('buildRecentAnalysisRows', () => {
 
   it('배열이 아니면 빈 목록을 반환한다', () => {
     expect(buildRecentAnalysisRows(null)).toEqual([])
+  })
+})
+
+describe('Shadow Trading 표시', () => {
+  it('가상 결과 라벨과 가격을 표시한다', () => {
+    expect(getShadowResultLabel('WIN')).toBe('WIN')
+    expect(getShadowTagLabel('support_ob')).toBe('support OB')
+    expect(formatShadowPrice(2560)).toBe('$2,560')
+    expect(formatShadowReturnPct(0.7)).toBe('+0.7%')
+    expect(formatShadowHorizon(null, '1h')).toBe('1h 대기')
+    expect(formatShadowHorizon({ return1hPct: 0.4 }, '1h')).toBe('1h +0.4%')
+    expect(SHADOW_TRADE_DISCLAIMER).toContain('가상 계산')
+    expect(SHADOW_TRADE_DISCLAIMER).not.toMatch(/승률|매수 추천|매도 추천/)
+  })
+
+  it('진행/완료를 나누고 승률 대신 완료 결과 비율을 쓴다', () => {
+    const split = splitShadowTrades([
+      { id: '1', status: 'OPEN' },
+      { id: '2', status: 'CLOSED' },
+      { id: '3', status: 'EVALUATING' },
+    ])
+    expect(split.open.map((item) => item.id)).toEqual(['1', '3'])
+    expect(split.closed.map((item) => item.id)).toEqual(['2'])
+    expect(formatShadowResultShare({ resultShare: { WIN: 1, LOSS: 2, NEUTRAL: 0 } })).toBe(
+      '완료 결과 비율 WIN 1 · LOSS 2 · NEUTRAL 0',
+    )
+    expect(formatShadowResultShare({ resultShare: { WIN: 1, LOSS: 2, NEUTRAL: 0 } })).not.toMatch(
+      /승률/,
+    )
   })
 })

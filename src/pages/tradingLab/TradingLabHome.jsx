@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import MarketStatePanel from '../../components/tradingLab/MarketStatePanel.jsx'
 import AnalysisPanel from '../../components/tradingLab/AnalysisPanel.jsx'
+import ShadowTradingPanel from '../../components/tradingLab/ShadowTradingPanel.jsx'
 import RecentAnalysisList from '../../components/tradingLab/RecentAnalysisList.jsx'
 import AnalysisComposerDrawer from '../../components/tradingLab/AnalysisComposerDrawer.jsx'
 import AnalysisDetailDrawer from '../../components/tradingLab/AnalysisDetailDrawer.jsx'
@@ -14,7 +15,10 @@ import {
   fetchMarketStateHistory,
   fetchObservedLiquidations,
   fetchTradeFlowCollectorStatus,
+  fetchShadowTradeStats,
+  fetchShadowTrades,
   fetchTradingLabStats,
+  saveShadowTradeSettings,
 } from '../../services/tradingLabApi.js'
 import '../../styles/TradingLab.css'
 
@@ -37,6 +41,11 @@ export default function TradingLabHome() {
   const [error, setError] = useState('')
   const [composerOpen, setComposerOpen] = useState(false)
   const [detailId, setDetailId] = useState(null)
+  const [shadowTrades, setShadowTrades] = useState([])
+  const [shadowStats, setShadowStats] = useState(null)
+  const [shadowSettings, setShadowSettings] = useState({ autoRecord: false })
+  const [shadowCandidates, setShadowCandidates] = useState([])
+  const [shadowLoading, setShadowLoading] = useState(false)
 
   const loadMarket = useCallback(async () => {
     setMarketLoading(true)
@@ -105,14 +114,24 @@ export default function TradingLabHome() {
     let cancelled = false
     const timer = setInterval(async () => {
       try {
-        const [liqPayload, liqStatus, cvdPayload, cvdStatus, statePayload, stateHistory] =
-          await Promise.all([
+        const [
+          liqPayload,
+          liqStatus,
+          cvdPayload,
+          cvdStatus,
+          statePayload,
+          stateHistory,
+          listPayload,
+          statsPayload,
+        ] = await Promise.all([
             fetchObservedLiquidations(symbol, { window: '15m' }),
             fetchLiquidationCollectorStatus(),
             fetchCvdSummary(symbol, { window: '15m' }),
             fetchTradeFlowCollectorStatus(),
             fetchMarketState(symbol),
             fetchMarketStateHistory(symbol, { limit: 20 }),
+            fetchShadowTrades({ symbol, limit: 50 }),
+            fetchShadowTradeStats({ symbol }),
           ])
         if (cancelled) return
         setObservedLiquidations(liqPayload)
@@ -121,6 +140,10 @@ export default function TradingLabHome() {
         setTradeFlowCollector(cvdStatus?.collector || null)
         setMarketState(statePayload)
         setMarketStateHistory(stateHistory?.observations || [])
+        setShadowTrades(listPayload.trades || [])
+        setShadowSettings(listPayload.settings || { autoRecord: false })
+        setShadowCandidates(listPayload.candidates || [])
+        setShadowStats(statsPayload.stats || null)
       } catch {
         // 청산/CVD 폴링 실패가 화면 전체를 막지 않는다
       }
@@ -131,9 +154,41 @@ export default function TradingLabHome() {
     }
   }, [symbol])
 
+  const loadShadow = useCallback(async () => {
+    setShadowLoading(true)
+    try {
+      const [listPayload, statsPayload] = await Promise.all([
+        fetchShadowTrades({ symbol, limit: 50 }),
+        fetchShadowTradeStats({ symbol }),
+      ])
+      setShadowTrades(listPayload.trades || [])
+      setShadowSettings(listPayload.settings || { autoRecord: false })
+      setShadowCandidates(listPayload.candidates || [])
+      setShadowStats(statsPayload.stats || null)
+    } catch {
+      setShadowTrades([])
+      setShadowStats(null)
+    } finally {
+      setShadowLoading(false)
+    }
+  }, [symbol])
+
   useEffect(() => {
     loadAnalyses()
   }, [loadAnalyses])
+
+  useEffect(() => {
+    loadShadow()
+  }, [loadShadow])
+
+  async function handleToggleAuto(autoRecord) {
+    try {
+      const payload = await saveShadowTradeSettings({ autoRecord })
+      setShadowSettings(payload.settings || { autoRecord })
+    } catch {
+      setError('자동 기록 설정을 바꾸지 못했습니다.')
+    }
+  }
 
   const latestAnalysis = analyses[0] || null
 
@@ -192,6 +247,18 @@ export default function TradingLabHome() {
         marketState={marketState}
         marketStateHistory={marketStateHistory}
         onRecord={() => setComposerOpen(true)}
+      />
+
+      <ShadowTradingPanel
+        symbol={symbol}
+        market={market}
+        trades={shadowTrades}
+        stats={shadowStats}
+        settings={shadowSettings}
+        candidates={shadowCandidates}
+        loading={shadowLoading}
+        onToggleAuto={handleToggleAuto}
+        onRefresh={loadShadow}
       />
 
       <ChartCaptureSlot

@@ -199,6 +199,81 @@ export function migrateTradingLab(db) {
 
     CREATE INDEX IF NOT EXISTS idx_market_state_obs_symbol_eval
       ON market_state_observation(symbol, evaluatedAt DESC);
+
+    CREATE TABLE IF NOT EXISTS shadow_trade (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      source TEXT NOT NULL,
+      status TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      entryPrice REAL NOT NULL,
+      entryReason TEXT,
+      strategyVersion TEXT NOT NULL,
+      marketStateObservationId TEXT,
+      strengthScore INTEGER,
+      primaryState TEXT,
+      secondaryStatesJson TEXT,
+      timeframe15m TEXT,
+      timeframe1h TEXT,
+      timeframe4h TEXT,
+      cvdNotional REAL,
+      buySharePct REAL,
+      sellSharePct REAL,
+      oiChangePct REAL,
+      fundingRate REAL,
+      volumeRatio REAL,
+      longLiquidationNotional REAL,
+      shortLiquidationNotional REAL,
+      userTagsJson TEXT,
+      userNote TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_shadow_trade_symbol_created
+      ON shadow_trade(symbol, createdAt DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_shadow_trade_status
+      ON shadow_trade(status, createdAt DESC);
+
+    CREATE TABLE IF NOT EXISTS shadow_trade_outcome (
+      shadowTradeId TEXT NOT NULL UNIQUE
+        REFERENCES shadow_trade(id) ON DELETE CASCADE,
+      evaluatedAt TEXT,
+      price1h REAL,
+      price4h REAL,
+      price12h REAL,
+      price24h REAL,
+      return1hPct REAL,
+      return4hPct REAL,
+      return12hPct REAL,
+      return24hPct REAL,
+      maxFavorableMovePct REAL,
+      maxAdverseMovePct REAL,
+      result TEXT NOT NULL DEFAULT 'UNRESOLVED',
+      feeAdjustedReturnPct REAL,
+      assumedFeeBps INTEGER,
+      assumedSlippageBps INTEGER,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS shadow_trade_candidate (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      primaryState TEXT NOT NULL,
+      strengthScore INTEGER,
+      evaluatedAt TEXT NOT NULL,
+      bucketStart TEXT NOT NULL,
+      reason TEXT,
+      UNIQUE (symbol, direction, bucketStart)
+    );
+
+    CREATE TABLE IF NOT EXISTS shadow_trade_setting (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
   `)
 }
 
