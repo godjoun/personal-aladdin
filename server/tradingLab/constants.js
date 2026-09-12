@@ -178,6 +178,8 @@ export const SHADOW_TRADE_TAGS = Object.freeze([
   'liquidity_sweep',
   'volume_divergence',
   'fomo',
+  'has_stop',
+  'has_target',
 ])
 export const SHADOW_TRADE_TAG_LABELS = Object.freeze({
   support: 'support',
@@ -190,6 +192,8 @@ export const SHADOW_TRADE_TAG_LABELS = Object.freeze({
   liquidity_sweep: 'liquidity sweep',
   volume_divergence: 'volume divergence',
   fomo: 'FOMO',
+  has_stop: '손절 기준 있음',
+  has_target: '목표 기준 있음',
 })
 
 export const SHADOW_TRADE_DIRECTION_SET = new Set(SHADOW_TRADE_DIRECTIONS)

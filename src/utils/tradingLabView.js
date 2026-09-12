@@ -31,8 +31,9 @@ export const SHADOW_QUICK_TAGS = Object.freeze([
   'trendline',
   'fakeout',
   'liquidity_sweep',
-  'volume_divergence',
   'fomo',
+  'has_stop',
+  'has_target',
 ])
 
 const MARKET_STATE_LABELS = {
@@ -513,6 +514,8 @@ const SHADOW_TAG_LABELS = {
   liquidity_sweep: 'liquidity sweep',
   volume_divergence: 'volume divergence',
   fomo: 'FOMO',
+  has_stop: '손절 기준 있음',
+  has_target: '목표 기준 있음',
 }
 
 const SHADOW_RESULT_LABELS = {

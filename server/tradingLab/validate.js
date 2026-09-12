@@ -448,6 +448,10 @@ const SHADOW_TAG_ALIASES = Object.freeze({
   volume_divergence: 'volume_divergence',
   'volume divergence': 'volume_divergence',
   fomo: 'fomo',
+  has_stop: 'has_stop',
+  has_target: 'has_target',
+  '손절 기준 있음': 'has_stop',
+  '목표 기준 있음': 'has_target',
 })
 
 /**

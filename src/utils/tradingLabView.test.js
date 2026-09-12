@@ -31,6 +31,7 @@ import {
   formatMarketStateClock,
   MARKET_STATE_DISCLAIMER,
   SHADOW_TRADE_DISCLAIMER,
+  SHADOW_QUICK_TAGS,
   formatShadowHorizon,
   formatShadowPrice,
   formatShadowResultShare,
@@ -276,6 +277,22 @@ describe('Shadow Trading 표시', () => {
     expect(getShadowResultLabel('WIN')).toBe('WIN')
     expect(getShadowTagLabel('support_ob')).toBe('support OB')
     expect(getShadowTagLabel('fomo')).toBe('FOMO')
+    expect(getShadowTagLabel('has_stop')).toBe('손절 기준 있음')
+    expect(getShadowTagLabel('has_target')).toBe('목표 기준 있음')
+    expect(SHADOW_QUICK_TAGS).toEqual([
+      'support',
+      'resistance',
+      'support_ob',
+      'resistance_ob',
+      'fvg',
+      'trendline',
+      'fakeout',
+      'liquidity_sweep',
+      'fomo',
+      'has_stop',
+      'has_target',
+    ])
+    expect(SHADOW_QUICK_TAGS).not.toContain('volume_divergence')
     expect(formatShadowPrice(2560)).toBe('$2,560')
     expect(formatShadowReturnPct(0.7)).toBe('+0.7%')
     expect(formatShadowHorizon(null, '1h')).toBe('1h 대기')

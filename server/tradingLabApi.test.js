@@ -885,7 +885,7 @@ describe('Trading Lab API', () => {
         symbol: 'BTCUSDT',
         direction: 'LONG',
         quick: true,
-        userTags: ['support', 'FOMO'],
+        userTags: ['support', 'FOMO', '손절 기준 있음', '목표 기준 있음'],
       }),
     )
     expect(long.status).toBe(201)
@@ -893,7 +893,12 @@ describe('Trading Lab API', () => {
     expect(long.json.trade.source).toBe('MANUAL_USER')
     expect(long.json.trade.symbol).toBe('BTCUSDT')
     expect(long.json.trade.entryPrice).toBeGreaterThan(0)
-    expect(long.json.trade.userTags).toEqual(['support', 'fomo'])
+    expect(long.json.trade.userTags).toEqual([
+      'support',
+      'fomo',
+      'has_stop',
+      'has_target',
+    ])
     expect(long.json.trade.warnings || []).not.toContain('진입 이유가 비어 있습니다')
 
     const short = await request(
