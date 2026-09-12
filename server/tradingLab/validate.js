@@ -590,6 +590,38 @@ export function sanitizeShadowTradePatch(raw) {
  * @param {unknown} raw
  * @returns {{ ok: true, value: { autoRecord: boolean } } | { ok: false, field: string }}
  */
+/**
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: object } | { ok: false, field: string }}
+ */
+export function sanitizeStrategyCheckInput(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, field: 'body' }
+  }
+
+  const symbol = asLabSymbol(raw.symbol)
+  if (!symbol) return { ok: false, field: 'symbol' }
+
+  const direction = asShadowDirection(raw.direction)
+  if (!direction) return { ok: false, field: 'direction' }
+
+  const selectedTags = asShadowTags(raw.selectedTags ?? raw.userTags ?? raw.tags)
+  if (selectedTags === undefined) return { ok: false, field: 'selectedTags' }
+
+  return {
+    ok: true,
+    value: {
+      symbol,
+      direction,
+      selectedTags,
+    },
+  }
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {{ ok: true, value: { autoRecord: boolean } } | { ok: false, field: string }}
+ */
 export function sanitizeShadowSettingsInput(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { ok: false, field: 'body' }

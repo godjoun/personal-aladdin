@@ -274,6 +274,25 @@ export function migrateTradingLab(db) {
       value TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS strategy_check (
+      id TEXT PRIMARY KEY,
+      symbol TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      checkedAt TEXT NOT NULL,
+      strategyVersion TEXT NOT NULL,
+      score REAL NOT NULL,
+      result TEXT NOT NULL,
+      selectedTagsJson TEXT,
+      autoEvidenceJson TEXT,
+      missingItemsJson TEXT,
+      riskWarningsJson TEXT,
+      marketStateSnapshotJson TEXT,
+      shadowTradeId TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_strategy_check_symbol_checked
+      ON strategy_check(symbol, checkedAt DESC);
   `)
 }
 

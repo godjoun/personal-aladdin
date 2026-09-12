@@ -293,6 +293,18 @@ describe('로컬 bypass 활성 서버', () => {
     })
     expect(quick.status).toBe(201)
     expect(quick.json.trade.entryReason).toBe('quick_manual')
+
+    const strategy = await request('POST', '/api/trading-lab/strategy-checks', {
+      body: {
+        symbol: 'BTCUSDT',
+        direction: 'LONG',
+        selectedTags: ['support', 'has_stop'],
+      },
+      headers: { [CSRF_HEADER]: jar[CSRF_COOKIE] },
+      origin: ORIGIN,
+    })
+    expect(strategy.status).toBe(201)
+    expect(strategy.json.check.strategyVersion).toBe('my_strategy_v1')
   })
 
   it('bypass 상태에서도 입력 검증은 그대로 적용된다', async () => {

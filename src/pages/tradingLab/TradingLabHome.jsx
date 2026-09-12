@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import MarketStatePanel from '../../components/tradingLab/MarketStatePanel.jsx'
 import AnalysisPanel from '../../components/tradingLab/AnalysisPanel.jsx'
 import ShadowTradingPanel from '../../components/tradingLab/ShadowTradingPanel.jsx'
+import StrategyChecklistPanel from '../../components/tradingLab/StrategyChecklistPanel.jsx'
 import RecentAnalysisList from '../../components/tradingLab/RecentAnalysisList.jsx'
 import AnalysisComposerDrawer from '../../components/tradingLab/AnalysisComposerDrawer.jsx'
 import AnalysisDetailDrawer from '../../components/tradingLab/AnalysisDetailDrawer.jsx'
@@ -247,6 +248,11 @@ export default function TradingLabHome() {
         marketState={marketState}
         marketStateHistory={marketStateHistory}
         onRecord={() => setComposerOpen(true)}
+      />
+
+      <StrategyChecklistPanel
+        symbol={symbol}
+        onShadowRecorded={loadShadow}
       />
 
       <ShadowTradingPanel

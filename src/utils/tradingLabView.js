@@ -22,6 +22,25 @@ export const SHADOW_QUICK_SECTION_HINT =
   '실제 주문 없이 현재 시장 상태를 기준으로 가상 진입만 기록합니다.'
 export const SHADOW_QUICK_HINT =
   '먼저 1초 기록하고, 이유는 나중에 보강해도 됩니다.'
+export const STRATEGY_CHECK_DISCLAIMER =
+  '시장 관찰 및 기준 점검 도구이며 매수·매도 추천이 아닙니다.'
+export const STRATEGY_SCORE_LABEL = '기준 충족도'
+export const STRATEGY_LOCATION_TAGS = Object.freeze([
+  'support',
+  'resistance',
+  'support_ob',
+  'resistance_ob',
+  'fvg',
+  'trendline',
+  'fakeout',
+  'liquidity_sweep',
+])
+export const STRATEGY_RISK_TAGS = Object.freeze(['has_stop', 'has_target', 'fomo'])
+export const STRATEGY_CHECK_RESULT_LABELS = Object.freeze({
+  READY: '기준 충족',
+  NOT_READY: '기준 부족',
+  RISK_HIGH: '리스크 높음',
+})
 export const SHADOW_QUICK_TAGS = Object.freeze([
   'support',
   'resistance',
@@ -582,6 +601,32 @@ export function splitShadowTrades(trades) {
     open: list.filter((item) => item.status === 'OPEN' || item.status === 'EVALUATING'),
     closed: list.filter((item) => item.status === 'CLOSED'),
   }
+}
+
+/**
+ * @param {object | null | undefined} stats
+ */
+/**
+ * @param {string | null | undefined} result
+ */
+export function getStrategyCheckResultLabel(result) {
+  return STRATEGY_CHECK_RESULT_LABELS[result] || result || NO_DATA_LABEL
+}
+
+/**
+ * @param {object | null | undefined} check
+ */
+export function formatStrategyScore(check) {
+  if (!check || check.score == null) return NO_DATA_LABEL
+  return `${Math.round(check.score)} / 100`
+}
+
+/**
+ * @param {object | null | undefined} category
+ */
+export function formatStrategyCategoryScore(category) {
+  if (!category) return NO_DATA_LABEL
+  return `${category.score} / ${category.max}`
 }
 
 /**

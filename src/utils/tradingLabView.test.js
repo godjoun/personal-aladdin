@@ -39,6 +39,9 @@ import {
   getShadowResultLabel,
   getShadowTagLabel,
   splitShadowTrades,
+  getStrategyCheckResultLabel,
+  formatStrategyScore,
+  STRATEGY_CHECK_DISCLAIMER,
 } from './tradingLabView.js'
 
 describe('bias / outcome 표시', () => {
@@ -315,5 +318,14 @@ describe('Shadow Trading 표시', () => {
     expect(formatShadowResultShare({ resultShare: { WIN: 1, LOSS: 2, NEUTRAL: 0 } })).not.toMatch(
       /승률/,
     )
+  })
+
+  it('My Strategy 결과는 기준 충족도로 표시한다', () => {
+    expect(getStrategyCheckResultLabel('READY')).toBe('기준 충족')
+    expect(getStrategyCheckResultLabel('NOT_READY')).toBe('기준 부족')
+    expect(getStrategyCheckResultLabel('RISK_HIGH')).toBe('리스크 높음')
+    expect(formatStrategyScore({ score: 62 })).toBe('62 / 100')
+    expect(STRATEGY_CHECK_DISCLAIMER).toContain('기준 점검')
+    expect(STRATEGY_CHECK_DISCLAIMER).not.toMatch(/승률|수익 확률/)
   })
 })

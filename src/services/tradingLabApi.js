@@ -247,6 +247,41 @@ export async function saveShadowTradeSettings(payload) {
  * @param {string} id
  * @param {{ userNote?: string | null, userTags?: string[] }} payload
  */
+/**
+ * @param {{ symbol?: string, limit?: number }} [filter]
+ */
+export async function fetchStrategyChecks(filter = {}) {
+  const params = new URLSearchParams()
+  if (filter.symbol) params.set('symbol', filter.symbol)
+  if (filter.limit) params.set('limit', String(filter.limit))
+  const query = params.toString()
+  return call(`${BASE}/strategy-checks${query ? `?${query}` : ''}`)
+}
+
+/**
+ * @param {object} payload
+ */
+export async function createStrategyCheck(payload) {
+  return call(`${BASE}/strategy-checks`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+/**
+ * @param {string} id
+ */
+export async function createStrategyShadowTrade(id) {
+  return call(`${BASE}/strategy-checks/${encodeURIComponent(id)}/shadow-trade`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
+/**
+ * @param {string} id
+ * @param {{ userNote?: string | null, userTags?: string[] }} payload
+ */
 export async function patchShadowTrade(id, payload) {
   return call(`${BASE}/shadow-trades/${encodeURIComponent(id)}`, {
     method: 'PATCH',

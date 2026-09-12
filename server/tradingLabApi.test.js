@@ -258,6 +258,7 @@ describe('Trading Lab API', () => {
       '/api/trading-lab/shadow-trades',
       '/api/trading-lab/shadow-trades/stats',
       '/api/trading-lab/shadow-trades/settings',
+      '/api/trading-lab/strategy-checks',
       '/api/trading-lab/stats',
     ]) {
       const res = await request('GET', urlPath)
@@ -282,6 +283,12 @@ describe('Trading Lab API', () => {
       origin: ORIGIN,
     })
     expect(shadowPatch.status).toBe(401)
+
+    const strategyPost = await request('POST', '/api/trading-lab/strategy-checks', {
+      body: { symbol: 'BTCUSDT', direction: 'LONG' },
+      origin: ORIGIN,
+    })
+    expect(strategyPost.status).toBe(401)
   })
 
   it('CSRF 토큰 없는 쓰기 요청은 403', async () => {
@@ -314,6 +321,10 @@ describe('Trading Lab API', () => {
     expect(res.json.marketStates).toContain('BULLISH_PRESSURE')
     expect(res.json.marketStates).toContain('DATA_INSUFFICIENT')
     expect(res.json.marketDataConfigured).toBe(true)
+    expect(res.json.strategyVersion).toBe('my_strategy_v1')
+    expect(res.json.strategyCheckResults).toEqual(['READY', 'NOT_READY', 'RISK_HIGH'])
+    expect(res.json.strategyScoreLabel).toBe('기준 충족도')
+    expect(res.json.strategyCheckDisclaimer).not.toMatch(/승률|수익 확률/)
   })
 
   it('시장 데이터는 Bybit provider 로 조회한다', async () => {
@@ -941,6 +952,76 @@ describe('Trading Lab API', () => {
     )
     expect(detailed.status).toBe(201)
     expect(detailed.json.trade.entryReason).toBe('상세 모달 유지')
+  })
+
+  it('My Strategy v1 체크와 가상 기록을 저장한다', async () => {
+    await login()
+    const long = await request(
+      'POST',
+      '/api/trading-lab/strategy-checks',
+      authed({
+        symbol: 'BTCUSDT',
+        direction: 'LONG',
+        selectedTags: ['support', 'support_ob', 'has_stop', 'has_target'],
+      }),
+    )
+    expect(long.status).toBe(201)
+    expect(long.json.check.strategyVersion).toBe('my_strategy_v1')
+    expect(long.json.check.direction).toBe('LONG')
+    expect(long.json.check.selectedTags).toEqual([
+      'support',
+      'support_ob',
+      'has_stop',
+      'has_target',
+    ])
+    expect(['READY', 'NOT_READY', 'RISK_HIGH']).toContain(long.json.check.result)
+    expect(long.json.check.scoreLabel).toBe('기준 충족도')
+    expect(long.json.disclaimer).not.toMatch(/승률|매수 추천/)
+
+    const listed = await request('GET', '/api/trading-lab/strategy-checks?symbol=BTCUSDT')
+    expect(listed.status).toBe(200)
+    expect(listed.json.checks[0].id).toBe(long.json.check.id)
+
+    const recorded = await request(
+      'POST',
+      `/api/trading-lab/strategy-checks/${long.json.check.id}/shadow-trade`,
+      authed({}),
+    )
+    expect(recorded.status).toBe(201)
+    expect(recorded.json.trade.entryReason).toBe('my_strategy_v1')
+    expect(recorded.json.trade.userTags).toEqual([
+      'support',
+      'support_ob',
+      'has_stop',
+      'has_target',
+    ])
+    expect(recorded.json.check.shadowTradeId).toBe(recorded.json.trade.id)
+
+    const fomo = await request(
+      'POST',
+      '/api/trading-lab/strategy-checks',
+      authed({
+        symbol: 'ETHUSDT',
+        direction: 'SHORT',
+        selectedTags: ['resistance', 'has_stop', 'has_target', 'FOMO'],
+      }),
+    )
+    expect(fomo.status).toBe(201)
+    expect(fomo.json.check.result).toBe('RISK_HIGH')
+    expect(fomo.json.check.selectedTags).toContain('fomo')
+
+    const noStop = await request(
+      'POST',
+      '/api/trading-lab/strategy-checks',
+      authed({
+        symbol: 'ETHUSDT',
+        direction: 'SHORT',
+        selectedTags: ['resistance', 'has_target'],
+      }),
+    )
+    expect(noStop.status).toBe(201)
+    expect(noStop.json.check.result).toBe('RISK_HIGH')
+    expect(noStop.json.check.missingItems).toContain('손절 기준이 없습니다.')
   })
 
   it('오류 응답에 내부 경로·secret 을 노출하지 않는다', async () => {

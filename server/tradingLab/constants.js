@@ -229,3 +229,31 @@ export const SHADOW_OBSERVE_STATES = Object.freeze([
   'SHORT_LIQUIDATION_DRIVEN',
   'LONG_LIQUIDATION_DRIVEN',
 ])
+
+export const STRATEGY_CHECKLIST_VERSION = 'my_strategy_v1'
+export const STRATEGY_CHECK_RESULTS = Object.freeze([
+  'READY',
+  'NOT_READY',
+  'RISK_HIGH',
+])
+export const STRATEGY_CHECK_RESULT_SET = new Set(STRATEGY_CHECK_RESULTS)
+export const STRATEGY_CHECK_RESULT_LABELS = Object.freeze({
+  READY: '기준 충족',
+  NOT_READY: '기준 부족',
+  RISK_HIGH: '리스크 높음',
+})
+export const STRATEGY_SCORE_LABEL = '기준 충족도'
+export const STRATEGY_ENTRY_REASON = 'my_strategy_v1'
+export const STRATEGY_LOCATION_TAGS = Object.freeze([
+  'support',
+  'resistance',
+  'support_ob',
+  'resistance_ob',
+  'fvg',
+  'trendline',
+  'fakeout',
+  'liquidity_sweep',
+])
+export const STRATEGY_RISK_TAGS = Object.freeze(['has_stop', 'has_target', 'fomo'])
+export const STRATEGY_CHECK_DISCLAIMER =
+  '시장 관찰 및 기준 점검 도구이며 매수·매도 추천이 아닙니다.'

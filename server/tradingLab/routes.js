@@ -29,6 +29,13 @@ import {
   SHADOW_TRADE_DISCLAIMER,
   SHADOW_ASSUMED_FEE_BPS,
   SHADOW_ASSUMED_SLIPPAGE_BPS,
+  STRATEGY_CHECKLIST_VERSION,
+  STRATEGY_CHECK_RESULTS,
+  STRATEGY_CHECK_RESULT_LABELS,
+  STRATEGY_CHECK_DISCLAIMER,
+  STRATEGY_SCORE_LABEL,
+  STRATEGY_LOCATION_TAGS,
+  STRATEGY_RISK_TAGS,
 } from './constants.js'
 import {
   asBias,
@@ -44,6 +51,7 @@ import {
   sanitizeShadowSettingsInput,
   sanitizeShadowTradeInput,
   sanitizeShadowTradePatch,
+  sanitizeStrategyCheckInput,
 } from './validate.js'
 import {
   createAnalysis,
@@ -88,6 +96,11 @@ import {
   processAutoShadowTrades,
   updatePresentedShadowSettings,
 } from './shadowTradeService.js'
+import {
+  createShadowTradeFromStrategyCheck,
+  createStrategyCheck,
+  listPresentedStrategyChecks,
+} from './strategyCheckService.js'
 
 /**
  * @param {import('express').Response} res
@@ -130,6 +143,13 @@ export function createTradingLabRouter() {
       shadowDisclaimer: SHADOW_TRADE_DISCLAIMER,
       assumedFeeBps: SHADOW_ASSUMED_FEE_BPS,
       assumedSlippageBps: SHADOW_ASSUMED_SLIPPAGE_BPS,
+      strategyVersion: STRATEGY_CHECKLIST_VERSION,
+      strategyCheckResults: STRATEGY_CHECK_RESULTS,
+      strategyCheckResultLabels: STRATEGY_CHECK_RESULT_LABELS,
+      strategyScoreLabel: STRATEGY_SCORE_LABEL,
+      strategyLocationTags: STRATEGY_LOCATION_TAGS,
+      strategyRiskTags: STRATEGY_RISK_TAGS,
+      strategyCheckDisclaimer: STRATEGY_CHECK_DISCLAIMER,
       marketDataConfigured: isMarketDataConfigured(),
     })
   })
@@ -676,6 +696,79 @@ export function createTradingLabRouter() {
       })
     } catch {
       console.error('[TradingLab] get shadow trade failed')
+      serverError(res)
+    }
+  })
+
+  router.get('/strategy-checks', (req, res) => {
+    const symbol = req.query.symbol != null ? asLabSymbol(req.query.symbol) : null
+    if (req.query.symbol != null && !symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+    const limit = asListLimit(req.query.limit, 20)
+    if (limit === null) {
+      badRequest(res, 'limit')
+      return
+    }
+
+    try {
+      res.status(200).json({
+        ok: true,
+        checks: listPresentedStrategyChecks({ symbol, limit }),
+        disclaimer: STRATEGY_CHECK_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] list strategy checks failed')
+      serverError(res)
+    }
+  })
+
+  router.post('/strategy-checks', async (req, res) => {
+    const parsed = sanitizeStrategyCheckInput(req.body)
+    if (!parsed.ok) {
+      badRequest(res, parsed.field)
+      return
+    }
+
+    try {
+      const created = await createStrategyCheck(parsed.value)
+      res.status(201).json({
+        ok: true,
+        check: created.check,
+        disclaimer: STRATEGY_CHECK_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] create strategy check failed')
+      serverError(res)
+    }
+  })
+
+  router.post('/strategy-checks/:id/shadow-trade', async (req, res) => {
+    const id = asId(req.params.id)
+    if (!id) {
+      badRequest(res, 'id')
+      return
+    }
+
+    try {
+      const created = await createShadowTradeFromStrategyCheck(id)
+      if (created.notFound) {
+        res.status(404).json({ ok: false, message: 'Not found' })
+        return
+      }
+      if (!created.ok) {
+        badRequest(res, created.field)
+        return
+      }
+      res.status(201).json({
+        ok: true,
+        check: created.check,
+        trade: created.trade,
+        disclaimer: STRATEGY_CHECK_DISCLAIMER,
+      })
+    } catch {
+      console.error('[TradingLab] strategy shadow trade failed')
       serverError(res)
     }
   })
