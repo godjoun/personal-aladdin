@@ -22,8 +22,59 @@ export const SHADOW_QUICK_SECTION_HINT =
   '실제 주문 없이 현재 시장 상태를 기준으로 가상 진입만 기록합니다.'
 export const SHADOW_QUICK_HINT =
   '먼저 1초 기록하고, 이유는 나중에 보강해도 됩니다.'
+export const SHADOW_REVIEW_TITLE = '가상 기록 / 복기'
+export const SHADOW_REVIEW_HINT =
+  '내 진입 기준에서 만든 기준 체크 기반 가상 기록을 보고 복기합니다. 실제 주문은 없습니다.'
+export const SHADOW_AUTO_MODE_LABEL = '자동 기록'
+export const STRATEGY_PANEL_TITLE = '내 진입 기준'
+export const STRATEGY_RECORD_HINT = '기준 체크 기반 가상 기록 · 실제 주문 없음'
 export const STRATEGY_CHECK_DISCLAIMER =
   '시장 관찰 및 기준 점검 도구이며 매수·매도 추천이 아닙니다.'
+export const MARKET_QUOTE_TITLE = '현재 시세'
+export const MARKET_DATA_TITLE = '시장 데이터'
+export const MARKET_FLOW_TITLE = '수급 확인'
+export const MARKET_LIQUIDATION_TITLE = '청산 확인'
+export const MARKET_ENGINE_TITLE = '시장 상태'
+export const CHART_TIMEFRAMES = Object.freeze(['15m', '1h', '4h'])
+export const CHART_VIEW_TITLE = '시장 차트'
+export const COMMAND_CENTER_TITLE = '오늘의 ALADDIN'
+export const COMMAND_ROUTINE_TITLE = '오늘의 ALADDIN 루틴'
+export const COMMAND_ROUTINE_STEPS = Object.freeze([
+  'BTC/ETH 시장 확인',
+  '내 진입 기준 체크',
+  '기준 부족이면 대기',
+  '기준이 괜찮으면 가상 기록',
+  '어제 기록 복기',
+])
+export const COMMAND_TODO_STEPS = Object.freeze([
+  '시장 확인',
+  '내 진입 기준 체크',
+  '가상 기록 또는 대기',
+])
+export const SHADOW_RECORD_TYPES = Object.freeze([
+  'STRATEGY',
+  'IMPULSE',
+  'OBSERVATION',
+])
+export const SHADOW_RECORD_TYPE_LABELS = Object.freeze({
+  STRATEGY: '기준 기록',
+  IMPULSE: '충동 기록',
+  OBSERVATION: '관찰 기록',
+})
+export const STRATEGY_ACTION_LABELS = Object.freeze({
+  WAIT: '대기',
+  CONFIRM: '추가 확인',
+  RECORDABLE: '가상 기록 가능',
+  RISK_HIGH: '리스크 높음',
+})
+export const COMMAND_STATUS_LABELS = Object.freeze({
+  WAIT: '대기',
+  NOT_READY: '기준 부족',
+  RISK_HIGH: '리스크 높음',
+  REVIEWABLE: '검토 가능',
+})
+export const CHART_VIEW_DISCLAIMER =
+  'Bybit 공개 캔들 관측용 차트이며 실제 주문은 없습니다.'
 export const STRATEGY_SCORE_LABEL = '기준 충족도'
 export const STRATEGY_LOCATION_TAGS = Object.freeze([
   'support',
@@ -40,6 +91,7 @@ export const STRATEGY_CHECK_RESULT_LABELS = Object.freeze({
   READY: '기준 충족',
   NOT_READY: '기준 부족',
   RISK_HIGH: '리스크 높음',
+  DATA_INSUFFICIENT: '데이터 부족',
 })
 export const SHADOW_QUICK_TAGS = Object.freeze([
   'support',
@@ -554,6 +606,18 @@ export function getShadowTagLabel(tag) {
 /**
  * @param {string | null | undefined} result
  */
+/**
+ * @param {string | null | undefined} direction
+ */
+export function formatShadowDirectionLabel(direction) {
+  if (direction === 'LONG') return '가상 LONG 기록'
+  if (direction === 'SHORT') return '가상 SHORT 기록'
+  return NO_DATA_LABEL
+}
+
+/**
+ * @param {string | null | undefined} result
+ */
 export function getShadowResultLabel(result) {
   return SHADOW_RESULT_LABELS[result] || SHADOW_RESULT_LABELS.UNRESOLVED
 }
@@ -616,6 +680,161 @@ export function getStrategyCheckResultLabel(result) {
 /**
  * @param {object | null | undefined} check
  */
+export function getStrategyDisplayResult(check) {
+  if (!check) return null
+  const evidence = check.autoEvidence || {}
+  const dataMissing =
+    evidence.structure4h == null &&
+    evidence.structure1h == null &&
+    evidence.cvdNotional == null &&
+    evidence.volumeRatio == null
+  if (dataMissing && check.result !== 'READY' && check.result !== 'RISK_HIGH') {
+    return 'DATA_INSUFFICIENT'
+  }
+  return check.result || 'NOT_READY'
+}
+
+/**
+ * @param {string | null | undefined} result
+ * @param {string | null | undefined} direction
+ */
+export function getStrategyActionLabel(result, _direction) {
+  if (result === 'READY') return STRATEGY_ACTION_LABELS.RECORDABLE
+  if (result === 'RISK_HIGH') return STRATEGY_ACTION_LABELS.RISK_HIGH
+  if (result === 'NOT_READY') return STRATEGY_ACTION_LABELS.CONFIRM
+  return STRATEGY_ACTION_LABELS.WAIT
+}
+
+/**
+ * @param {string | null | undefined} result
+ * @param {string | null | undefined} direction
+ */
+export function getStrategyReviewLabel(result, direction) {
+  if (result !== 'READY') return getStrategyActionLabel(result, direction)
+  if (direction === 'SHORT') return 'SHORT 검토 가능'
+  if (direction === 'LONG') return 'LONG 검토 가능'
+  return '검토 가능'
+}
+
+/**
+ * @param {object | null | undefined} check
+ */
+export function getStrategyPrimaryIssue(check) {
+  if (!check) return null
+  const missing = Array.isArray(check.missingItems) ? check.missingItems : []
+  const warnings = Array.isArray(check.riskWarnings) ? check.riskWarnings : []
+  const tags = Array.isArray(check.selectedTags) ? check.selectedTags : []
+  if (tags.includes('fomo') || warnings.some((item) => item.includes('FOMO'))) {
+    return 'FOMO 태그 있음'
+  }
+  if (missing.some((item) => item.includes('손절'))) return '손절 기준 없음'
+  if (missing.some((item) => item.includes('목표'))) return '목표 기준 없음'
+  if (missing.some((item) => item.includes('4H'))) return '4H 방향 불명확'
+  if (missing.some((item) => item.includes('CVD'))) return 'CVD 불일치'
+  if (missing.some((item) => item.includes('거래량'))) return '거래량 근거 약함'
+  return missing[0] || warnings[0] || null
+}
+
+/**
+ * @param {{
+ *   result?: string | null,
+ *   selectedTags?: string[] | null,
+ *   userTags?: string[] | null,
+ *   score?: number | null,
+ *   recordType?: string | null,
+ * }} [input]
+ */
+export function classifyShadowRecordType(input = {}) {
+  if (
+    input.recordType === 'STRATEGY' ||
+    input.recordType === 'IMPULSE' ||
+    input.recordType === 'OBSERVATION'
+  ) {
+    return input.recordType
+  }
+  const result = input.result || null
+  const tags = Array.isArray(input.selectedTags)
+    ? input.selectedTags
+    : Array.isArray(input.userTags)
+      ? input.userTags
+      : []
+  const hasFomo = tags.includes('fomo')
+  const hasStop = tags.includes('has_stop')
+  const hasTarget = tags.includes('has_target')
+  const score = Number(input.score)
+  const lowScore = Number.isFinite(score) && score < 50
+
+  if (result === 'READY' && !hasFomo && hasStop && hasTarget) return 'STRATEGY'
+  if (result === 'RISK_HIGH' || hasFomo || !hasStop) return 'IMPULSE'
+  if (result === 'NOT_READY') return 'OBSERVATION'
+  if (lowScore) return 'IMPULSE'
+  return 'OBSERVATION'
+}
+
+/**
+ * @param {string | null | undefined} recordType
+ */
+export function getShadowRecordTypeLabel(recordType) {
+  return SHADOW_RECORD_TYPE_LABELS[recordType] || SHADOW_RECORD_TYPE_LABELS.OBSERVATION
+}
+
+/**
+ * @param {object | null | undefined} check
+ */
+export function getCommandStatus(check) {
+  const result = getStrategyDisplayResult(check)
+  if (!result) return { id: 'WAIT', label: COMMAND_STATUS_LABELS.WAIT }
+  if (result === 'READY') return { id: 'REVIEWABLE', label: COMMAND_STATUS_LABELS.REVIEWABLE }
+  if (result === 'RISK_HIGH') return { id: 'RISK_HIGH', label: COMMAND_STATUS_LABELS.RISK_HIGH }
+  if (result === 'DATA_INSUFFICIENT') return { id: 'WAIT', label: COMMAND_STATUS_LABELS.WAIT }
+  return { id: 'NOT_READY', label: COMMAND_STATUS_LABELS.NOT_READY }
+}
+
+/**
+ * @param {unknown} trades
+ * @param {object | null | undefined} stats
+ */
+export function summarizeShadowReview(trades, stats) {
+  const list = Array.isArray(trades) ? trades : []
+  let strategyCount = stats?.strategyCount ?? 0
+  let impulseCount = stats?.impulseCount ?? 0
+  let observationCount = stats?.observationCount ?? 0
+  let fomoCount = stats?.fomoCount ?? 0
+  let reviewCount = stats?.reviewCount
+
+  if (stats?.strategyCount == null) {
+    strategyCount = 0
+    impulseCount = 0
+    observationCount = 0
+    fomoCount = 0
+    for (const trade of list) {
+      const type = classifyShadowRecordType(trade)
+      if (type === 'STRATEGY') strategyCount += 1
+      else if (type === 'IMPULSE') impulseCount += 1
+      else observationCount += 1
+      if (Array.isArray(trade.userTags) && trade.userTags.includes('fomo')) {
+        fomoCount += 1
+      }
+    }
+  }
+  if (reviewCount == null) {
+    reviewCount = list.filter(
+      (trade) => trade.status === 'OPEN' || trade.status === 'EVALUATING',
+    ).length
+  }
+
+  return {
+    reviewCount,
+    strategyCount,
+    impulseCount,
+    observationCount,
+    fomoCount,
+  }
+}
+
+/**
+ * @param {object | null | undefined} check
+ */
 export function formatStrategyScore(check) {
   if (!check || check.score == null) return NO_DATA_LABEL
   return `${Math.round(check.score)} / 100`
@@ -636,4 +855,113 @@ export function formatShadowResultShare(stats) {
   if (!stats) return NO_DATA_LABEL
   const share = stats.resultShare || {}
   return `완료 결과 비율 WIN ${share.WIN || 0} · LOSS ${share.LOSS || 0} · NEUTRAL ${share.NEUTRAL || 0}`
+}
+
+/**
+ * Lightweight Charts 는 UTC seconds 를 사용한다.
+ *
+ * @param {unknown} value
+ * @returns {number | null}
+ */
+export function toUnixSeconds(value) {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value)
+    if (!Number.isFinite(parsed)) return null
+    return Math.floor(parsed / 1000)
+  }
+  const num = Number(value)
+  if (!Number.isFinite(num)) return null
+  return num > 1e12 ? Math.floor(num / 1000) : Math.floor(num)
+}
+
+/**
+ * @param {unknown} candles
+ * @returns {{ time: number, open: number, high: number, low: number, close: number }[]}
+ */
+export function toChartCandles(candles) {
+  if (!Array.isArray(candles)) return []
+
+  const mapped = []
+  for (const row of candles) {
+    const time = toUnixSeconds(row?.timestamp ?? row?.time)
+    const open = Number(row?.open)
+    const high = Number(row?.high)
+    const low = Number(row?.low)
+    const close = Number(row?.close)
+    if (
+      time === null ||
+      !Number.isFinite(open) ||
+      !Number.isFinite(high) ||
+      !Number.isFinite(low) ||
+      !Number.isFinite(close)
+    ) {
+      continue
+    }
+    mapped.push({ time, open, high, low, close })
+  }
+
+  mapped.sort((left, right) => left.time - right.time)
+  const unique = []
+  for (const candle of mapped) {
+    const last = unique[unique.length - 1]
+    if (last && last.time === candle.time) {
+      unique[unique.length - 1] = candle
+    } else {
+      unique.push(candle)
+    }
+  }
+  return unique
+}
+
+/**
+ * @param {number | null} timeSec
+ * @param {number[]} candleTimes
+ * @returns {number | null}
+ */
+export function snapUnixSecondsToCandleTime(timeSec, candleTimes) {
+  if (!Number.isFinite(timeSec) || !Array.isArray(candleTimes) || candleTimes.length === 0) {
+    return null
+  }
+  if (timeSec < candleTimes[0]) return null
+  let chosen = candleTimes[0]
+  for (const time of candleTimes) {
+    if (time <= timeSec) chosen = time
+    else break
+  }
+  return chosen
+}
+
+/**
+ * Shadow Trade 진입 시각을 현재 캔들에 맞춘 마커.
+ *
+ * @param {unknown} trades
+ * @param {unknown} candles
+ * @param {string} [symbol]
+ */
+export function buildShadowEntryMarkers(trades, candles, symbol) {
+  const chartCandles = toChartCandles(candles)
+  const candleTimes = chartCandles.map((candle) => candle.time)
+  const rows = Array.isArray(trades) ? trades : []
+  const markers = []
+
+  for (const trade of rows) {
+    if (symbol && trade?.symbol && trade.symbol !== symbol) continue
+    const direction = trade?.direction
+    if (direction !== 'LONG' && direction !== 'SHORT') continue
+    const snapped = snapUnixSecondsToCandleTime(
+      toUnixSeconds(trade.createdAt),
+      candleTimes,
+    )
+    if (snapped == null) continue
+    markers.push({
+      time: snapped,
+      position: direction === 'LONG' ? 'belowBar' : 'aboveBar',
+      color: direction === 'LONG' ? '#0a7f3f' : '#cf222e',
+      shape: direction === 'LONG' ? 'arrowUp' : 'arrowDown',
+      text: direction === 'LONG' ? '가상 LONG' : '가상 SHORT',
+    })
+  }
+
+  return markers.sort((left, right) => left.time - right.time)
 }

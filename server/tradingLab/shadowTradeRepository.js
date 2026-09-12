@@ -60,6 +60,7 @@ export function mapShadowTrade(row) {
     shortLiquidationNotional: row.shortLiquidationNotional ?? null,
     userTags: parseJson(row.userTagsJson, []),
     userNote: row.userNote ?? null,
+    recordType: row.recordType ?? null,
   }
 }
 
@@ -120,14 +121,14 @@ export function insertShadowTrade(input, db = getDb()) {
       secondaryStatesJson, timeframe15m, timeframe1h, timeframe4h,
       cvdNotional, buySharePct, sellSharePct, oiChangePct, fundingRate,
       volumeRatio, longLiquidationNotional, shortLiquidationNotional,
-      userTagsJson, userNote
+      userTagsJson, userNote, recordType
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?,
-      ?, ?
+      ?, ?, ?
     )`,
   ).run(
     id,
@@ -156,6 +157,7 @@ export function insertShadowTrade(input, db = getDb()) {
     input.shortLiquidationNotional ?? null,
     JSON.stringify(input.userTags || []),
     input.userNote ?? null,
+    input.recordType ?? null,
   )
   return getShadowTradeById(id, db)
 }

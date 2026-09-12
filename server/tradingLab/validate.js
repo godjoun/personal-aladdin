@@ -19,6 +19,7 @@ import {
   TRADING_LAB_STRUCTURE_SET,
   TRADING_LAB_SYMBOL_SET,
   TRADING_LAB_TIMEFRAME_SET,
+  CHART_TIMEFRAME_SET,
   SHADOW_TRADE_DIRECTION_SET,
   SHADOW_TRADE_SOURCE_SET,
   SHADOW_TRADE_TAG_SET,
@@ -92,6 +93,18 @@ export function asLabTimeframe(value) {
   if (typeof value !== 'string') return null
   const normalized = value.trim().toLowerCase()
   return TRADING_LAB_TIMEFRAME_SET.has(normalized) ? normalized : null
+}
+
+/**
+ * Chart View 전용 타임프레임 — 15m / 1h / 4h 만 허용
+ *
+ * @param {unknown} value
+ * @returns {string | null}
+ */
+export function asChartTimeframe(value) {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim().toLowerCase()
+  return CHART_TIMEFRAME_SET.has(normalized) ? normalized : null
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   TRADING_LAB_CVD_WINDOWS,
   TRADING_LAB_SYMBOLS,
   TRADING_LAB_TIMEFRAMES,
+  CHART_TIMEFRAMES,
   MARKET_STATES,
   MARKET_STATE_HISTORY_LIMIT,
   SHADOW_TRADE_DIRECTIONS,
@@ -39,6 +40,7 @@ import {
 } from './constants.js'
 import {
   asBias,
+  asChartTimeframe,
   asCvdWindow,
   asLabSymbol,
   asLiquidationSide,
@@ -75,7 +77,11 @@ import {
   listScreenshotsByAnalysisId,
 } from './screenshotRepository.js'
 import { getMarketSnapshot } from './marketSnapshotService.js'
-import { isMarketDataConfigured } from './marketDataProvider.js'
+import {
+  PROVIDER_STATUS,
+  callMarketData,
+  isMarketDataConfigured,
+} from './marketDataProvider.js'
 import { getLiquidationCollector } from './liquidationCollector.js'
 import { getCvdSummary } from './tradeFlowRepository.js'
 import { getTradeFlowCollector } from './tradeFlowCollector.js'
@@ -126,6 +132,7 @@ export function createTradingLabRouter() {
       ok: true,
       symbols: TRADING_LAB_SYMBOLS,
       timeframes: TRADING_LAB_TIMEFRAMES,
+      chartTimeframes: CHART_TIMEFRAMES,
       biases: TRADING_LAB_BIASES,
       outcomeResults: TRADING_LAB_OUTCOME_RESULTS,
       structureStates: TRADING_LAB_STRUCTURE_STATES,
@@ -167,6 +174,54 @@ export function createTradingLabRouter() {
       res.status(200).json({ ok: true, market: snapshot })
     } catch {
       console.error('[TradingLab] market snapshot failed')
+      serverError(res)
+    }
+  })
+
+  /** Chart View — Bybit 공개 캔들만. 주문/프라이빗 API 없음 */
+  router.get('/market/:symbol/candles', async (req, res) => {
+    const symbol = asLabSymbol(req.params.symbol)
+    if (!symbol) {
+      badRequest(res, 'symbol')
+      return
+    }
+
+    const timeframe = asChartTimeframe(req.query.timeframe || '1h')
+    if (!timeframe) {
+      badRequest(res, 'timeframe')
+      return
+    }
+
+    const limit = asListLimit(req.query.limit, 150)
+    if (limit === null) {
+      badRequest(res, 'limit')
+      return
+    }
+
+    try {
+      const result = await callMarketData('getCandles', {
+        symbol,
+        timeframe,
+        limit,
+      })
+      const data = result.data || {}
+      res.status(200).json({
+        ok: true,
+        symbol,
+        timeframe,
+        status: result.status,
+        stale: Boolean(result.stale),
+        fetchedAt: result.fetchedAt || null,
+        candles: Array.isArray(data.candles) ? data.candles : [],
+        structure: data.structure ?? null,
+        changePct: typeof data.changePct === 'number' ? data.changePct : null,
+        message:
+          result.status === PROVIDER_STATUS.OK
+            ? null
+            : result.message || '데이터 연결 전',
+      })
+    } catch {
+      console.error('[TradingLab] market candles failed')
       serverError(res)
     }
   })

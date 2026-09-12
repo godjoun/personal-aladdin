@@ -247,6 +247,7 @@ describe('Trading Lab API', () => {
     for (const urlPath of [
       '/api/trading-lab/config',
       '/api/trading-lab/market/BTCUSDT',
+      '/api/trading-lab/market/BTCUSDT/candles',
       '/api/trading-lab/analyses',
       '/api/trading-lab/liquidations',
       '/api/trading-lab/liquidations/status',
@@ -321,6 +322,7 @@ describe('Trading Lab API', () => {
     expect(res.json.marketStates).toContain('BULLISH_PRESSURE')
     expect(res.json.marketStates).toContain('DATA_INSUFFICIENT')
     expect(res.json.marketDataConfigured).toBe(true)
+    expect(res.json.chartTimeframes).toEqual(['15m', '1h', '4h'])
     expect(res.json.strategyVersion).toBe('my_strategy_v1')
     expect(res.json.strategyCheckResults).toEqual(['READY', 'NOT_READY', 'RISK_HIGH'])
     expect(res.json.strategyScoreLabel).toBe('기준 충족도')
@@ -348,6 +350,55 @@ describe('Trading Lab API', () => {
     expect(eth.status).toBe(200)
     expect(eth.json.market.symbol).toBe('ETHUSDT')
     expect(eth.json.market.metrics.price.value).toBe(3500)
+  })
+
+  it('Chart View 공개 캔들을 15m/1h/4h 로 조회한다', async () => {
+    await login()
+
+    const hourly = await request('GET', '/api/trading-lab/market/BTCUSDT/candles?timeframe=1h')
+    expect(hourly.status).toBe(200)
+    expect(hourly.json.symbol).toBe('BTCUSDT')
+    expect(hourly.json.timeframe).toBe('1h')
+    expect(hourly.json.status).toBe('OK')
+    expect(hourly.json.candles.length).toBe(3)
+    expect(hourly.json.candles[0]).toMatchObject({
+      timestamp: 1_700_000_000_000,
+      open: 1,
+      high: 2,
+      low: 0.5,
+      close: 1.5,
+    })
+    expect(JSON.stringify(hourly.json)).not.toMatch(/placeOrder|private|승률/)
+
+    const fifteen = await request(
+      'GET',
+      '/api/trading-lab/market/ETHUSDT/candles?timeframe=15m',
+    )
+    expect(fifteen.status).toBe(200)
+    expect(fifteen.json.symbol).toBe('ETHUSDT')
+    expect(fifteen.json.timeframe).toBe('15m')
+    expect(fifteen.json.candles.length).toBe(3)
+
+    const fourHour = await request(
+      'GET',
+      '/api/trading-lab/market/BTCUSDT/candles?timeframe=4h',
+    )
+    expect(fourHour.status).toBe(200)
+    expect(fourHour.json.timeframe).toBe('4h')
+
+    const blocked = await request(
+      'GET',
+      '/api/trading-lab/market/BTCUSDT/candles?timeframe=12h',
+    )
+    expect(blocked.status).toBe(400)
+    expect(blocked.json.field).toBe('timeframe')
+
+    const daily = await request(
+      'GET',
+      '/api/trading-lab/market/BTCUSDT/candles?timeframe=1d',
+    )
+    expect(daily.status).toBe(400)
+    expect(daily.json.field).toBe('timeframe')
   })
 
   it('관측 청산 status / window API 를 제공한다', async () => {
@@ -524,6 +575,11 @@ describe('Trading Lab API', () => {
     expect(res.json.market.status).toBe('NOT_CONFIGURED')
     expect(res.json.market.configured).toBe(false)
     expect(res.json.market.metrics.price.value).toBeNull()
+
+    const candles = await request('GET', '/api/trading-lab/market/BTCUSDT/candles?timeframe=1h')
+    expect(candles.status).toBe(200)
+    expect(candles.json.status).toBe('NOT_CONFIGURED')
+    expect(candles.json.candles).toEqual([])
   })
 
   it('허용되지 않은 symbol 은 400 으로 차단한다', async () => {
@@ -532,6 +588,10 @@ describe('Trading Lab API', () => {
     const market = await request('GET', '/api/trading-lab/market/SOLUSDT')
     expect(market.status).toBe(400)
     expect(market.json.field).toBe('symbol')
+
+    const candles = await request('GET', '/api/trading-lab/market/SOLUSDT/candles?timeframe=1h')
+    expect(candles.status).toBe(400)
+    expect(candles.json.field).toBe('symbol')
 
     const list = await request('GET', '/api/trading-lab/analyses?symbol=SOLUSDT')
     expect(list.status).toBe(400)
@@ -996,6 +1056,7 @@ describe('Trading Lab API', () => {
       'has_target',
     ])
     expect(recorded.json.check.shadowTradeId).toBe(recorded.json.trade.id)
+    expect(['STRATEGY', 'IMPULSE', 'OBSERVATION']).toContain(recorded.json.trade.recordType)
 
     const fomo = await request(
       'POST',

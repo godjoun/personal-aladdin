@@ -226,7 +226,8 @@ export function migrateTradingLab(db) {
       longLiquidationNotional REAL,
       shortLiquidationNotional REAL,
       userTagsJson TEXT,
-      userNote TEXT
+      userNote TEXT,
+      recordType TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_shadow_trade_symbol_created
@@ -294,6 +295,8 @@ export function migrateTradingLab(db) {
     CREATE INDEX IF NOT EXISTS idx_strategy_check_symbol_checked
       ON strategy_check(symbol, checkedAt DESC);
   `)
+
+  addColumnIfMissing(db, 'shadow_trade', 'recordType', 'TEXT')
 }
 
 /**

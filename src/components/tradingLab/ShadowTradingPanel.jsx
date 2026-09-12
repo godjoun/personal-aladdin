@@ -1,39 +1,29 @@
 import { useState } from 'react'
-import ShadowTradeComposer from './ShadowTradeComposer.jsx'
-import {
-  createShadowTrade,
-  patchShadowTrade,
-} from '../../services/tradingLabApi.js'
+import { patchShadowTrade } from '../../services/tradingLabApi.js'
 import {
   NO_DATA_LABEL,
-  SHADOW_QUICK_HINT,
-  SHADOW_QUICK_SECTION_HINT,
+  SHADOW_AUTO_MODE_LABEL,
   SHADOW_QUICK_TAGS,
+  SHADOW_REVIEW_HINT,
+  SHADOW_REVIEW_TITLE,
   SHADOW_TRADE_DISCLAIMER,
+  formatShadowDirectionLabel,
   formatShadowHorizon,
   formatShadowPrice,
   formatShadowResultShare,
   formatShadowReturnPct,
   getShadowResultLabel,
+  getShadowRecordTypeLabel,
   getShadowTagLabel,
   splitShadowTrades,
+  summarizeShadowReview,
 } from '../../utils/tradingLabView.js'
 
-function readMarketPrice(market) {
-  return (
-    market?.metrics?.price?.value
-    ?? market?.ticker?.lastPrice
-    ?? market?.ticker?.markPrice
-    ?? null
-  )
-}
-
 /**
- * Shadow Trading — 가상 기록과 관찰. 실제 주문/추천이 아니다.
+ * 가상 기록 / 복기 — 이미 만든 가상 기록과 결과만 본다.
+ * 새 진입 기록은 My Strategy v1 에서만 만든다.
  */
 export default function ShadowTradingPanel({
-  symbol,
-  market,
   trades,
   stats,
   settings,
@@ -42,9 +32,6 @@ export default function ShadowTradingPanel({
   onToggleAuto,
   onRefresh,
 }) {
-  const [composer, setComposer] = useState(null)
-  const [quickTags, setQuickTags] = useState([])
-  const [savingDirection, setSavingDirection] = useState(null)
   const [message, setMessage] = useState('')
   const [editing, setEditing] = useState(null)
   const [editNote, setEditNote] = useState('')
@@ -53,42 +40,11 @@ export default function ShadowTradingPanel({
 
   const autoOn = Boolean(settings?.autoRecord)
   const { open, closed } = splitShadowTrades(trades)
-  const entryPrice = readMarketPrice(market)
+  const review = summarizeShadowReview(trades, stats)
   const warnings = [
     ...(stats?.warnings || []),
     ...open.flatMap((trade) => trade.warnings || []),
   ].filter((item, index, list) => list.indexOf(item) === index)
-
-  function toggleQuickTag(tag) {
-    setQuickTags((current) =>
-      current.includes(tag)
-        ? current.filter((item) => item !== tag)
-        : [...current, tag],
-    )
-  }
-
-  async function handleQuickRecord(direction) {
-    if (savingDirection) return
-    setSavingDirection(direction)
-    setMessage('')
-    try {
-      const payload = await createShadowTrade({
-        symbol,
-        direction,
-        entryPrice,
-        userTags: quickTags,
-        userNote: null,
-        quick: true,
-      })
-      setMessage(`가상 ${direction} 기록 완료`)
-      onRefresh()
-      return payload
-    } catch (saveError) {
-      setMessage(saveError.message || '가상 기록을 저장하지 못했습니다.')
-    } finally {
-      setSavingDirection(null)
-    }
-  }
 
   function startEdit(trade, mode) {
     setEditing({ id: trade.id, mode })
@@ -118,7 +74,10 @@ export default function ShadowTradingPanel({
     return (
       <li key={trade.id} className="trading-lab__shadow-card">
         <p className="trading-lab__shadow-card-title">
-          {trade.symbol} {trade.direction}
+          {trade.symbol} {formatShadowDirectionLabel(trade.direction)}
+          {trade.recordType || trade.recordTypeLabel
+            ? ` · ${trade.recordTypeLabel || getShadowRecordTypeLabel(trade.recordType)}`
+            : ''}
         </p>
         <p>Entry {formatShadowPrice(trade.entryPrice)}</p>
         {showOutcome ? (
@@ -243,50 +202,26 @@ export default function ShadowTradingPanel({
   }
 
   return (
-    <section className="trading-lab__section" aria-label="Shadow Trading">
+    <section className="trading-lab__section" aria-label={SHADOW_REVIEW_TITLE}>
       <header className="trading-lab__section-head">
-        <h2 className="trading-lab__section-title">Shadow Trading</h2>
+        <h2 className="trading-lab__section-title">{SHADOW_REVIEW_TITLE}</h2>
         <span className={`trading-lab__badge${autoOn ? ' trading-lab__badge--ok' : ''}`}>
-          자동 기록 {autoOn ? 'ON' : 'OFF'}
+          {SHADOW_AUTO_MODE_LABEL} {autoOn ? 'ON' : 'OFF'}
         </span>
       </header>
 
-      <p className="trading-lab__notice">{SHADOW_QUICK_SECTION_HINT}</p>
+      <p className="trading-lab__notice">{SHADOW_REVIEW_HINT}</p>
       <p className="trading-lab__notice">{SHADOW_TRADE_DISCLAIMER}</p>
 
-      <div className="trading-lab__shadow-quick">
-        <button
-          type="button"
-          className="trading-lab__shadow-quick-btn trading-lab__shadow-quick-btn--long"
-          disabled={Boolean(savingDirection)}
-          onClick={() => handleQuickRecord('LONG')}
-        >
-          {savingDirection === 'LONG' ? '저장 중' : '가상 LONG 1초 기록'}
-        </button>
-        <button
-          type="button"
-          className="trading-lab__shadow-quick-btn trading-lab__shadow-quick-btn--short"
-          disabled={Boolean(savingDirection)}
-          onClick={() => handleQuickRecord('SHORT')}
-        >
-          {savingDirection === 'SHORT' ? '저장 중' : '가상 SHORT 1초 기록'}
-        </button>
-      </div>
-      <p className="trading-lab-drawer__hint">{SHADOW_QUICK_HINT}</p>
-
-      <div className="trading-lab__shadow-chips" aria-label="빠른 태그">
-        {SHADOW_QUICK_TAGS.map((tag) => (
-          <button
-            key={tag}
-            type="button"
-            className={`trading-lab__shadow-chip${
-              quickTags.includes(tag) ? ' is-active' : ''
-            }`}
-            onClick={() => toggleQuickTag(tag)}
-          >
-            {getShadowTagLabel(tag)}
-          </button>
-        ))}
+      <div className="trading-lab__review-summary" aria-label="오늘의 복기">
+        <h3>오늘의 복기</h3>
+        <p>
+          복기할 기록 {review.reviewCount}개 · 기준 기록 {review.strategyCount}개 · 충동
+          기록 {review.impulseCount}개
+        </p>
+        {review.fomoCount > 0 ? (
+          <p>최근 FOMO 기록 {review.fomoCount}건 결과 확인 필요</p>
+        ) : null}
       </div>
 
       {message ? <p className="trading-lab__shadow-toast">{message}</p> : null}
@@ -297,21 +232,7 @@ export default function ShadowTradingPanel({
           className="trading-lab__action"
           onClick={() => onToggleAuto(!autoOn)}
         >
-          Shadow Trading 자동 기록: {autoOn ? 'ON' : 'OFF'}
-        </button>
-        <button
-          type="button"
-          className="trading-lab__action"
-          onClick={() => setComposer('LONG')}
-        >
-          상세 LONG 기록
-        </button>
-        <button
-          type="button"
-          className="trading-lab__action"
-          onClick={() => setComposer('SHORT')}
-        >
-          상세 SHORT 기록
+          {SHADOW_AUTO_MODE_LABEL}: {autoOn ? 'ON' : 'OFF'}
         </button>
       </div>
 
@@ -324,10 +245,16 @@ export default function ShadowTradingPanel({
       ) : null}
 
       {stats ? (
-        <dl className="trading-lab__data-grid" aria-label="Shadow Trading 통계">
+        <dl className="trading-lab__data-grid" aria-label="가상 기록 통계">
           <div className="trading-lab__data-item">
-            <dt>총 shadow trade</dt>
+            <dt>총 가상 기록</dt>
             <dd>{stats.total}</dd>
+          </div>
+          <div className="trading-lab__data-item">
+            <dt>기준 / 충동 / 관찰</dt>
+            <dd>
+              {review.strategyCount} / {review.impulseCount} / {review.observationCount}
+            </dd>
           </div>
           <div className="trading-lab__data-item">
             <dt>OPEN / CLOSED</dt>
@@ -336,7 +263,7 @@ export default function ShadowTradingPanel({
             </dd>
           </div>
           <div className="trading-lab__data-item">
-            <dt>LONG / SHORT</dt>
+            <dt>가상 LONG / 가상 SHORT</dt>
             <dd>
               {stats.long} / {stats.short}
             </dd>
@@ -419,18 +346,6 @@ export default function ShadowTradingPanel({
           </ul>
         </div>
       ) : null}
-
-      <ShadowTradeComposer
-        open={Boolean(composer)}
-        symbol={symbol}
-        direction={composer || 'LONG'}
-        entryPrice={entryPrice}
-        onClose={() => setComposer(null)}
-        onSaved={() => {
-          setComposer(null)
-          onRefresh()
-        }}
-      />
     </section>
   )
 }

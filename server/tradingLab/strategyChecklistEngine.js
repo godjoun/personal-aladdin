@@ -307,5 +307,5 @@ export function evaluateStrategyChecklist(input) {
  */
 export function buildStrategyShadowNote(evaluation) {
   const resultLabel = evaluation.resultLabel || STRATEGY_CHECK_RESULT_LABELS[evaluation.result]
-  return `My Strategy v1 ${evaluation.direction} · ${resultLabel} · ${STRATEGY_SCORE_LABEL} ${evaluation.score}/100`
+  return `내 진입 기준 ${evaluation.direction} · ${resultLabel} · ${STRATEGY_SCORE_LABEL} ${evaluation.score}/100`
 }

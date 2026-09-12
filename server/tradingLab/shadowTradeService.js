@@ -10,6 +10,10 @@ import {
   TRADING_LAB_SYMBOLS,
 } from './constants.js'
 import { callMarketData } from './marketDataProvider.js'
+import {
+  classifyShadowRecordType,
+  getShadowRecordTypeLabel,
+} from './shadowRecordType.js'
 import { assembleMarketStateInput } from './marketStateService.js'
 import { evaluateMarketState } from './marketStateEngine.js'
 import {
@@ -114,8 +118,15 @@ export function attachShadowRiskContext(trade, db) {
  */
 export function presentShadowTrade(trade, currentPrice = null, db) {
   const outcome = getShadowTradeOutcome(trade.id, db)
+  const recordType =
+    trade.recordType ||
+    classifyShadowRecordType({
+      selectedTags: trade.userTags,
+    })
   return {
     ...trade,
+    recordType,
+    recordTypeLabel: getShadowRecordTypeLabel(recordType),
     outcome,
     currentReturnPct: signedReturnPct(
       trade.direction,
@@ -535,8 +546,15 @@ export async function listPresentedShadowTrades(options = {}) {
       priceCache[trade.symbol] = await fetchShadowEntryPrice(trade.symbol)
     }
     const currentPrice = priceCache[trade.symbol] ?? null
+    const recordType =
+      trade.recordType ||
+      classifyShadowRecordType({
+        selectedTags: trade.userTags,
+      })
     presented.push({
       ...trade,
+      recordType,
+      recordTypeLabel: getShadowRecordTypeLabel(recordType),
       outcome: outcomes.get(trade.id) || null,
       currentReturnPct: signedReturnPct(
         trade.direction,
@@ -568,8 +586,30 @@ export async function getPresentedShadowTrade(id, options = {}) {
  */
 export function getPresentedShadowStats(options = {}) {
   const db = options.db
+  const stats = getShadowTradeStats({ symbol: options.symbol }, db)
+  const trades = listShadowTrades({ symbol: options.symbol, limit: 200 }, db)
+  let strategyCount = 0
+  let impulseCount = 0
+  let observationCount = 0
+  let fomoCount = 0
+  for (const trade of trades) {
+    const recordType =
+      trade.recordType ||
+      classifyShadowRecordType({ selectedTags: trade.userTags })
+    if (recordType === 'STRATEGY') strategyCount += 1
+    else if (recordType === 'IMPULSE') impulseCount += 1
+    else observationCount += 1
+    if (Array.isArray(trade.userTags) && trade.userTags.includes('fomo')) {
+      fomoCount += 1
+    }
+  }
   return {
-    ...getShadowTradeStats({ symbol: options.symbol }, db),
+    ...stats,
+    strategyCount,
+    impulseCount,
+    observationCount,
+    fomoCount,
+    reviewCount: stats.open + stats.evaluating,
     settings: getShadowTradeSettings(db),
     warnings: buildShadowRiskWarnings({
       recentClosedResults: listRecentClosedResults({ limit: 3 }, db),

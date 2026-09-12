@@ -17,6 +17,9 @@ export const TRADING_LAB_OUTCOME_RESULTS = Object.freeze([
 
 export const TRADING_LAB_TIMEFRAMES = Object.freeze(['15m', '1h', '4h', '12h', '1d'])
 
+/** Chart View v1 — Lightweight Charts 에 노출하는 공개 캔들 타임프레임 */
+export const CHART_TIMEFRAMES = Object.freeze(['15m', '1h', '4h'])
+
 export const TRADING_LAB_STRUCTURE_STATES = Object.freeze([
   'BULLISH',
   'BEARISH',
@@ -71,6 +74,7 @@ export const TRADING_LAB_SYMBOL_SET = new Set(TRADING_LAB_SYMBOLS)
 export const TRADING_LAB_BIAS_SET = new Set(TRADING_LAB_BIASES)
 export const TRADING_LAB_OUTCOME_RESULT_SET = new Set(TRADING_LAB_OUTCOME_RESULTS)
 export const TRADING_LAB_TIMEFRAME_SET = new Set(TRADING_LAB_TIMEFRAMES)
+export const CHART_TIMEFRAME_SET = new Set(CHART_TIMEFRAMES)
 export const TRADING_LAB_STRUCTURE_SET = new Set(TRADING_LAB_STRUCTURE_STATES)
 export const TRADING_LAB_LIQUIDATION_SIDE_SET = new Set(TRADING_LAB_LIQUIDATION_SIDES)
 export const TRADING_LAB_SOURCE_TYPE_SET = new Set(TRADING_LAB_SOURCE_TYPES)

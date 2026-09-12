@@ -11,6 +11,42 @@
   gap: 0.65rem;
 }
 
+.trading-lab__command {
+  order: 1;
+}
+
+.trading-lab__market {
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.trading-lab__strategy {
+  order: 3;
+}
+
+.trading-lab__review {
+  order: 4;
+}
+
+.trading-lab__extras {
+  order: 5;
+  padding: 0.7rem 0.85rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.trading-lab__extras summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.trading-lab__extras > *:not(summary) {
+  margin-top: 0.65rem;
+}
+
 .trading-lab__header {
   display: flex;
   align-items: flex-start;
@@ -927,9 +963,147 @@
   color: var(--color-text-muted);
 }
 
+.trading-lab__command-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.trading-lab__command-card {
+  padding: 0.65rem 0.7rem;
+  background: #f8fafc;
+  border: 1px solid var(--color-border-light);
+  border-radius: 8px;
+}
+
+.trading-lab__command-card h3,
+.trading-lab__review-summary h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.trading-lab__command-card ol {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.trading-lab__command-stats {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.6rem;
+}
+
+.trading-lab__command-stats dt {
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+.trading-lab__command-stats dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.trading-lab__badge--status-reviewable {
+  color: #0a7f3f;
+  border-color: #a7e0bf;
+  background: #f0fbf4;
+}
+
+.trading-lab__badge--status-risk_high {
+  color: #cf222e;
+  border-color: #f1aeb5;
+  background: #fff5f5;
+}
+
+.trading-lab__strategy-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.trading-lab__strategy-score,
+.trading-lab__strategy-action,
+.trading-lab__strategy-issue {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.trading-lab__strategy-issue {
+  color: #9a6700;
+}
+
+.trading-lab__review-summary {
+  padding: 0.55rem 0.65rem;
+  background: #f8fafc;
+  border: 1px solid var(--color-border-light);
+  border-radius: 8px;
+}
+
+.trading-lab__review-summary p {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.trading-lab__chart-wrap {
+  position: relative;
+  min-height: 320px;
+  border: 1px solid var(--color-border-light);
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.trading-lab__chart-canvas {
+  width: 100%;
+  height: 320px;
+}
+
+.trading-lab__chart-canvas.is-empty {
+  opacity: 0;
+}
+
+.trading-lab__chart-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+  background: #fff;
+}
+
 @media (max-width: 720px) {
-  .trading-lab__metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .trading-lab__strategy {
+    order: 2;
+  }
+
+  .trading-lab__market {
+    order: 3;
+  }
+
+  .trading-lab__review {
+    order: 4;
+  }
+
+  .trading-lab__command-grid,
+  .trading-lab__command-stats,
+  .trading-lab__metrics,
+  .trading-lab__data-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trading-lab__shadow-quick-btn,
+  .trading-lab__symbol {
+    min-height: 3.25rem;
+    font-size: 1.02rem;
   }
 
   .trading-lab__analysis-row {

@@ -29,6 +29,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "lightweight-charts": "^5.2.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

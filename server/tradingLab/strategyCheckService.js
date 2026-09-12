@@ -19,6 +19,10 @@ import {
 } from './shadowTradeRepository.js'
 import { createManualShadowTrade } from './shadowTradeService.js'
 import {
+  classifyShadowRecordType,
+  getShadowRecordTypeLabel,
+} from './shadowRecordType.js'
+import {
   buildStrategyShadowNote,
   evaluateStrategyChecklist,
 } from './strategyChecklistEngine.js'
@@ -38,12 +42,19 @@ export function presentStrategyCheck(row, evaluation = null) {
   if (!row) return null
   const resultLabel =
     evaluation?.resultLabel || STRATEGY_CHECK_RESULT_LABELS[row.result] || row.result
+  const recordType = classifyShadowRecordType({
+    result: row.result,
+    selectedTags: row.selectedTags,
+    score: row.score,
+  })
   return {
     ...row,
     resultLabel,
     scoreLabel: STRATEGY_SCORE_LABEL,
     categories: evaluation?.categories || null,
     confirmedEvidence: evaluation?.confirmedEvidence || [],
+    recordType,
+    recordTypeLabel: getShadowRecordTypeLabel(recordType),
     disclaimer: STRATEGY_CHECK_DISCLAIMER,
   }
 }
@@ -147,6 +158,11 @@ export async function createShadowTradeFromStrategyCheck(id, options = {}) {
   })
   const presented = presentStrategyCheck(check, evaluation)
   const userNote = buildStrategyShadowNote(evaluation)
+  const recordType = classifyShadowRecordType({
+    result: check.result,
+    selectedTags: check.selectedTags,
+    score: check.score,
+  })
 
   const created = await createManualShadowTrade(
     {
@@ -156,6 +172,7 @@ export async function createShadowTradeFromStrategyCheck(id, options = {}) {
       entryReason: STRATEGY_ENTRY_REASON,
       userTags: check.selectedTags,
       userNote,
+      recordType,
       entryPrice: snapshot.referencePrice ?? null,
       strategyVersion: STRATEGY_CHECKLIST_VERSION,
       primaryState: snapshot.primaryState ?? null,

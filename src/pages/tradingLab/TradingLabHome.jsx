@@ -6,7 +6,9 @@ import StrategyChecklistPanel from '../../components/tradingLab/StrategyChecklis
 import RecentAnalysisList from '../../components/tradingLab/RecentAnalysisList.jsx'
 import AnalysisComposerDrawer from '../../components/tradingLab/AnalysisComposerDrawer.jsx'
 import AnalysisDetailDrawer from '../../components/tradingLab/AnalysisDetailDrawer.jsx'
+import ChartViewPanel from '../../components/tradingLab/ChartViewPanel.jsx'
 import ChartCaptureSlot from '../../components/tradingLab/ChartCaptureSlot.jsx'
+import CommandCenter from '../../components/tradingLab/CommandCenter.jsx'
 import {
   fetchAnalyses,
   fetchCvdSummary,
@@ -47,6 +49,7 @@ export default function TradingLabHome() {
   const [shadowSettings, setShadowSettings] = useState({ autoRecord: false })
   const [shadowCandidates, setShadowCandidates] = useState([])
   const [shadowLoading, setShadowLoading] = useState(false)
+  const [latestCheck, setLatestCheck] = useState(null)
 
   const loadMarket = useCallback(async () => {
     setMarketLoading(true)
@@ -182,6 +185,10 @@ export default function TradingLabHome() {
     loadShadow()
   }, [loadShadow])
 
+  const handleCheckChange = useCallback((nextCheck) => {
+    setLatestCheck(nextCheck)
+  }, [])
+
   async function handleToggleAuto(autoRecord) {
     try {
       const payload = await saveShadowTradeSettings({ autoRecord })
@@ -204,8 +211,8 @@ export default function TradingLabHome() {
         <div>
           <h1 className="trading-lab__title">Trading Lab</h1>
           <p className="trading-lab__subtitle">
-            BTC/ETH 무기한 선물 시장을 분석하고 내 판단과 결과를 누적하는 공간입니다.
-            주문 기능은 없습니다.
+            시장을 확인하고, 내 진입 기준을 체크한 뒤 가상 기록으로 복기합니다.
+            실제 주문은 없습니다.
           </p>
         </div>
         {stats ? (
@@ -234,50 +241,67 @@ export default function TradingLabHome() {
 
       {error ? <p className="trading-lab__error">{error}</p> : null}
 
-      <MarketStatePanel
-        market={market}
-        loading={marketLoading}
-        observedLiquidations={observedLiquidations}
-        liquidationCollector={liquidationCollector}
-        cvdSummary={cvdSummary}
-        tradeFlowCollector={tradeFlowCollector}
-      />
-
-      <AnalysisPanel
-        analysis={latestAnalysis}
-        marketState={marketState}
-        marketStateHistory={marketStateHistory}
-        onRecord={() => setComposerOpen(true)}
-      />
-
-      <StrategyChecklistPanel
+      <CommandCenter
         symbol={symbol}
-        onShadowRecorded={loadShadow}
-      />
-
-      <ShadowTradingPanel
-        symbol={symbol}
-        market={market}
+        check={latestCheck}
         trades={shadowTrades}
         stats={shadowStats}
         settings={shadowSettings}
-        candidates={shadowCandidates}
-        loading={shadowLoading}
-        onToggleAuto={handleToggleAuto}
-        onRefresh={loadShadow}
       />
 
-      <ChartCaptureSlot
-        symbol={symbol}
-        analysisId={latestAnalysis?.id || null}
-        onSaved={loadAnalyses}
-      />
+      <div className="trading-lab__market">
+        <ChartViewPanel symbol={symbol} trades={shadowTrades} />
+        <MarketStatePanel
+          market={market}
+          loading={marketLoading}
+          observedLiquidations={observedLiquidations}
+          liquidationCollector={liquidationCollector}
+          cvdSummary={cvdSummary}
+          tradeFlowCollector={tradeFlowCollector}
+        />
+        <AnalysisPanel
+          analysis={latestAnalysis}
+          marketState={marketState}
+          marketStateHistory={marketStateHistory}
+          onRecord={() => setComposerOpen(true)}
+        />
+      </div>
 
-      <RecentAnalysisList
-        analyses={analyses}
-        loading={analysesLoading}
-        onSelect={setDetailId}
-      />
+      <div className="trading-lab__strategy">
+        <StrategyChecklistPanel
+          symbol={symbol}
+          onShadowRecorded={loadShadow}
+          onCheckChange={handleCheckChange}
+        />
+      </div>
+
+      <div className="trading-lab__review">
+        <ShadowTradingPanel
+          symbol={symbol}
+          market={market}
+          trades={shadowTrades}
+          stats={shadowStats}
+          settings={shadowSettings}
+          candidates={shadowCandidates}
+          loading={shadowLoading}
+          onToggleAuto={handleToggleAuto}
+          onRefresh={loadShadow}
+        />
+      </div>
+
+      <details className="trading-lab__extras">
+        <summary>추가 기록 · 차트 이미지</summary>
+        <ChartCaptureSlot
+          symbol={symbol}
+          analysisId={latestAnalysis?.id || null}
+          onSaved={loadAnalyses}
+        />
+        <RecentAnalysisList
+          analyses={analyses}
+          loading={analysesLoading}
+          onSelect={setDetailId}
+        />
+      </details>
 
       <AnalysisComposerDrawer
         open={composerOpen}

@@ -75,6 +75,58 @@ describe('strategyCheckService', () => {
     expect(linked.trade.userNote).not.toMatch(/승률/)
     expect(linked.check.shadowTradeId).toBe(linked.trade.id)
     expect(linked.trade.source).toBe('MANUAL_USER')
+    expect(linked.trade.recordType).toBe('STRATEGY')
+    expect(linked.check.recordType).toBe('STRATEGY')
+  })
+
+  it('RISK_HIGH 또는 FOMO 는 충동 기록, NOT_READY 는 관찰 기록이다', async () => {
+    const { db } = makeTempDb()
+    const impulseCheck = await createStrategyCheck(
+      {
+        symbol: 'BTCUSDT',
+        direction: 'LONG',
+        selectedTags: ['support', 'has_stop', 'has_target', 'fomo'],
+      },
+      {
+        db,
+        assembled: assembled(),
+        evaluation: { primaryState: 'MIXED', strengthScore: 44 },
+      },
+    )
+    expect(impulseCheck.check.result).toBe('RISK_HIGH')
+    const impulse = await createShadowTradeFromStrategyCheck(impulseCheck.check.id, {
+      db,
+      currentPrice: 77200,
+    })
+    expect(impulse.trade.recordType).toBe('IMPULSE')
+
+    const observeCheck = await createStrategyCheck(
+      {
+        symbol: 'ETHUSDT',
+        direction: 'SHORT',
+        selectedTags: ['resistance', 'has_stop', 'has_target'],
+      },
+      {
+        db,
+        assembled: assembled({
+          symbol: 'ETHUSDT',
+          structure4h: 'UNKNOWN',
+          structure1h: 'UNKNOWN',
+          structure15m: 'UNKNOWN',
+          cvdNotional: null,
+          buySharePct: null,
+          volumeRatio: 0.2,
+          oiChangePct: null,
+        }),
+        evaluation: { primaryState: 'DATA_INSUFFICIENT', strengthScore: 10 },
+      },
+    )
+    expect(observeCheck.check.result).toBe('NOT_READY')
+    const observed = await createShadowTradeFromStrategyCheck(observeCheck.check.id, {
+      db,
+      currentPrice: 2560,
+    })
+    expect(observed.trade.recordType).toBe('OBSERVATION')
   })
 
   it('최근 같은 방향 과다 기록을 리스크 높음으로 본다', async () => {

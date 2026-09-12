@@ -23,6 +23,10 @@ import {
   getObservedLiquidationStatus,
   getStructureLabel,
   isMarketDataConnected,
+  MARKET_DATA_TITLE,
+  MARKET_FLOW_TITLE,
+  MARKET_LIQUIDATION_TITLE,
+  MARKET_QUOTE_TITLE,
 } from '../../utils/tradingLabView.js'
 
 const STRUCTURE_ORDER = ['15m', '1h', '4h']
@@ -153,9 +157,9 @@ export default function MarketStatePanel({
 
   return (
     <>
-      <section className="trading-lab__section" aria-label="시장 상태">
+      <section className="trading-lab__section" aria-label={MARKET_QUOTE_TITLE}>
         <header className="trading-lab__section-head">
-          <h2 className="trading-lab__section-title">시장 상태</h2>
+          <h2 className="trading-lab__section-title">{MARKET_QUOTE_TITLE}</h2>
           <span
             className={`trading-lab__badge${
               connected && !market?.stale ? ' trading-lab__badge--ok' : ''
@@ -191,9 +195,9 @@ export default function MarketStatePanel({
         </div>
       </section>
 
-      <section className="trading-lab__section" aria-label="Market Data">
+      <section className="trading-lab__section" aria-label={MARKET_DATA_TITLE}>
         <header className="trading-lab__section-head">
-          <h2 className="trading-lab__section-title">Market Data</h2>
+          <h2 className="trading-lab__section-title">{MARKET_DATA_TITLE}</h2>
         </header>
 
         <dl className="trading-lab__data-grid">
@@ -210,7 +214,8 @@ export default function MarketStatePanel({
           ))}
         </dl>
 
-        <div className="trading-lab__liq" aria-label="CVD">
+        <h3 className="trading-lab__reason-title">{MARKET_FLOW_TITLE}</h3>
+        <div className="trading-lab__liq" aria-label={MARKET_FLOW_TITLE}>
           <p className="trading-lab__liq-title">CVD ({cvdWindow})</p>
           {cvdStatus === 'RECONNECTING' ? (
             <p className="trading-lab__notice">{CVD_RECONNECTING_LABEL}</p>
@@ -246,7 +251,8 @@ export default function MarketStatePanel({
           )}
         </div>
 
-        <div className="trading-lab__liq" aria-label="최근 관측된 청산">
+        <h3 className="trading-lab__reason-title">{MARKET_LIQUIDATION_TITLE}</h3>
+        <div className="trading-lab__liq" aria-label={MARKET_LIQUIDATION_TITLE}>
           <p className="trading-lab__liq-title">최근 15분 관측된 청산</p>
           {liqStatus === 'RECONNECTING' ? (
             <p className="trading-lab__notice">{LIQUIDATION_RECONNECTING_LABEL}</p>

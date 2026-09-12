@@ -202,6 +202,12 @@ describe('로컬 bypass 활성 서버', () => {
     expect(market.json.market.provider).toBe('BYBIT')
     expect(market.json.market.metrics.price.value).toBe(65000)
 
+    const candles = await request('GET', '/api/trading-lab/market/BTCUSDT/candles?timeframe=1h')
+    expect(candles.status).toBe(200)
+    expect(candles.json.symbol).toBe('BTCUSDT')
+    expect(candles.json.timeframe).toBe('1h')
+    expect(candles.json.candles.length).toBeGreaterThan(0)
+
     const stats = await request('GET', '/api/trading-lab/stats')
     expect(stats.status).toBe(200)
 

@@ -28,6 +28,7 @@ import {
   asConfidence,
   asCvdWindow,
   asLabSymbol,
+  asChartTimeframe,
   asLabTimeframe,
   asListLimit,
   sanitizeAnalysisInput,
@@ -95,6 +96,12 @@ describe('Trading Lab 입력 검증', () => {
     expect(asLabTimeframe('4H')).toBe('4h')
     expect(asLabTimeframe('3m')).toBeNull()
     expect(asLabTimeframe('1w')).toBeNull()
+    expect(asChartTimeframe('15m')).toBe('15m')
+    expect(asChartTimeframe('1H')).toBe('1h')
+    expect(asChartTimeframe('4h')).toBe('4h')
+    expect(asChartTimeframe('12h')).toBeNull()
+    expect(asChartTimeframe('1d')).toBeNull()
+    expect(asChartTimeframe('3m')).toBeNull()
   })
 
   it('CVD window 는 5m/15m/1h/4h 만 허용한다', () => {

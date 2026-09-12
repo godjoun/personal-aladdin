@@ -50,6 +50,21 @@ export async function fetchMarketSnapshot(symbol) {
 }
 
 /**
+ * Chart View 공개 캔들. 주문/프라이빗 시세와 무관하다.
+ *
+ * @param {string} symbol
+ * @param {{ timeframe?: string, limit?: number }} [options]
+ */
+export async function fetchMarketCandles(symbol, options = {}) {
+  const params = new URLSearchParams()
+  params.set('timeframe', options.timeframe || '1h')
+  if (options.limit) params.set('limit', String(options.limit))
+  return call(
+    `${BASE}/market/${encodeURIComponent(symbol)}/candles?${params.toString()}`,
+  )
+}
+
+/**
  * @param {{ symbol?: string, bias?: string, limit?: number }} [filter]
  */
 export async function fetchAnalyses(filter = {}) {

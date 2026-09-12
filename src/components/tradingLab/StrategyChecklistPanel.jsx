@@ -16,12 +16,23 @@ import {
   getShadowTagLabel,
   getStrategyCheckResultLabel,
   getStructureLabel,
+  STRATEGY_RECORD_HINT,
+  STRATEGY_PANEL_TITLE,
+  getStrategyActionLabel,
+  getStrategyDisplayResult,
+  getStrategyPrimaryIssue,
+  getStrategyReviewLabel,
+  getShadowRecordTypeLabel,
 } from '../../utils/tradingLabView.js'
 
 /**
- * My Strategy v1 — 진입 기준 점검. 추천/실제 주문이 아니다.
+ * 내 진입 기준 — 진입 기준 점검. 추천/실제 주문이 아니다.
  */
-export default function StrategyChecklistPanel({ symbol, onShadowRecorded }) {
+export default function StrategyChecklistPanel({
+  symbol,
+  onShadowRecorded,
+  onCheckChange,
+}) {
   const [direction, setDirection] = useState(null)
   const [selectedTags, setSelectedTags] = useState([])
   const [check, setCheck] = useState(null)
@@ -35,7 +46,8 @@ export default function StrategyChecklistPanel({ symbol, onShadowRecorded }) {
     setDirection(null)
     setMessage('')
     setError('')
-  }, [symbol])
+    onCheckChange?.(null)
+  }, [symbol, onCheckChange])
 
   function toggleTag(tag) {
     setSelectedTags((current) =>
@@ -59,6 +71,7 @@ export default function StrategyChecklistPanel({ symbol, onShadowRecorded }) {
       })
       setCheck(payload.check)
       setDirection(chosen)
+      onCheckChange?.(payload.check)
     } catch (err) {
       setError(err.message || '기준 점검에 실패했습니다.')
     } finally {
@@ -88,6 +101,7 @@ export default function StrategyChecklistPanel({ symbol, onShadowRecorded }) {
     try {
       const payload = await createStrategyShadowTrade(check.id)
       setCheck(payload.check)
+      onCheckChange?.(payload.check)
       setMessage(
         payload.trade.direction === 'SHORT'
           ? '이 기준으로 가상 SHORT 기록 완료'
@@ -101,20 +115,24 @@ export default function StrategyChecklistPanel({ symbol, onShadowRecorded }) {
     }
   }
 
+  const displayResult = getStrategyDisplayResult(check)
   const resultModifier =
-    check?.result === 'READY'
+    displayResult === 'READY'
       ? 'ready'
-      : check?.result === 'RISK_HIGH'
+      : displayResult === 'RISK_HIGH'
         ? 'risk'
         : check
           ? 'not-ready'
           : ''
   const evidence = check?.autoEvidence || {}
+  const primaryIssue = getStrategyPrimaryIssue(check)
+  const actionLabel = getStrategyActionLabel(displayResult, check?.direction)
+  const reviewLabel = getStrategyReviewLabel(displayResult, check?.direction)
 
   return (
-    <section className="trading-lab__section" aria-label="My Strategy v1">
+    <section className="trading-lab__section" aria-label={STRATEGY_PANEL_TITLE}>
       <header className="trading-lab__section-head">
-        <h2 className="trading-lab__section-title">My Strategy v1</h2>
+        <h2 className="trading-lab__section-title">{STRATEGY_PANEL_TITLE}</h2>
         <span className="trading-lab__badge">진입 기준 체크</span>
       </header>
       <p className="trading-lab__notice">{STRATEGY_CHECK_DISCLAIMER}</p>
@@ -181,10 +199,29 @@ export default function StrategyChecklistPanel({ symbol, onShadowRecorded }) {
           <p className="trading-lab__strategy-kicker">
             {check.direction} 기준 체크 결과
           </p>
-          <p className="trading-lab__shadow-card-title">
-            {getStrategyCheckResultLabel(check.result)} · {STRATEGY_SCORE_LABEL}{' '}
-            {formatStrategyScore(check)}
-          </p>
+          <div className="trading-lab__strategy-result">
+            <p className="trading-lab__shadow-card-title">
+              {getStrategyCheckResultLabel(displayResult)}
+            </p>
+            <p className="trading-lab__strategy-score">
+              {STRATEGY_SCORE_LABEL} {formatStrategyScore(check)}
+            </p>
+            <p className="trading-lab__strategy-action">
+              지금 행동 {actionLabel}
+              {reviewLabel !== actionLabel ? ` · ${reviewLabel}` : ''}
+            </p>
+            {check.recordTypeLabel || check.recordType ? (
+              <p className="trading-lab__metric-sub">
+                기록 유형 {check.recordTypeLabel || getShadowRecordTypeLabel(check.recordType)}
+              </p>
+            ) : null}
+          </div>
+          {primaryIssue ? (
+            <div className="trading-lab__strategy-block">
+              <h3>가장 큰 문제</h3>
+              <p className="trading-lab__strategy-issue">{primaryIssue}</p>
+            </div>
+          ) : null}
           <div className="trading-lab__strategy-block">
             <h3>큰 흐름</h3>
             <dl className="trading-lab__data-grid">
@@ -287,6 +324,7 @@ export default function StrategyChecklistPanel({ symbol, onShadowRecorded }) {
             </p>
           ) : null}
 
+          <p className="trading-lab-drawer__hint">{STRATEGY_RECORD_HINT}</p>
           <div className="trading-lab__shadow-quick">
             <button
               type="button"
@@ -312,7 +350,7 @@ export default function StrategyChecklistPanel({ symbol, onShadowRecorded }) {
         </div>
       ) : (
         <p className="trading-lab-drawer__hint">
-          방향을 고르면 큰 흐름·시장 확인·리스크를 같이 점검합니다.
+          먼저 방향을 점검한 뒤, 기준 체크 기반 가상 기록을 남길 수 있습니다. 실제 주문은 없습니다.
         </p>
       )}
 

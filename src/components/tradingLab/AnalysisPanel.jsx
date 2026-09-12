@@ -1,4 +1,5 @@
 import {
+  MARKET_ENGINE_TITLE,
   MARKET_STATE_DISCLAIMER,
   formatConfidence,
   formatPriceValue,
@@ -33,9 +34,9 @@ export default function AnalysisPanel({
     : []
 
   return (
-    <section className="trading-lab__section" aria-label="ALADDIN Analysis">
+    <section className="trading-lab__section" aria-label={MARKET_ENGINE_TITLE}>
       <header className="trading-lab__section-head">
-        <h2 className="trading-lab__section-title">ALADDIN Analysis</h2>
+        <h2 className="trading-lab__section-title">{MARKET_ENGINE_TITLE}</h2>
         <button type="button" className="trading-lab__action" onClick={onRecord}>
           + 분석 기록
         </button>
