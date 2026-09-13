@@ -83,15 +83,17 @@ describe('Trade Journal API', () => {
     expect(loaded.headers.get('cache-control')).toBe('no-store')
   })
   it('saves review text with optimistic revision and freezes entry snapshot', async () => {
-    const created = (await request('/trading-lab/journals', { method: 'POST', data: body({ direction: 'SHORT', symbol: 'ETHUSDT' }) })).json
-    const patch = { timeframe: '1h', reasonTags: ['CVD'], scenarioText: 'updated', reviewText: '확인한 근거 부족', lessonText: '봉 마감 확인', reviewed: true, revision: 1 }
+    const created = (await request('/trading-lab/journals', { method: 'POST', data: body({ direction: 'SHORT', symbol: 'ETHUSDT', takeProfitPrice: 90, stopLossPrice: 110 }) })).json
+    expect(created.journal).toMatchObject({ entryPrice: 100, takeProfitPrice: 90, stopLossPrice: 110 })
+    const patch = { timeframe: '1h', reasonTags: ['CVD'], scenarioText: 'updated', reviewText: '확인한 근거 부족', lessonText: '봉 마감 확인', reviewed: true, revision: 1, entryPrice: 100, takeProfitPrice: 88, stopLossPrice: 112 }
     const saved = await request(`/trading-lab/shadow-trades/${created.trade.id}/journal`, { method: 'PUT', data: patch })
     expect(saved.status).toBe(200)
-    expect(saved.json.journal.reviewedAt).toBeTruthy()
+    expect(saved.json.journal).toMatchObject({ takeProfitPrice: 88, stopLossPrice: 112, reviewedAt: expect.any(String) })
+    expect(saved.json.journal.entryPlanSnapshot).toMatchObject({ takeProfitPrice: 90, stopLossPrice: 110 })
     expect(saved.json.journal.indicatorSnapshot).toEqual(created.journal.indicatorSnapshot)
     expect((await request(`/trading-lab/shadow-trades/${created.trade.id}/journal`, { method: 'PUT', data: patch })).status).toBe(409)
     const listed = await request('/trading-lab/journals?symbol=ETHUSDT&filter=reviewed')
-    expect(listed.json.trades.some((t) => t.id === created.trade.id)).toBe(true)
+    expect(listed.json.trades.find((t) => t.id === created.trade.id).journal).toMatchObject({ takeProfitPrice: 88, stopLossPrice: 112 })
   })
   it('uploads and privately retrieves images, rejects spoofing, limits size/count and deletes only selected attachment', async () => {
     const created = (await request('/trading-lab/journals', { method: 'POST', data: body() })).json
@@ -113,6 +115,8 @@ describe('Trade Journal API', () => {
     expect((await request(url, { method: 'POST', data: Buffer.alloc(5 * 1024 * 1024 + 1), headers })).status).toBe(413)
     for (let i = 0; i < 3; i++) expect((await request(url, { method: 'POST', data: png, headers: { ...headers, 'X-Upload-Id': randomUUID() } })).status).toBe(201)
     expect((await request(url, { method: 'POST', data: png, headers: { ...headers, 'X-Upload-Id': randomUUID() } })).status).toBe(409)
+    const listed = await request('/trading-lab/journals?symbol=BTCUSDT')
+    expect(listed.json.trades.find((item) => item.id === created.trade.id).journal.coverImageUrl).toContain('/images/')
     const deleted = await request(imageUrl, { method: 'DELETE' })
     expect(deleted.json.images).toHaveLength(3)
     expect((await request(imageUrl)).status).toBe(404)

@@ -13,6 +13,9 @@ export const TRADE_JOURNAL_COLUMNS = Object.freeze([
   ['entryReasonText', 'TEXT'],
   ['reasonTagsJson', 'TEXT'],
   ['invalidationPrice', 'REAL'],
+  ['entryPrice', 'REAL'],
+  ['takeProfitPrice', 'REAL'],
+  ['stopLossPrice', 'REAL'],
   ['hasStopPlan', 'INTEGER'],
   ['hasTargetPlan', 'INTEGER'],
   ['fomo', 'INTEGER'],
@@ -57,6 +60,9 @@ export function migrateTradeJournal(db) {
       entryReasonText TEXT,
       reasonTagsJson TEXT NOT NULL DEFAULT '[]',
       invalidationPrice REAL CHECK(invalidationPrice IS NULL OR invalidationPrice > 0),
+      entryPrice REAL CHECK(entryPrice IS NULL OR entryPrice > 0),
+      takeProfitPrice REAL CHECK(takeProfitPrice IS NULL OR takeProfitPrice > 0),
+      stopLossPrice REAL CHECK(stopLossPrice IS NULL OR stopLossPrice > 0),
       hasStopPlan INTEGER CHECK(hasStopPlan IS NULL OR hasStopPlan IN (0, 1)),
       hasTargetPlan INTEGER CHECK(hasTargetPlan IS NULL OR hasTargetPlan IN (0, 1)),
       fomo INTEGER CHECK(fomo IS NULL OR fomo IN (0, 1)),
@@ -88,6 +94,15 @@ export function migrateTradeJournal(db) {
   }
   for (const [column, sqlType] of TRADE_JOURNAL_IMAGE_COLUMNS) {
     addColumnIfMissing(db, 'trade_journal_image', column, sqlType)
+  }
+
+  // Rename leftover draft columns from an earlier WIP if present.
+  const journalCols = new Set(db.prepare('PRAGMA table_info(trade_journal)').all().map((row) => row.name))
+  if (journalCols.has('targetPrice') && journalCols.has('takeProfitPrice')) {
+    db.exec(`UPDATE trade_journal SET takeProfitPrice = COALESCE(takeProfitPrice, targetPrice) WHERE takeProfitPrice IS NULL`)
+  }
+  if (journalCols.has('stopPrice') && journalCols.has('stopLossPrice')) {
+    db.exec(`UPDATE trade_journal SET stopLossPrice = COALESCE(stopLossPrice, stopPrice) WHERE stopLossPrice IS NULL`)
   }
 
   db.exec(`

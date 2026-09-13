@@ -4,11 +4,18 @@ import { journalDate, journalNumber, journalOutcomeLabel, journalReturn } from '
 import { getMarketStateLabel, getChartAnnotationLabel } from '../../utils/tradingLabView.js'
 
 export function JournalOutcome({ trade }) {
-  return <section className="journal-outcome" aria-label="가상 기록 결과">
-    <h3>시간이 지난 뒤</h3>
+  const mae = trade.outcome?.maxAdverseMovePct
+  const mfe = trade.outcome?.maxFavorableMovePct
+  return <section className="journal-outcome" aria-label="시간별 결과">
+    <div className="lab-eyebrow">TIME RESULTS</div>
+    <h3>시간별 결과</h3>
     <p className="lab-muted">가상 {trade.direction} 기준 가격 변화 · 앱 서버가 실행 중일 때 자동 추적</p>
-    <div className="journal-outcome__horizons">{JOURNAL_HORIZONS.map((horizon) => <div key={horizon}><span>{horizon} 후</span><strong>{journalOutcomeLabel(trade, horizon)}</strong><small>{journalNumber(trade.outcome?.[`price${horizon}`])}</small></div>)}</div>
-    <div className="journal-outcome__excursion"><span>최대 유리한 움직임 (MFE) <b>{journalReturn(trade.outcome?.maxFavorableMovePct)}</b></span><span>최대 불리한 움직임 (MAE) <b>{journalReturn(trade.outcome?.maxAdverseMovePct)}</b></span></div>
+    <div className="journal-outcome__horizons">{JOURNAL_HORIZONS.map((horizon) => <div key={horizon}><span>{horizon}</span><strong>{journalOutcomeLabel(trade, horizon)}</strong><small>{Number.isFinite(trade.outcome?.[`return${horizon}Pct`]) ? `${horizon} 후 ${journalOutcomeLabel(trade, horizon)}` : '추적 대기'} · {journalNumber(trade.outcome?.[`price${horizon}`])}</small></div>)}</div>
+    <div className="journal-outcome__excursion">
+      <span>MFE <b>{journalReturn(mfe)}</b></span>
+      <span>MAE <b>{journalReturn(mae)}</b></span>
+      {typeof mae === 'number' && Number.isFinite(mae) ? <span>먼저 {journalReturn(mae)}까지 흔들림</span> : null}
+    </div>
     <p className="lab-muted">15분 봉 기준 관찰값입니다. 경과 시점의 봉이 없으면 데이터 대기로 남습니다. 마지막 평가 {journalDate(trade.outcome?.evaluatedAt)}</p>
   </section>
 }
@@ -33,6 +40,6 @@ export function JournalSnapshot({ snapshot, entryPlan }) {
     {!historical && <p className="lab-muted">닫힌 봉 {indicators?.candleCount ?? 0}개 · EMA는 최초 기간의 단순평균으로 시작, RSI는 Wilder 방식. EMA 200은 연속된 닫힌 봉 200개가 필요합니다. 거래량 배수는 마지막 닫힌 봉과 직전 20봉의 평균을 비교합니다.</p>}
     <h4>함께 남긴 차트 표시</h4>
     {snapshot.annotations?.length ? <ul>{snapshot.annotations.map((a, i) => <li key={a.id || i}>{a.timeframe} · {getChartAnnotationLabel(a.annotationType)} · {a.price ?? `${a.bottomPrice ?? '—'} ~ ${a.topPrice ?? '—'}`} {a.memo}</li>)}</ul> : <p className="lab-muted">저장된 차트 표시 없음</p>}
-    {entryPlan && <details><summary>처음 저장한 시나리오 · 리스크 계획</summary><p>{entryPlan.scenarioText || '미기록'}</p><p>{entryPlan.entryReasonText}</p><p>무효화 가격 {journalNumber(entryPlan.invalidationPrice)}</p><p>{entryPlan.riskPlanText}</p><p>{entryPlan.avoidReasonText}</p></details>}
+    {entryPlan && <details><summary>처음 저장한 시나리오 · 리스크 계획</summary><p>{entryPlan.scenarioText || '미기록'}</p><p>{entryPlan.entryReasonText}</p><p>Entry {journalNumber(entryPlan.entryPrice)} · TP {journalNumber(entryPlan.takeProfitPrice)} · SL {journalNumber(entryPlan.stopLossPrice)}</p><p>무효화 가격 {journalNumber(entryPlan.invalidationPrice)}</p><p>{entryPlan.riskPlanText}</p><p>{entryPlan.avoidReasonText}</p></details>}
   </details>
 }

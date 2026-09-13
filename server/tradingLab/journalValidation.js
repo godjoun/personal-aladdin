@@ -9,8 +9,9 @@ export function validateJournal(body, { create = false } = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false, field: 'body' }
   const allowed = new Set([
     ...Object.keys(JOURNAL_TEXT_LIMITS), 'timeframe', 'reasonTags', 'invalidationPrice',
+    'entryPrice', 'takeProfitPrice', 'stopLossPrice',
     'hasStopPlan', 'hasTargetPlan', 'fomo', 'emotionTag', 'reviewed', 'revision',
-    ...(create ? ['symbol', 'direction', 'entryPrice', 'recordType', 'requestId'] : []),
+    ...(create ? ['symbol', 'direction', 'recordType', 'requestId'] : []),
   ])
   const extra = Object.keys(body).find((key) => !allowed.has(key))
   if (extra) return { ok: false, field: 'body' }
@@ -28,7 +29,7 @@ export function validateJournal(body, { create = false } = {}) {
     if (body[key] != null && typeof body[key] !== 'boolean') return fail(key)
     value[key] = body[key] ?? null
   }
-  for (const key of create ? ['invalidationPrice', 'entryPrice'] : ['invalidationPrice']) {
+  for (const key of ['invalidationPrice', 'entryPrice', 'takeProfitPrice', 'stopLossPrice']) {
     if (body[key] != null && (typeof body[key] !== 'number' || !Number.isFinite(body[key]) || body[key] <= 0 || body[key] > 1e12)) return fail(key)
     value[key] = body[key] ?? null
   }

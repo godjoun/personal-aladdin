@@ -100,12 +100,25 @@ function JournalWorkspace({ symbol, view, setView, timeframe, setTimeframe }) {
   }
   const summary = records.summary || {}
   return <>
-    <section className="lab-intro" aria-label="나의 기록 흐름"><div className="lab-intro__copy"><div className="lab-eyebrow">{view === 'observe' ? 'CAPTURE → RECORD → REVIEW' : 'LOOK BACK, LEARN FORWARD'}</div><h2>{view === 'observe' ? '지금 본 장면, 나중에도 기억할 수 있게.' : '결과보다, 내 근거부터 돌아보기.'}</h2><p>{view === 'observe' ? 'TradingView 캡처도 좋습니다. 본 구간, 진입 근거, 틀렸다고 볼 기준을 함께 남겨보세요.' : '시간별 움직임을 확인하고 무엇을 놓쳤는지, 다음에는 무엇을 바꿀지 적어보세요.'}</p><button type="button" className="lab-button lab-button--primary" onClick={() => setEditor({ tradeId: null })}>+ 시나리오 남기기</button></div><div className="lab-intro__stats"><button type="button" onClick={() => { setView('review'); setFilter('review'); setOffset(0) }}><strong>{summary.needsReview ?? '—'}</strong><span>복기할 기록 ↗</span></button><div><strong>{summary.total ?? '—'}</strong><span>남긴 가상 기록</span></div><div><strong>{summary.reviewed ?? '—'}</strong><span>복기 완료</span></div></div></section>
+    <section className={`lab-intro${view === 'review' ? ' lab-intro--compact' : ''}`} aria-label="나의 기록 흐름">
+      <div className="lab-intro__copy">
+        <div className="lab-eyebrow">{view === 'observe' ? 'CAPTURE → RECORD → REVIEW' : 'LOOK BACK, LEARN FORWARD'}</div>
+        <h2>{view === 'observe' ? '지금 본 장면, 나중에도 기억할 수 있게.' : '결과보다, 내 근거부터 돌아보기.'}</h2>
+        {view === 'observe' && <p>TradingView 캡처도 좋습니다. 본 구간, 진입 근거, 틀렸다고 볼 기준을 함께 남겨보세요.</p>}
+        {view === 'observe' && <button type="button" className="lab-button lab-button--primary" onClick={() => setEditor({ tradeId: null })}>+ 시나리오 남기기</button>}
+      </div>
+      <div className="lab-intro__stats">
+        <button type="button" onClick={() => { setView('review'); setFilter('review'); setOffset(0) }}><strong>{summary.needsReview ?? '—'}</strong><span>복기할 기록</span></button>
+        <button type="button" onClick={() => { setView('review'); setFilter('all'); setOffset(0) }}><strong>{summary.total ?? '—'}</strong><span>남긴 기록</span></button>
+        <button type="button" onClick={() => { setView('review'); setFilter('reviewed'); setOffset(0) }}><strong>{summary.reviewed ?? '—'}</strong><span>복기 완료</span></button>
+        {view === 'review' && <button type="button" className="lab-button lab-button--primary" onClick={() => setEditor({ tradeId: null })}>+ 시나리오 남기기</button>}
+      </div>
+    </section>
     {view === 'observe' && <>
       <div className="lab-observe-grid"><div className="lab-chart-column"><Suspense fallback={<div className="lab-empty" role="status">시장 차트 준비 중…</div>}><ChartViewPanel symbol={symbol} trades={chartTrades} timeframe={timeframe} onTimeframeChange={setTimeframe} /></Suspense><p className="lab-chart-note">ALADDIN 차트는 관찰을 돕습니다. TradingView 캡처는 시나리오 일지에 직접 첨부하세요.</p></div><ObservationPanel state={marketData.state} loading={marketLoading} error={marketError} fetchedAt={marketData.market?.fetchedAt} stale={marketData.market?.stale}><button type="button" className="lab-button" onClick={loadMarket} disabled={marketLoading}>관찰 근거 새로고침</button></ObservationPanel></div>
       <div className="lab-support-tools"><details><summary>내 진입 기준 점검 <span>필요할 때 체크리스트로 정리</span></summary><StrategyChecklistPanel symbol={symbol} onShadowRecorded={(trade) => { recorded(trade); if (trade?.id) setEditor({ tradeId: trade.id }) }} /></details><details><summary>시장 데이터 상세 <span>CVD · OI · 거래량 · Funding · 청산</span></summary><MarketStatePanel market={marketData.market} loading={marketLoading} observedLiquidations={marketData.liquidations} liquidationCollector={marketData.liquidationCollector} cvdSummary={marketData.cvd} tradeFlowCollector={marketData.tradeFlowCollector} /></details></div>
     </>}
-    <TradeJournalList {...records} loading={recordsLoading} error={recordsError} filter={filter} offset={offset} onFilter={(next) => { setFilter(next); setOffset(0); setRecords((current) => ({ ...current, trades: [] })) }} onSelect={(tradeId) => setEditor({ tradeId })} onCreate={() => setEditor({ tradeId: null })} onRefresh={loadRecords} onMore={() => setOffset((current) => current + 30)} onPrevious={() => setOffset((current) => Math.max(0, current - 30))} />
+    {view === 'review' && <TradeJournalList {...records} loading={recordsLoading} error={recordsError} filter={filter} offset={offset} onFilter={(next) => { setFilter(next); setOffset(0); setRecords((current) => ({ ...current, trades: [] })) }} onSelect={(tradeId) => setEditor({ tradeId })} onCreate={() => setEditor({ tradeId: null })} onRefresh={loadRecords} onMore={() => setOffset((current) => current + 30)} onPrevious={() => setOffset((current) => Math.max(0, current - 30))} />}
     <footer className="lab-workspace-footer"><p>가상 결과 추적은 기록 생성과 별개로 계속됩니다. 자동 기록 {autoRecord == null ? '설정 확인 중' : autoRecord ? 'ON' : 'OFF'}.</p><details onToggle={(event) => setLegacyOpen(event.currentTarget.open)}><summary>이전 분석 기록</summary><button className="lab-button" type="button" onClick={() => setLegacyComposer(true)}>수동 분석 기록 추가</button>{legacyError && <p role="alert">{legacyError}</p>}<RecentAnalysisList analyses={legacyRecords} onSelect={setLegacyDetail} /></details></footer>
     {editor && <TradeJournalDialog key={editor.tradeId || 'new'} tradeId={editor.tradeId} symbol={symbol} timeframe={timeframe} onClose={() => setEditor(null)} onSaved={recorded} />}
     <AnalysisComposerDrawer open={legacyComposer} symbol={symbol} onClose={() => setLegacyComposer(false)} onSaved={() => { setLegacyComposer(false); void loadLegacy() }} />

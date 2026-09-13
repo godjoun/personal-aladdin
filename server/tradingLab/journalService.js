@@ -26,7 +26,7 @@ export async function createTradeJournal(input, { db = getDb(), capture = captur
       longLiquidationNotional: snapshot.liquidations?.long?.estimatedNotional,
       shortLiquidationNotional: snapshot.liquidations?.short?.estimatedNotional,
     }, db)
-    insertJournal(trade.id, input, { ...snapshot, entryPriceSource: input.entryPrice == null ? 'PUBLIC_TICKER' : 'USER_ENTERED' }, db)
+    insertJournal(trade.id, { ...input, entryPrice }, { ...snapshot, entryPriceSource: input.entryPrice == null ? 'PUBLIC_TICKER' : 'USER_ENTERED' }, db)
     upsertShadowTradeOutcome(trade.id, { evaluatedAt: null, result: 'UNRESOLVED' }, db)
     return { ok: true, ...getJournalDetail(trade.id, db) }
   })()
