@@ -7,6 +7,7 @@
  */
 
 import express from 'express'
+import { createJournalRouter } from './journalRoutes.js'
 import { asId } from '../security/validate.js'
 import {
   TRADING_LAB_BIASES,
@@ -151,6 +152,7 @@ function marketDataMessage(status) {
 
 export function createTradingLabRouter() {
   const router = express.Router()
+  router.use(createJournalRouter())
 
   /** 허용값 목록 — 클라이언트가 allowlist 를 하드코딩하지 않도록 제공 */
   router.get('/config', (_req, res) => {

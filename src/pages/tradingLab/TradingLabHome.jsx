@@ -1,322 +1,114 @@
-import { useCallback, useEffect, useState } from 'react'
+import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import MarketStatePanel from '../../components/tradingLab/MarketStatePanel.jsx'
-import AnalysisPanel from '../../components/tradingLab/AnalysisPanel.jsx'
-import ShadowTradingPanel from '../../components/tradingLab/ShadowTradingPanel.jsx'
 import StrategyChecklistPanel from '../../components/tradingLab/StrategyChecklistPanel.jsx'
 import RecentAnalysisList from '../../components/tradingLab/RecentAnalysisList.jsx'
 import AnalysisComposerDrawer from '../../components/tradingLab/AnalysisComposerDrawer.jsx'
 import AnalysisDetailDrawer from '../../components/tradingLab/AnalysisDetailDrawer.jsx'
-import ChartViewPanel from '../../components/tradingLab/ChartViewPanel.jsx'
-import ChartCaptureSlot from '../../components/tradingLab/ChartCaptureSlot.jsx'
-import CommandCenter from '../../components/tradingLab/CommandCenter.jsx'
+import ObservationPanel from '../../components/tradingLab/ObservationPanel.jsx'
+import TradeJournalDialog from '../../components/tradingLab/TradeJournalDialog.jsx'
+import TradeJournalList from '../../components/tradingLab/TradeJournalList.jsx'
 import {
-  fetchAnalyses,
-  fetchCvdSummary,
-  fetchLiquidationCollectorStatus,
-  fetchMarketSnapshot,
-  fetchMarketState,
-  fetchMarketStateHistory,
-  fetchObservedLiquidations,
-  fetchTradeFlowCollectorStatus,
-  fetchShadowTradeStats,
-  fetchShadowTrades,
-  fetchTradingLabStats,
-  saveShadowTradeSettings,
+  fetchAnalyses, fetchCvdSummary, fetchLiquidationCollectorStatus, fetchMarketSnapshot,
+  fetchMarketState, fetchObservedLiquidations, fetchTradeFlowCollectorStatus,
+  fetchShadowTrades, fetchTradeJournals,
 } from '../../services/tradingLabApi.js'
 import '../../styles/TradingLab.css'
+import '../../styles/TradeJournal.css'
 
-/** MVP 대상 — 서버 allowlist 와 동일 */
+const ChartViewPanel = lazy(() => import('../../components/tradingLab/ChartViewPanel.jsx'))
 const SYMBOLS = ['BTCUSDT', 'ETHUSDT']
 
 export default function TradingLabHome() {
-  const [symbol, setSymbol] = useState(SYMBOLS[0])
-  const [market, setMarket] = useState(null)
-  const [marketLoading, setMarketLoading] = useState(false)
-  const [observedLiquidations, setObservedLiquidations] = useState(null)
-  const [liquidationCollector, setLiquidationCollector] = useState(null)
-  const [cvdSummary, setCvdSummary] = useState(null)
-  const [tradeFlowCollector, setTradeFlowCollector] = useState(null)
-  const [marketState, setMarketState] = useState(null)
-  const [marketStateHistory, setMarketStateHistory] = useState([])
-  const [analyses, setAnalyses] = useState([])
-  const [analysesLoading, setAnalysesLoading] = useState(false)
-  const [stats, setStats] = useState(null)
-  const [error, setError] = useState('')
-  const [composerOpen, setComposerOpen] = useState(false)
-  const [detailId, setDetailId] = useState(null)
-  const [shadowTrades, setShadowTrades] = useState([])
-  const [shadowStats, setShadowStats] = useState(null)
-  const [shadowSettings, setShadowSettings] = useState({ autoRecord: false })
-  const [shadowCandidates, setShadowCandidates] = useState([])
-  const [shadowLoading, setShadowLoading] = useState(false)
-  const [latestCheck, setLatestCheck] = useState(null)
+  const [symbol, setSymbol] = useState('BTCUSDT')
+  const [view, setView] = useState('observe')
+  const [timeframe, setTimeframe] = useState('1h')
+  return <div className="trading-lab lab-workspace" aria-label="Trading Lab">
+    <header className="lab-header"><div><div className="lab-eyebrow">ALADDIN / PERSONAL TRADING JOURNAL</div><h1>Trading Lab<span>내 판단을 남기는 곳</span></h1><p>차트에서 본 시나리오를 기록하고, 시간이 지난 뒤 내 근거를 돌아봅니다.</p></div><span className="lab-local-status"><i />로컬 · 가상 기록 전용</span></header>
+    <div className="lab-navigation"><nav aria-label="Trading Lab 작업"><button type="button" aria-current={view === 'observe' ? 'page' : undefined} onClick={() => setView('observe')}>관찰 · 기록</button><button type="button" aria-current={view === 'review' ? 'page' : undefined} onClick={() => setView('review')}>일지 · 복기</button></nav><div className="lab-symbols" aria-label="관찰 종목">{SYMBOLS.map((item) => <button type="button" key={item} aria-pressed={symbol === item} onClick={() => setSymbol(item)}>{item}</button>)}</div></div>
+    <JournalWorkspace key={symbol} symbol={symbol} view={view} setView={setView} timeframe={timeframe} setTimeframe={setTimeframe} />
+  </div>
+}
 
+function JournalWorkspace({ symbol, view, setView, timeframe, setTimeframe }) {
+  const [marketData, setMarketData] = useState({})
+  const [marketLoading, setMarketLoading] = useState(true)
+  const [marketError, setMarketError] = useState(false)
+  const [records, setRecords] = useState({ trades: [], summary: {}, hasMore: false })
+  const [recordsLoading, setRecordsLoading] = useState(true)
+  const [recordsError, setRecordsError] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [offset, setOffset] = useState(0)
+  const [chartTrades, setChartTrades] = useState([])
+  const [autoRecord, setAutoRecord] = useState(null)
+  const [editor, setEditor] = useState(null)
+  const [legacyOpen, setLegacyOpen] = useState(false)
+  const [legacyRecords, setLegacyRecords] = useState([])
+  const [legacyError, setLegacyError] = useState('')
+  const [legacyComposer, setLegacyComposer] = useState(false)
+  const [legacyDetail, setLegacyDetail] = useState(null)
+  const recordsRequest = useRef(0)
+  const marketRequest = useRef(0)
+  const markersRequest = useRef(0)
+  const cancelRecords = useCallback(() => { recordsRequest.current++ }, [])
+  const cancelMarket = useCallback(() => { marketRequest.current++; markersRequest.current++ }, [])
+
+  const loadRecords = useCallback(async () => {
+    const request = ++recordsRequest.current
+    setRecordsLoading(true)
+    try {
+      const payload = await fetchTradeJournals(symbol, { filter, offset })
+      if (request !== recordsRequest.current) return
+      setRecords(payload); setRecordsError('')
+    } catch { if (request === recordsRequest.current) setRecordsError('일지를 불러오지 못했습니다. 목록 새로고침으로 다시 시도해주세요.') }
+    finally { if (request === recordsRequest.current) setRecordsLoading(false) }
+  }, [symbol, filter, offset])
+  const loadMarkers = useCallback(async () => {
+    const request = ++markersRequest.current
+    try {
+      const payload = await fetchShadowTrades({ symbol, limit: 200 })
+      if (request !== markersRequest.current) return
+      setChartTrades(payload.trades || []); setAutoRecord(Boolean(payload.settings?.autoRecord))
+    } catch { /* Keep saved markers when a background refresh fails. */ }
+  }, [symbol])
   const loadMarket = useCallback(async () => {
+    const request = ++marketRequest.current
     setMarketLoading(true)
-    try {
-      const [
-        payload,
-        liqPayload,
-        liqStatus,
-        cvdPayload,
-        cvdStatus,
-        statePayload,
-        stateHistory,
-      ] = await Promise.all([
-        fetchMarketSnapshot(symbol),
-        fetchObservedLiquidations(symbol, { window: '15m' }).catch(() => null),
-        fetchLiquidationCollectorStatus().catch(() => null),
-        fetchCvdSummary(symbol, { window: '15m' }).catch(() => null),
-        fetchTradeFlowCollectorStatus().catch(() => null),
-        fetchMarketState(symbol).catch(() => null),
-        fetchMarketStateHistory(symbol, { limit: 20 }).catch(() => null),
-      ])
-      setMarket(payload.market)
-      setObservedLiquidations(liqPayload)
-      setLiquidationCollector(liqStatus?.collector || null)
-      setCvdSummary(cvdPayload)
-      setTradeFlowCollector(cvdStatus?.collector || null)
-      setMarketState(statePayload)
-      setMarketStateHistory(stateHistory?.observations || [])
-    } catch {
-      // provider 미연결과 조회 실패를 화면에서 구분해 보여준다
-      setMarket({ symbol, configured: false, status: 'ERROR', metrics: {} })
-      setObservedLiquidations(null)
-      setLiquidationCollector(null)
-      setCvdSummary(null)
-      setTradeFlowCollector(null)
-      setMarketState(null)
-      setMarketStateHistory([])
-    } finally {
-      setMarketLoading(false)
-    }
+    const results = await Promise.allSettled([
+      fetchMarketSnapshot(symbol), fetchMarketState(symbol), fetchObservedLiquidations(symbol, { window: '15m' }),
+      fetchCvdSummary(symbol, { window: '15m' }), fetchLiquidationCollectorStatus(), fetchTradeFlowCollectorStatus(),
+    ])
+    if (request !== marketRequest.current) return
+    const value = (i) => results[i].status === 'fulfilled' ? results[i].value : null
+    setMarketData({ market: value(0)?.market, state: value(1), liquidations: value(2), cvd: value(3), liquidationCollector: value(4)?.collector, tradeFlowCollector: value(5)?.collector })
+    setMarketError(!value(0) || !value(1)); setMarketLoading(false)
   }, [symbol])
-
-  const loadAnalyses = useCallback(async () => {
-    setAnalysesLoading(true)
-    setError('')
-    try {
-      const [listPayload, statsPayload] = await Promise.all([
-        fetchAnalyses({ symbol, limit: 20 }),
-        fetchTradingLabStats(),
-      ])
-      setAnalyses(listPayload.analyses || [])
-      setStats(statsPayload.stats || null)
-    } catch (loadError) {
-      setError(loadError.message || '분석 기록을 불러오지 못했습니다.')
-      setAnalyses([])
-    } finally {
-      setAnalysesLoading(false)
-    }
-  }, [symbol])
-
   useEffect(() => {
-    loadMarket()
-  }, [loadMarket])
-
+    void loadRecords()
+    const timer = setInterval(loadRecords, 30000)
+    return () => { clearInterval(timer); cancelRecords() }
+  }, [loadRecords, cancelRecords])
   useEffect(() => {
-    let cancelled = false
-    const timer = setInterval(async () => {
-      try {
-        const [
-          liqPayload,
-          liqStatus,
-          cvdPayload,
-          cvdStatus,
-          statePayload,
-          stateHistory,
-          listPayload,
-          statsPayload,
-        ] = await Promise.all([
-            fetchObservedLiquidations(symbol, { window: '15m' }),
-            fetchLiquidationCollectorStatus(),
-            fetchCvdSummary(symbol, { window: '15m' }),
-            fetchTradeFlowCollectorStatus(),
-            fetchMarketState(symbol),
-            fetchMarketStateHistory(symbol, { limit: 20 }),
-            fetchShadowTrades({ symbol, limit: 50 }),
-            fetchShadowTradeStats({ symbol }),
-          ])
-        if (cancelled) return
-        setObservedLiquidations(liqPayload)
-        setLiquidationCollector(liqStatus?.collector || null)
-        setCvdSummary(cvdPayload)
-        setTradeFlowCollector(cvdStatus?.collector || null)
-        setMarketState(statePayload)
-        setMarketStateHistory(stateHistory?.observations || [])
-        setShadowTrades(listPayload.trades || [])
-        setShadowSettings(listPayload.settings || { autoRecord: false })
-        setShadowCandidates(listPayload.candidates || [])
-        setShadowStats(statsPayload.stats || null)
-      } catch {
-        // 청산/CVD 폴링 실패가 화면 전체를 막지 않는다
-      }
-    }, 15_000)
-    return () => {
-      cancelled = true
-      clearInterval(timer)
-    }
-  }, [symbol])
-
-  const loadShadow = useCallback(async () => {
-    setShadowLoading(true)
-    try {
-      const [listPayload, statsPayload] = await Promise.all([
-        fetchShadowTrades({ symbol, limit: 50 }),
-        fetchShadowTradeStats({ symbol }),
-      ])
-      setShadowTrades(listPayload.trades || [])
-      setShadowSettings(listPayload.settings || { autoRecord: false })
-      setShadowCandidates(listPayload.candidates || [])
-      setShadowStats(statsPayload.stats || null)
-    } catch {
-      setShadowTrades([])
-      setShadowStats(null)
-    } finally {
-      setShadowLoading(false)
-    }
-  }, [symbol])
-
-  useEffect(() => {
-    loadAnalyses()
-  }, [loadAnalyses])
-
-  useEffect(() => {
-    loadShadow()
-  }, [loadShadow])
-
-  const handleCheckChange = useCallback((nextCheck) => {
-    setLatestCheck(nextCheck)
-  }, [])
-
-  async function handleToggleAuto(autoRecord) {
-    try {
-      const payload = await saveShadowTradeSettings({ autoRecord })
-      setShadowSettings(payload.settings || { autoRecord })
-    } catch {
-      setError('자동 기록 설정을 바꾸지 못했습니다.')
-    }
+    void loadMarket(); void loadMarkers()
+    const timer = setInterval(() => { void loadMarket(); void loadMarkers() }, 30000)
+    return () => { clearInterval(timer); cancelMarket() }
+  }, [loadMarket, loadMarkers, cancelMarket])
+  const loadLegacy = useCallback(() => fetchAnalyses({ symbol, limit: 20 }).then((p) => { setLegacyRecords(p.analyses || []); setLegacyError('') }).catch(() => setLegacyError('기존 분석 기록을 불러오지 못했습니다.')), [symbol])
+  useEffect(() => { if (legacyOpen) void loadLegacy() }, [legacyOpen, loadLegacy])
+  function recorded(trade) {
+    if (trade?.id) setChartTrades((current) => [trade, ...current.filter((item) => item.id !== trade.id)])
+    void loadRecords(); void loadMarkers()
   }
-
-  const latestAnalysis = analyses[0] || null
-
-  function handleSaved() {
-    setComposerOpen(false)
-    loadAnalyses()
-  }
-
-  return (
-    <div className="trading-lab" aria-label="Trading Lab">
-      <header className="trading-lab__header">
-        <div>
-          <h1 className="trading-lab__title">Trading Lab</h1>
-          <p className="trading-lab__subtitle">
-            시장을 확인하고, 내 진입 기준을 체크한 뒤 가상 기록으로 복기합니다.
-            실제 주문은 없습니다.
-          </p>
-        </div>
-        {stats ? (
-          <p className="trading-lab__stats">
-            분석 {stats.total}건 · 결과 확정 {stats.resolved}건
-          </p>
-        ) : null}
-      </header>
-
-      <div className="trading-lab__symbols" role="tablist" aria-label="분석 종목">
-        {SYMBOLS.map((item) => (
-          <button
-            key={item}
-            type="button"
-            role="tab"
-            aria-selected={symbol === item}
-            className={`trading-lab__symbol${
-              symbol === item ? ' is-active' : ''
-            }`}
-            onClick={() => setSymbol(item)}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-
-      {error ? <p className="trading-lab__error">{error}</p> : null}
-
-      <CommandCenter
-        symbol={symbol}
-        check={latestCheck}
-        trades={shadowTrades}
-        stats={shadowStats}
-        settings={shadowSettings}
-      />
-
-      <div className="trading-lab__market">
-        <ChartViewPanel symbol={symbol} trades={shadowTrades} />
-        <MarketStatePanel
-          market={market}
-          loading={marketLoading}
-          observedLiquidations={observedLiquidations}
-          liquidationCollector={liquidationCollector}
-          cvdSummary={cvdSummary}
-          tradeFlowCollector={tradeFlowCollector}
-        />
-        <AnalysisPanel
-          analysis={latestAnalysis}
-          marketState={marketState}
-          marketStateHistory={marketStateHistory}
-          onRecord={() => setComposerOpen(true)}
-        />
-      </div>
-
-      <div className="trading-lab__strategy">
-        <StrategyChecklistPanel
-          symbol={symbol}
-          onShadowRecorded={loadShadow}
-          onCheckChange={handleCheckChange}
-        />
-      </div>
-
-      <div className="trading-lab__review">
-        <ShadowTradingPanel
-          symbol={symbol}
-          market={market}
-          trades={shadowTrades}
-          stats={shadowStats}
-          settings={shadowSettings}
-          candidates={shadowCandidates}
-          loading={shadowLoading}
-          onToggleAuto={handleToggleAuto}
-          onRefresh={loadShadow}
-        />
-      </div>
-
-      <details className="trading-lab__extras">
-        <summary>추가 기록 · 차트 이미지</summary>
-        <ChartCaptureSlot
-          symbol={symbol}
-          analysisId={latestAnalysis?.id || null}
-          onSaved={loadAnalyses}
-        />
-        <RecentAnalysisList
-          analyses={analyses}
-          loading={analysesLoading}
-          onSelect={setDetailId}
-        />
-      </details>
-
-      <AnalysisComposerDrawer
-        open={composerOpen}
-        symbol={symbol}
-        onClose={() => setComposerOpen(false)}
-        onSaved={handleSaved}
-      />
-
-      {detailId ? (
-        <AnalysisDetailDrawer
-          analysisId={detailId}
-          onClose={() => setDetailId(null)}
-          onChanged={loadAnalyses}
-        />
-      ) : null}
-    </div>
-  )
+  const summary = records.summary || {}
+  return <>
+    <section className="lab-intro" aria-label="나의 기록 흐름"><div className="lab-intro__copy"><div className="lab-eyebrow">{view === 'observe' ? 'CAPTURE → RECORD → REVIEW' : 'LOOK BACK, LEARN FORWARD'}</div><h2>{view === 'observe' ? '지금 본 장면, 나중에도 기억할 수 있게.' : '결과보다, 내 근거부터 돌아보기.'}</h2><p>{view === 'observe' ? 'TradingView 캡처도 좋습니다. 본 구간, 진입 근거, 틀렸다고 볼 기준을 함께 남겨보세요.' : '시간별 움직임을 확인하고 무엇을 놓쳤는지, 다음에는 무엇을 바꿀지 적어보세요.'}</p><button type="button" className="lab-button lab-button--primary" onClick={() => setEditor({ tradeId: null })}>+ 시나리오 남기기</button></div><div className="lab-intro__stats"><button type="button" onClick={() => { setView('review'); setFilter('review'); setOffset(0) }}><strong>{summary.needsReview ?? '—'}</strong><span>복기할 기록 ↗</span></button><div><strong>{summary.total ?? '—'}</strong><span>남긴 가상 기록</span></div><div><strong>{summary.reviewed ?? '—'}</strong><span>복기 완료</span></div></div></section>
+    {view === 'observe' && <>
+      <div className="lab-observe-grid"><div className="lab-chart-column"><Suspense fallback={<div className="lab-empty" role="status">시장 차트 준비 중…</div>}><ChartViewPanel symbol={symbol} trades={chartTrades} timeframe={timeframe} onTimeframeChange={setTimeframe} /></Suspense><p className="lab-chart-note">ALADDIN 차트는 관찰을 돕습니다. TradingView 캡처는 시나리오 일지에 직접 첨부하세요.</p></div><ObservationPanel state={marketData.state} loading={marketLoading} error={marketError} fetchedAt={marketData.market?.fetchedAt} stale={marketData.market?.stale}><button type="button" className="lab-button" onClick={loadMarket} disabled={marketLoading}>관찰 근거 새로고침</button></ObservationPanel></div>
+      <div className="lab-support-tools"><details><summary>내 진입 기준 점검 <span>필요할 때 체크리스트로 정리</span></summary><StrategyChecklistPanel symbol={symbol} onShadowRecorded={(trade) => { recorded(trade); if (trade?.id) setEditor({ tradeId: trade.id }) }} /></details><details><summary>시장 데이터 상세 <span>CVD · OI · 거래량 · Funding · 청산</span></summary><MarketStatePanel market={marketData.market} loading={marketLoading} observedLiquidations={marketData.liquidations} liquidationCollector={marketData.liquidationCollector} cvdSummary={marketData.cvd} tradeFlowCollector={marketData.tradeFlowCollector} /></details></div>
+    </>}
+    <TradeJournalList {...records} loading={recordsLoading} error={recordsError} filter={filter} offset={offset} onFilter={(next) => { setFilter(next); setOffset(0); setRecords((current) => ({ ...current, trades: [] })) }} onSelect={(tradeId) => setEditor({ tradeId })} onCreate={() => setEditor({ tradeId: null })} onRefresh={loadRecords} onMore={() => setOffset((current) => current + 30)} onPrevious={() => setOffset((current) => Math.max(0, current - 30))} />
+    <footer className="lab-workspace-footer"><p>가상 결과 추적은 기록 생성과 별개로 계속됩니다. 자동 기록 {autoRecord == null ? '설정 확인 중' : autoRecord ? 'ON' : 'OFF'}.</p><details onToggle={(event) => setLegacyOpen(event.currentTarget.open)}><summary>이전 분석 기록</summary><button className="lab-button" type="button" onClick={() => setLegacyComposer(true)}>수동 분석 기록 추가</button>{legacyError && <p role="alert">{legacyError}</p>}<RecentAnalysisList analyses={legacyRecords} onSelect={setLegacyDetail} /></details></footer>
+    {editor && <TradeJournalDialog key={editor.tradeId || 'new'} tradeId={editor.tradeId} symbol={symbol} timeframe={timeframe} onClose={() => setEditor(null)} onSaved={recorded} />}
+    <AnalysisComposerDrawer open={legacyComposer} symbol={symbol} onClose={() => setLegacyComposer(false)} onSaved={() => { setLegacyComposer(false); void loadLegacy() }} />
+    {legacyDetail && <AnalysisDetailDrawer analysisId={legacyDetail} onClose={() => setLegacyDetail(null)} onChanged={loadLegacy} />}
+  </>
 }

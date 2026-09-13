@@ -35,8 +35,10 @@ import { ChartAnnotationPrimitive } from './chartAnnotationPrimitive.js'
  * Chart View + Chart Tools v1 — 공개 캔들, 가상 진입 마커, 사용자 표시.
  * 실제 주문/포지션과 연결하지 않는다.
  */
-export default function ChartViewPanel({ symbol, trades, annotations: annotationsProp }) {
-  const [timeframe, setTimeframe] = useState('1h')
+export default function ChartViewPanel({ symbol, trades, annotations: annotationsProp, timeframe: controlledTimeframe, onTimeframeChange }) {
+  const [localTimeframe, setLocalTimeframe] = useState('1h')
+  const timeframe = controlledTimeframe || localTimeframe
+  function setTimeframe(next) { setLocalTimeframe(next); onTimeframeChange?.(next) }
   const [rawCandles, setRawCandles] = useState([])
   const [loading, setLoading] = useState(false)
   const [stale, setStale] = useState(false)
@@ -315,8 +317,8 @@ export default function ChartViewPanel({ symbol, trades, annotations: annotation
         />
       </div>
 
-      <div className="trading-lab__chart-tools" aria-label={CHART_TOOLS_TITLE}>
-        <h3>{CHART_TOOLS_TITLE}</h3>
+      <details className="trading-lab__chart-tools" aria-label={CHART_TOOLS_TITLE}>
+        <summary>{CHART_TOOLS_TITLE} · 구간 표시</summary>
         <p className="trading-lab__notice">{CHART_ANNOTATION_DISCLAIMER}</p>
         <div className="trading-lab__shadow-chips" aria-label="차트 표시 도구">
           {CHART_ANNOTATION_TYPES.map((type) => (
@@ -423,7 +425,7 @@ export default function ChartViewPanel({ symbol, trades, annotations: annotation
             ))}
           </ul>
         )}
-      </div>
+      </details>
     </section>
   )
 }

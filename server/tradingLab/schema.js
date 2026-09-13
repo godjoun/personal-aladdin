@@ -13,6 +13,8 @@
 /**
  * @param {import('better-sqlite3').Database} db
  */
+import { migrateTradeJournal } from './journalSchema.js'
+
 export function migrateTradingLab(db) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS trade_analysis (
@@ -316,6 +318,7 @@ export function migrateTradingLab(db) {
   `)
 
   addColumnIfMissing(db, 'shadow_trade', 'recordType', 'TEXT')
+  migrateTradeJournal(db)
 }
 
 /**

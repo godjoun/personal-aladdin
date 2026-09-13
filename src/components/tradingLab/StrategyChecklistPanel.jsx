@@ -107,7 +107,7 @@ export default function StrategyChecklistPanel({
           ? '이 기준으로 가상 SHORT 기록 완료'
           : '이 기준으로 가상 LONG 기록 완료',
       )
-      onShadowRecorded?.()
+      onShadowRecorded?.(payload.trade)
     } catch (err) {
       setError(err.message || '가상 기록에 실패했습니다.')
     } finally {

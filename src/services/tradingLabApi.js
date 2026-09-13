@@ -9,6 +9,28 @@ import { apiFetch } from './apiClient.js'
 
 const BASE = '/api/trading-lab'
 
+export function fetchTradeJournals(symbol, { filter = 'all', offset = 0 } = {}) {
+  return call(`${BASE}/journals?${new URLSearchParams({ symbol, filter, offset: String(offset) })}`)
+}
+export function fetchTradeJournal(tradeId) {
+  return call(`${BASE}/shadow-trades/${encodeURIComponent(tradeId)}/journal`)
+}
+export function createTradeJournal(payload) {
+  return call(`${BASE}/journals`, { method: 'POST', body: JSON.stringify(payload) })
+}
+export function saveTradeJournal(tradeId, payload) {
+  return call(`${BASE}/shadow-trades/${encodeURIComponent(tradeId)}/journal`, { method: 'PUT', body: JSON.stringify(payload) })
+}
+export function uploadJournalImage(journalId, file, uploadId) {
+  return call(`${BASE}/journals/${encodeURIComponent(journalId)}/images`, {
+    method: 'POST', body: file,
+    headers: { 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(file.name), 'X-Upload-Id': uploadId },
+  })
+}
+export function removeJournalImage(journalId, imageId) {
+  return call(`${BASE}/journals/${encodeURIComponent(journalId)}/images/${encodeURIComponent(imageId)}`, { method: 'DELETE' })
+}
+
 /**
  * @param {Response} response
  */

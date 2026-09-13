@@ -10,6 +10,7 @@ import {
   TRADING_LAB_SYMBOLS,
 } from './constants.js'
 import { callMarketData } from './marketDataProvider.js'
+import { evaluateJournalOutcome } from './journalOutcome.js'
 import {
   classifyShadowRecordType,
   getShadowRecordTypeLabel,
@@ -450,15 +451,17 @@ export async function evaluateOpenShadowTrade(trade, options = {}) {
   const candles =
     options.candles !== undefined
       ? options.candles
-      : await fetchShadowCandles(trade.symbol)
+      : await fetchShadowCandles(trade.symbol, { limit: trade.strategyVersion === 'journal-v1' ? 200 : 96 })
 
-  const evaluated = evaluateShadowOutcome({
+  const evaluate = trade.strategyVersion === 'journal-v1' ? evaluateJournalOutcome : evaluateShadowOutcome
+  const evaluated = evaluate({
     direction: trade.direction,
     entryPrice: trade.entryPrice,
     createdAt: trade.createdAt,
     nowMs,
     currentPrice,
     candles,
+    previous: getShadowTradeOutcome(trade.id, db),
   })
 
   const outcome = upsertShadowTradeOutcome(

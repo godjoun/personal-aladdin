@@ -495,7 +495,7 @@ export function createBybitMarketDataProvider(options = {}) {
           : 'candles4h'
     const limit = Math.min(
       Math.max(Number(params.limit) || BYBIT_CANDLE_LIMIT, 1),
-      200,
+      250, // Journal EMA 200 needs 200 closed candles plus the current candle.
     )
 
     return withCache(
