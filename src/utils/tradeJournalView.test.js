@@ -4,7 +4,9 @@ import {
   formatPlanPct,
   formatRewardRisk,
   joinReviewNotes,
+  journalLeverageSummary,
   journalMaeSummary,
+  journalMarginModeLabel,
   journalPricePlanSummary,
   journalRecordTypeLabel,
   journalReviewSummary,
@@ -31,21 +33,30 @@ describe('journal review presentation', () => {
     expect(journalStatusLabel({ ...trade, journal: { reviewedAt: '2026-09-13T06:00:00Z' }, outcome: { return4hPct: 0.8 } })).toBe('복기 완료')
     expect(journalMaeSummary({ outcome: { maxAdverseMovePct: -1.2 } })).toBe('먼저 -1.20%까지 흔들림')
   })
-  it('calculates LONG/SHORT RR and warns on inverted price structure without inventing values', () => {
-    const long = calculateEntryPlanMetrics({ direction: 'LONG', entryPrice: 77250, takeProfitPrice: 78100, stopLossPrice: 76900 })
+  it('calculates LONG/SHORT RR and leveraged returns without inventing values', () => {
+    const long = calculateEntryPlanMetrics({ direction: 'LONG', entryPrice: 77250, takeProfitPrice: 78100, stopLossPrice: 76900, leverage: 10 })
     expect(long.rewardPct).toBeCloseTo(1.1003, 3)
     expect(long.riskPct).toBeCloseTo(0.4534, 3)
     expect(long.rewardRiskRatio).toBeCloseTo(2.426, 2)
+    expect(long.leveragedRewardPct).toBeCloseTo(11.003, 2)
+    expect(long.leveragedRiskPct).toBeCloseTo(4.534, 2)
     expect(formatRewardRisk(long.rewardRiskRatio)).toBe('1:2.43')
     expect(formatPlanPct(long.rewardPct, { signed: true })).toBe('+1.10%')
     expect(formatPlanPct(long.riskPct, { loss: true })).toBe('-0.45%')
-    const short = calculateEntryPlanMetrics({ direction: 'SHORT', entryPrice: 100, takeProfitPrice: 90, stopLossPrice: 105 })
-    expect(short).toMatchObject({ rewardPct: 10, riskPct: 5, rewardRiskRatio: 2, structureWarning: null })
+    expect(formatPlanPct(long.leveragedRewardPct, { signed: true })).toBe('+11.00%')
+    expect(formatPlanPct(long.leveragedRiskPct, { loss: true })).toBe('-4.53%')
+    const short = calculateEntryPlanMetrics({ direction: 'SHORT', entryPrice: 100, takeProfitPrice: 90, stopLossPrice: 105, leverage: 5 })
+    expect(short).toMatchObject({ rewardPct: 10, riskPct: 5, rewardRiskRatio: 2, leveragedRewardPct: 50, leveragedRiskPct: 25, structureWarning: null })
     expect(calculateEntryPlanMetrics({ direction: 'LONG', entryPrice: 100, takeProfitPrice: 90, stopLossPrice: 95 }).structureWarning).toBe('가격 구조 확인 필요')
     expect(calculateEntryPlanMetrics({ direction: 'LONG', entryPrice: 100 }).rewardRiskRatio).toBeNull()
+    expect(calculateEntryPlanMetrics({ direction: 'LONG', entryPrice: 100, takeProfitPrice: 110, stopLossPrice: 95 }).leveragedRewardPct).toBeNull()
     expect(journalPricePlanSummary({ entryPrice: 100, journal: {} })).toBe('가격 계획 미입력')
     expect(journalPricePlanSummary({ journal: { takeProfitPrice: 110, stopLossPrice: 95 }, entryPrice: 100 })).toContain('RR 1:2.00')
     expect(journalPricePlanSummary({ journal: { entryPrice: 100, takeProfitPrice: 110, stopLossPrice: 95 }, direction: 'LONG' })).toBe('Entry 100 · TP 110 · SL 95 · RR 1:2.00')
     expect(journalPricePlanSummary({ journal: {} })).toBe('가격 계획 미입력')
+    expect(journalLeverageSummary({ journal: { leverage: 10, marginMode: 'ISOLATED', marginAmount: 100, positionSize: 1000 } })).toBe('10x · Isolated · 증거금 100 USDT · 포지션 1,000 USDT')
+    expect(journalLeverageSummary({ journal: {} })).toBe('')
+    expect(journalMarginModeLabel('CROSS')).toBe('Cross')
+    expect(journalMarginModeLabel(null)).toBe('미입력')
   })
 })

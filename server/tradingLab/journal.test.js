@@ -69,15 +69,35 @@ describe('Trade Journal persistence', () => {
     expect(saved.journal.reviewedAt).toBeTruthy()
     expect(saveTradeJournal(created.trade.id, { ...form, revision: 1 }, { db })).toEqual({ conflict: true })
   })
-  it('persists entryPrice / takeProfitPrice / stopLossPrice for review cards', async () => {
-    const form = input({ entryPrice: 77250, takeProfitPrice: 78100, stopLossPrice: 76900 })
+  it('persists entryPrice / takeProfitPrice / stopLossPrice and leverage plan fields', async () => {
+    const form = input({
+      entryPrice: 77250, takeProfitPrice: 78100, stopLossPrice: 76900,
+      leverage: 10, marginMode: 'ISOLATED', marginAmount: 100, positionSize: 1000, liquidationPrice: 69800,
+    })
     const created = await createTradeJournal(form, { db, capture: async () => snapshot })
-    expect(created.journal).toMatchObject({ entryPrice: 77250, takeProfitPrice: 78100, stopLossPrice: 76900 })
+    expect(created.journal).toMatchObject({
+      entryPrice: 77250, takeProfitPrice: 78100, stopLossPrice: 76900,
+      leverage: 10, marginMode: 'ISOLATED', marginAmount: 100, positionSize: 1000, liquidationPrice: 69800,
+    })
     const listed = listJournalTrades({ symbol: 'BTCUSDT' }, db)
-    expect(listed.trades[0].journal).toMatchObject({ entryPrice: 77250, takeProfitPrice: 78100, stopLossPrice: 76900 })
-    const saved = saveTradeJournal(created.trade.id, { ...form, takeProfitPrice: 79000, stopLossPrice: 76000, revision: 1 }, { db })
-    expect(saved.journal).toMatchObject({ takeProfitPrice: 79000, stopLossPrice: 76000 })
-    expect(saved.journal.entryPlanSnapshot).toMatchObject({ takeProfitPrice: 78100, stopLossPrice: 76900 })
+    expect(listed.trades[0].journal).toMatchObject({
+      entryPrice: 77250, takeProfitPrice: 78100, stopLossPrice: 76900,
+      leverage: 10, marginMode: 'ISOLATED', marginAmount: 100, positionSize: 1000, liquidationPrice: 69800,
+    })
+    const saved = saveTradeJournal(created.trade.id, {
+      ...form, takeProfitPrice: 79000, stopLossPrice: 76000, leverage: 8, marginMode: 'CROSS', revision: 1,
+    }, { db })
+    expect(saved.journal).toMatchObject({ takeProfitPrice: 79000, stopLossPrice: 76000, leverage: 8, marginMode: 'CROSS' })
+    expect(saved.journal.entryPlanSnapshot).toMatchObject({
+      takeProfitPrice: 78100, stopLossPrice: 76900, leverage: 10, marginMode: 'ISOLATED', marginAmount: 100, positionSize: 1000, liquidationPrice: 69800,
+    })
+    expect(getJournalDetail(created.trade.id, db).journal).toMatchObject({
+      entryPrice: 77250, takeProfitPrice: 79000, stopLossPrice: 76000,
+      leverage: 8, marginMode: 'CROSS', marginAmount: 100, positionSize: 1000, liquidationPrice: 69800,
+    })
+    expect(listJournalTrades({ symbol: 'BTCUSDT' }, db).trades[0].journal).toMatchObject({
+      leverage: 8, marginMode: 'CROSS', marginAmount: 100, positionSize: 1000, liquidationPrice: 69800,
+    })
   })
   it('retries and concurrent double submissions create one record', async () => {
     const form = input()
@@ -115,7 +135,7 @@ describe('Trade Journal persistence', () => {
   it.each([
     ['symbol', 'SOLUSDT'], ['direction', 'BUY'], ['timeframe', '1m'], ['recordType', 'ORDER'],
     ['reasonTags', ['untrusted']], ['entryPrice', -1], ['invalidationPrice', Infinity], ['hasStopPlan', 'true'],
-    ['emotionTag', 'untrusted'], ['reviewed', 'true'], ['revision', -1], ['scenarioText', 'x'.repeat(4001)], ['indicatorSnapshot', {}],
+    ['emotionTag', 'untrusted'], ['marginMode', 'INVALID'], ['leverage', 0], ['marginAmount', -1], ['reviewed', 'true'], ['revision', -1], ['scenarioText', 'x'.repeat(4001)], ['indicatorSnapshot', {}],
   ])('rejects invalid %s', (key, value) => {
     const body = { symbol: 'BTCUSDT', direction: 'LONG', recordType: 'OBSERVATION', timeframe: '1h', reasonTags: [], scenarioText: '관찰', revision: 0, requestId: randomUUID(), [key]: value }
     expect(validateJournal(body, { create: true }).ok).toBe(false)

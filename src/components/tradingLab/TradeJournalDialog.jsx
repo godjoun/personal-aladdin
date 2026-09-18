@@ -119,6 +119,11 @@ export default function TradeJournalDialog({ tradeId, symbol, timeframe = '1h', 
         entryPrice: asPrice(form.entryPrice),
         takeProfitPrice: asPrice(form.takeProfitPrice),
         stopLossPrice: asPrice(form.stopLossPrice),
+        leverage: asPrice(form.leverage),
+        marginMode: form.marginMode || null,
+        marginAmount: asPrice(form.marginAmount),
+        positionSize: asPrice(form.positionSize),
+        liquidationPrice: asPrice(form.liquidationPrice),
       }
       let saved
       if (detail?.trade) saved = await saveTradeJournal(detail.trade.id, payload)

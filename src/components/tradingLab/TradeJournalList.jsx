@@ -4,6 +4,7 @@ import {
   journalDirectionLabel,
   journalHorizonResult,
   journalLatestReadyHorizon,
+  journalLeverageSummary,
   journalMaeSummary,
   journalPricePlanSummary,
   journalRecordTypeLabel,
@@ -17,6 +18,7 @@ import {
 function JournalCard({ trade, onSelect }) {
   const journal = trade.journal
   const ready = journalLatestReadyHorizon(trade)
+  const leverageLine = journalLeverageSummary(trade)
   return (
     <article className="lab-journal-card">
       <button type="button" className="lab-journal-card__hit" onClick={() => onSelect(trade.id)} aria-label={`${journalTitle(trade)} 일지 열기`}>
@@ -33,6 +35,7 @@ function JournalCard({ trade, onSelect }) {
           <h3>{journalTitle(trade)}</h3>
           <p className="lab-journal-card__meta">{trade.symbol} · {journalDirectionLabel(trade.direction)} · {journalRecordTypeLabel(trade.recordType)} · {journalDate(trade.createdAt)}</p>
           <p className="lab-journal-card__plan">{journalPricePlanSummary(trade)}</p>
+          {leverageLine ? <p className="lab-journal-card__leverage">{leverageLine}</p> : null}
           <dl className="lab-journal-card__facts">
             <div><dt>진입 시나리오</dt><dd>{journalSnippet(journal?.scenarioText, '시나리오를 남겨주세요')}</dd></div>
             <div><dt>리스크 계획</dt><dd>{journalRiskSummary(journal)}</dd></div>

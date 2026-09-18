@@ -14,7 +14,9 @@ const sampleTrade = (overrides = {}) => ({
   journal: {
     journalTitle: '첫 매매일지', scenarioText: '4H 저항 구간 근처, liquidity sweep 이후 단기 반등 가능성 관찰.',
     entryReasonText: 'FVG 반응 확인 후 가상 LONG', reasonTags: ['liquidity sweep', 'FVG', 'resistance'],
-    riskPlanText: '76500 봉 마감 시 재검토', invalidationPrice: null, entryPrice: 100, takeProfitPrice: 110, stopLossPrice: 95, hasStopPlan: null, fomo: true,
+    riskPlanText: '76500 봉 마감 시 재검토', invalidationPrice: null, entryPrice: 100, takeProfitPrice: 110, stopLossPrice: 95,
+    leverage: 10, marginMode: 'ISOLATED', marginAmount: 100, positionSize: 1000, liquidationPrice: 69800,
+    hasStopPlan: null, fomo: true,
     reviewText: '판단은 성급했다', mistakeText: '충돌 신호를 늦게 봄', lessonText: '봉 마감 후 기록',
     emotionTag: '조급함', imageCount: 1, coverImageUrl: '/api/trading-lab/journals/j1/images/img1',
   },
@@ -24,7 +26,7 @@ const sampleTrade = (overrides = {}) => ({
 describe('Journal interface', () => {
   it('has image/paste entry, scenario tags, nullable risk plans and personal review fields', () => {
     const html = renderToStaticMarkup(<TradeJournalDialog symbol="BTCUSDT" timeframe="4h" />)
-    for (const label of ['캡처와 근거', '⌘V', '진입 요약', 'Entry', 'TP', 'SL', 'RR', 'Scenario', 'Reasons', 'Risk Plan', '진입 시나리오', '진입 근거', 'support OB', 'FVG', '무효화 가격', '손절 기준', 'FOMO 여부', '들어가면 안 되는 이유', '내 판단이 맞았나?', '실제 전개는 어땠나?', '놓친 점은 무엇인가?', '다음에는 무엇을 바꿀 것인가?', '가상 기록으로 저장']) expect(html).toContain(label)
+    for (const label of ['캡처와 근거', '⌘V', '진입 요약', 'Entry', 'TP', 'SL', 'RR', '레버리지', '마진 방식', '증거금', '포지션 크기', '청산가', 'Scenario', 'Reasons', 'Risk Plan', '진입 시나리오', '진입 근거', 'support OB', 'FVG', '무효화 가격', '손절 기준', 'FOMO 여부', '들어가면 안 되는 이유', '내 판단이 맞았나?', '실제 전개는 어땠나?', '놓친 점은 무엇인가?', '다음에는 무엇을 바꿀 것인가?', '가상 기록으로 저장']) expect(html).toContain(label)
     expect(html).toContain('aria-labelledby="journal-dialog-title"')
     expect(html).toContain('캡처 없음')
     expect(html).not.toMatch(/iframe|매수하세요|매도하세요|성공 확률|수익 확률|확정 신호|분석 완료/)
@@ -42,7 +44,7 @@ describe('Journal interface', () => {
       sampleTrade(),
       sampleTrade({ id: 'short-1', symbol: 'ETHUSDT', direction: 'SHORT', recordType: 'IMPULSE', journal: { journalTitle: 'FVG 관찰', reasonTags: ['FVG'], imageCount: 0, coverImageUrl: null } }),
     ]} />)
-    for (const label of ['가상 LONG', '가상 SHORT', '관찰 기록', '충동 기록', '첫 매매일지', 'FVG 관찰', '캡처 없음', '진입 시나리오', '리스크 계획', '무효화 가격 미입력', '아직 복기 메모 없음', 'liquidity sweep', '4h 후 +0.80%', '먼저 -1.20%까지 흔들림', '일지 열기', '복기 필요', 'Entry 100', 'TP 110', 'SL 95', 'RR 1:2.00', '가격 계획 미입력']) expect(html).toContain(label)
+    for (const label of ['가상 LONG', '가상 SHORT', '관찰 기록', '충동 기록', '첫 매매일지', 'FVG 관찰', '캡처 없음', '진입 시나리오', '리스크 계획', '무효화 가격 미입력', '아직 복기 메모 없음', 'liquidity sweep', '4h 후 +0.80%', '먼저 -1.20%까지 흔들림', '일지 열기', '복기 필요', 'Entry 100', 'TP 110', 'SL 95', 'RR 1:2.00', '10x · Isolated · 증거금 100 USDT · 포지션 1,000 USDT', '가격 계획 미입력']) expect(html).toContain(label)
     expect(html).toContain('/api/trading-lab/journals/j1/images/img1')
     expect(html).toContain('판단은 성급했다')
     expect(html).toContain('봉 마감 후 기록')
@@ -68,13 +70,17 @@ describe('Journal interface', () => {
     for (const label of ['시간별 결과', '1h', '4h', '12h', '24h', 'MFE', 'MAE', '추적 대기']) expect(result).toContain(label)
     expect(journalForm(null, trade)).toMatchObject({ hasStopPlan: null, hasTargetPlan: null, fomo: null, revision: 0, unfoldText: '' })
   })
-  it('renders entry summary card under the capture area with Entry / TP / SL inputs', () => {
+  it('renders entry summary card under the capture area with Entry / TP / SL / leverage inputs', () => {
     const html = renderToStaticMarkup(<TradeJournalDialog symbol="BTCUSDT" timeframe="1h" />)
     expect(html.indexOf('캡처 없음')).toBeLessThan(html.indexOf('진입 요약'))
     expect(html).toContain('Entry')
     expect(html).toContain('손절가 · SL / SP')
+    expect(html).toContain('레버리지')
+    expect(html).toContain('청산가')
+    expect(html).toContain('미입력')
     expect(html).not.toContain('가격 구조 확인 필요')
-    expect(html).not.toMatch(/성공 확률|수익 확률|실제 주문 실행/)
+    expect(html).not.toContain('레버리지 반영 값은 수수료')
+    expect(html).not.toMatch(/성공 확률|수익 확률|실제 주문 실행|자동매매|Bybit private/)
   })
   it('checks clipboard/file format and size before reading the image', () => {
     expect(validateImageFile({ name: 'chart.webp', type: 'image/webp', size: 1000 })).toBeNull()

@@ -1,9 +1,11 @@
 import React from 'react'
+import { JOURNAL_MARGIN_MODES } from '../../../shared/tradeJournal.js'
 import {
   calculateEntryPlanMetrics,
   formatPlanPct,
   formatRewardRisk,
   journalDirectionLabel,
+  journalMarginModeLabel,
   journalNumber,
   journalRecordTypeLabel,
   journalSnippet,
@@ -13,7 +15,11 @@ function Metric({ label, value }) {
   return <div className="journal-entry-summary__metric"><span>{label}</span><strong>{value ?? '—'}</strong></div>
 }
 
-/** Compact Entry · TP · SL card under the chart for 3-second review. */
+function Fact({ label, value }) {
+  return <div className="journal-entry-summary__fact"><span>{label}</span><strong>{value}</strong></div>
+}
+
+/** Compact Entry · TP · SL · leverage card under the chart for 3-second review. */
 export default function JournalEntrySummary({
   direction,
   recordType,
@@ -25,8 +31,10 @@ export default function JournalEntrySummary({
     entryPrice: form.entryPrice,
     takeProfitPrice: form.takeProfitPrice,
     stopLossPrice: form.stopLossPrice,
+    leverage: form.leverage,
   })
   const rr = formatRewardRisk(metrics.rewardRiskRatio)
+  const marginLabel = journalMarginModeLabel(form.marginMode)
   return (
     <section className="journal-entry-summary" aria-label="진입 요약">
       <div className="journal-entry-summary__head">
@@ -41,11 +49,34 @@ export default function JournalEntrySummary({
         <label className="journal-field">TP<input type="number" min="0.00000001" max="1000000000000" step="any" value={form.takeProfitPrice} onChange={(e) => onChange('takeProfitPrice', e.target.value)} placeholder="목표가" /></label>
         <label className="journal-field">SL<input type="number" min="0.00000001" max="1000000000000" step="any" value={form.stopLossPrice} onChange={(e) => onChange('stopLossPrice', e.target.value)} placeholder="손절가 · SL / SP" /></label>
       </div>
+      <div className="journal-entry-summary__leverage">
+        <label className="journal-field">레버리지<input type="number" min="0.00000001" max="1000000000000" step="any" value={form.leverage} onChange={(e) => onChange('leverage', e.target.value)} placeholder="예: 10" /></label>
+        <label className="journal-field">마진 방식<select value={form.marginMode || ''} onChange={(e) => onChange('marginMode', e.target.value || '')}><option value="">미입력</option>{JOURNAL_MARGIN_MODES.filter((mode) => mode !== 'UNKNOWN').map((mode) => <option key={mode} value={mode}>{journalMarginModeLabel(mode)}</option>)}<option value="UNKNOWN">미입력 (UNKNOWN)</option></select></label>
+        <label className="journal-field">증거금<input type="number" min="0.00000001" max="1000000000000" step="any" value={form.marginAmount} onChange={(e) => onChange('marginAmount', e.target.value)} placeholder="USDT" /></label>
+        <label className="journal-field">포지션 크기<input type="number" min="0.00000001" max="1000000000000" step="any" value={form.positionSize} onChange={(e) => onChange('positionSize', e.target.value)} placeholder="USDT" /></label>
+        <label className="journal-field">청산가<input type="number" min="0.00000001" max="1000000000000" step="any" value={form.liquidationPrice} onChange={(e) => onChange('liquidationPrice', e.target.value)} placeholder="수동 입력" /></label>
+      </div>
+      <div className="journal-entry-summary__facts" aria-label="레버리지 요약">
+        <Fact label="레버리지" value={metrics.leverage != null ? `${metrics.leverage % 1 === 0 ? metrics.leverage : metrics.leverage}x` : '미입력'} />
+        <Fact label="마진 방식" value={marginLabel} />
+        <Fact label="증거금" value={form.marginAmount !== '' && form.marginAmount != null ? `${journalNumber(Number(form.marginAmount))} USDT` : '미입력'} />
+        <Fact label="포지션 크기" value={form.positionSize !== '' && form.positionSize != null ? `${journalNumber(Number(form.positionSize))} USDT` : '미입력'} />
+        <Fact label="청산가" value={form.liquidationPrice !== '' && form.liquidationPrice != null ? journalNumber(Number(form.liquidationPrice)) : '미입력'} />
+      </div>
       <div className="journal-entry-summary__metrics" aria-label="자동 계산">
         <Metric label="RR" value={rr} />
         <Metric label="예상 이익" value={formatPlanPct(metrics.rewardPct, { signed: true })} />
         <Metric label="예상 손실" value={formatPlanPct(metrics.riskPct, { loss: true })} />
       </div>
+      {(metrics.leveragedRewardPct != null || metrics.leveragedRiskPct != null) && (
+        <div className="journal-entry-summary__metrics journal-entry-summary__metrics--levered" aria-label="레버리지 반영 계산">
+          <Metric label="레버리지 반영 이익" value={formatPlanPct(metrics.leveragedRewardPct, { signed: true })} />
+          <Metric label="레버리지 반영 손실" value={formatPlanPct(metrics.leveragedRiskPct, { loss: true })} />
+        </div>
+      )}
+      {(metrics.leveragedRewardPct != null || metrics.leveragedRiskPct != null) && (
+        <p className="lab-muted journal-entry-summary__note">레버리지 반영 값은 수수료·펀딩비·슬리피지를 제외한 단순 계산입니다.</p>
+      )}
       {metrics.structureWarning && <p className="journal-entry-summary__warn" role="status">{metrics.structureWarning}</p>}
       <dl className="journal-entry-summary__notes">
         <div><dt>시나리오</dt><dd>{journalSnippet(form.scenarioText, '시나리오를 남겨주세요')}</dd></div>
@@ -57,6 +88,7 @@ export default function JournalEntrySummary({
         <p className="lab-muted journal-entry-summary__preview">
           Entry {journalNumber(metrics.entryPrice)} · TP {journalNumber(metrics.takeProfitPrice)} · SL {journalNumber(metrics.stopLossPrice)}
           {rr ? ` · RR ${rr}` : ''}
+          {metrics.leverage != null ? ` · ${metrics.leverage}x` : ''}
         </p>
       )}
     </section>

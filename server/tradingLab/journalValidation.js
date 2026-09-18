@@ -1,4 +1,4 @@
-import { JOURNAL_EMOTIONS, JOURNAL_REASON_TAGS, JOURNAL_RECORD_TYPES, JOURNAL_TIMEFRAMES } from '../../shared/tradeJournal.js'
+import { JOURNAL_EMOTIONS, JOURNAL_MARGIN_MODES, JOURNAL_REASON_TAGS, JOURNAL_RECORD_TYPES, JOURNAL_TIMEFRAMES } from '../../shared/tradeJournal.js'
 
 export const JOURNAL_TEXT_LIMITS = {
   journalTitle: 120, scenarioText: 4000, entryReasonText: 4000,
@@ -10,6 +10,7 @@ export function validateJournal(body, { create = false } = {}) {
   const allowed = new Set([
     ...Object.keys(JOURNAL_TEXT_LIMITS), 'timeframe', 'reasonTags', 'invalidationPrice',
     'entryPrice', 'takeProfitPrice', 'stopLossPrice',
+    'leverage', 'marginMode', 'marginAmount', 'positionSize', 'liquidationPrice',
     'hasStopPlan', 'hasTargetPlan', 'fomo', 'emotionTag', 'reviewed', 'revision',
     ...(create ? ['symbol', 'direction', 'recordType', 'requestId'] : []),
   ])
@@ -29,10 +30,12 @@ export function validateJournal(body, { create = false } = {}) {
     if (body[key] != null && typeof body[key] !== 'boolean') return fail(key)
     value[key] = body[key] ?? null
   }
-  for (const key of ['invalidationPrice', 'entryPrice', 'takeProfitPrice', 'stopLossPrice']) {
+  for (const key of ['invalidationPrice', 'entryPrice', 'takeProfitPrice', 'stopLossPrice', 'leverage', 'marginAmount', 'positionSize', 'liquidationPrice']) {
     if (body[key] != null && (typeof body[key] !== 'number' || !Number.isFinite(body[key]) || body[key] <= 0 || body[key] > 1e12)) return fail(key)
     value[key] = body[key] ?? null
   }
+  if (body.marginMode != null && !JOURNAL_MARGIN_MODES.includes(body.marginMode)) return fail('marginMode')
+  value.marginMode = body.marginMode ?? null
   if (body.emotionTag != null && !JOURNAL_EMOTIONS.includes(body.emotionTag)) return fail('emotionTag')
   value.emotionTag = body.emotionTag ?? null
   if (body.reviewed != null && typeof body.reviewed !== 'boolean') return fail('reviewed')

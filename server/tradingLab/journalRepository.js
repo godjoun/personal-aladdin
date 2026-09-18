@@ -4,8 +4,8 @@ import { getShadowTradeById, getShadowTradeOutcome, mapShadowTrade, mapShadowTra
 import { JOURNAL_TEXT_LIMITS } from './journalValidation.js'
 
 const textFields = Object.keys(JOURNAL_TEXT_LIMITS)
-const fields = [...textFields, 'timeframe', 'reasonTagsJson', 'invalidationPrice', 'entryPrice', 'takeProfitPrice', 'stopLossPrice', 'hasStopPlan', 'hasTargetPlan', 'fomo', 'emotionTag', 'reviewedAt']
-const planKeys = [...textFields.filter((key) => !['reviewText', 'mistakeText', 'lessonText'].includes(key)), 'timeframe', 'reasonTags', 'invalidationPrice', 'entryPrice', 'takeProfitPrice', 'stopLossPrice', 'hasStopPlan', 'hasTargetPlan', 'fomo', 'emotionTag']
+const fields = [...textFields, 'timeframe', 'reasonTagsJson', 'invalidationPrice', 'entryPrice', 'takeProfitPrice', 'stopLossPrice', 'leverage', 'marginMode', 'marginAmount', 'positionSize', 'liquidationPrice', 'hasStopPlan', 'hasTargetPlan', 'fomo', 'emotionTag', 'reviewedAt']
+const planKeys = [...textFields.filter((key) => !['reviewText', 'mistakeText', 'lessonText'].includes(key)), 'timeframe', 'reasonTags', 'invalidationPrice', 'entryPrice', 'takeProfitPrice', 'stopLossPrice', 'leverage', 'marginMode', 'marginAmount', 'positionSize', 'liquidationPrice', 'hasStopPlan', 'hasTargetPlan', 'fomo', 'emotionTag']
 const parse = (text, fallback) => { try { return JSON.parse(text) ?? fallback } catch { return fallback } }
 function mapJournal(row) {
   if (!row) return null
@@ -42,6 +42,11 @@ function params(input, now) {
     entryPrice: input.entryPrice ?? null,
     takeProfitPrice: input.takeProfitPrice ?? null,
     stopLossPrice: input.stopLossPrice ?? null,
+    leverage: input.leverage ?? null,
+    marginMode: input.marginMode ?? null,
+    marginAmount: input.marginAmount ?? null,
+    positionSize: input.positionSize ?? null,
+    liquidationPrice: input.liquidationPrice ?? null,
     ...Object.fromEntries(['hasStopPlan', 'hasTargetPlan', 'fomo'].map((key) => [key, input[key] == null ? null : Number(input[key])])),
     emotionTag: input.emotionTag ?? null, reviewedAt: input.reviewed ? now : null,
   }
@@ -74,6 +79,7 @@ export function listJournalTrades({ symbol, filter = 'all', offset = 0, limit = 
   const extra = filter === 'review' ? 'AND j.reviewedAt IS NULL AND (o.price1h IS NOT NULL OR o.price4h IS NOT NULL OR o.price12h IS NOT NULL OR o.price24h IS NOT NULL)' : filter === 'reviewed' ? 'AND j.reviewedAt IS NOT NULL' : ''
   const rows = db.prepare(`SELECT t.*, j.id AS journalId, j.journalTitle, j.scenarioText, j.entryReasonText,
     j.reasonTagsJson, j.invalidationPrice, j.entryPrice AS journalEntryPrice, j.takeProfitPrice, j.stopLossPrice,
+    j.leverage, j.marginMode, j.marginAmount, j.positionSize, j.liquidationPrice,
     j.hasStopPlan, j.hasTargetPlan, j.fomo, j.riskPlanText,
     j.avoidReasonText, j.reviewText, j.mistakeText, j.lessonText, j.emotionTag, j.reviewedAt,
     o.price1h, o.price4h, o.price12h, o.price24h, o.return1hPct, o.return4hPct, o.return12hPct, o.return24hPct,
@@ -96,6 +102,8 @@ export function listJournalTrades({ symbol, filter = 'all', offset = 0, limit = 
         id: row.journalId, journalTitle: row.journalTitle, scenarioText: row.scenarioText, entryReasonText: row.entryReasonText,
         reasonTags: parse(row.reasonTagsJson, []), invalidationPrice: row.invalidationPrice,
         entryPrice: row.journalEntryPrice ?? row.entryPrice, takeProfitPrice: row.takeProfitPrice, stopLossPrice: row.stopLossPrice,
+        leverage: row.leverage, marginMode: row.marginMode, marginAmount: row.marginAmount,
+        positionSize: row.positionSize, liquidationPrice: row.liquidationPrice,
         hasStopPlan: row.hasStopPlan == null ? null : Boolean(row.hasStopPlan),
         hasTargetPlan: row.hasTargetPlan == null ? null : Boolean(row.hasTargetPlan),
         fomo: row.fomo == null ? null : Boolean(row.fomo),

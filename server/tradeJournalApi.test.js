@@ -83,17 +83,36 @@ describe('Trade Journal API', () => {
     expect(loaded.headers.get('cache-control')).toBe('no-store')
   })
   it('saves review text with optimistic revision and freezes entry snapshot', async () => {
-    const created = (await request('/trading-lab/journals', { method: 'POST', data: body({ direction: 'SHORT', symbol: 'ETHUSDT', takeProfitPrice: 90, stopLossPrice: 110 }) })).json
-    expect(created.journal).toMatchObject({ entryPrice: 100, takeProfitPrice: 90, stopLossPrice: 110 })
-    const patch = { timeframe: '1h', reasonTags: ['CVD'], scenarioText: 'updated', reviewText: '확인한 근거 부족', lessonText: '봉 마감 확인', reviewed: true, revision: 1, entryPrice: 100, takeProfitPrice: 88, stopLossPrice: 112 }
+    const created = (await request('/trading-lab/journals', { method: 'POST', data: body({
+      direction: 'SHORT', symbol: 'ETHUSDT', takeProfitPrice: 90, stopLossPrice: 110,
+      leverage: 10, marginMode: 'ISOLATED', marginAmount: 100, positionSize: 1000, liquidationPrice: 120,
+    }) })).json
+    expect(created.journal).toMatchObject({
+      entryPrice: 100, takeProfitPrice: 90, stopLossPrice: 110,
+      leverage: 10, marginMode: 'ISOLATED', marginAmount: 100, positionSize: 1000, liquidationPrice: 120,
+    })
+    const patch = {
+      timeframe: '1h', reasonTags: ['CVD'], scenarioText: 'updated', reviewText: '확인한 근거 부족', lessonText: '봉 마감 확인',
+      reviewed: true, revision: 1, entryPrice: 100, takeProfitPrice: 88, stopLossPrice: 112,
+      leverage: 8, marginMode: 'CROSS', marginAmount: 80, positionSize: 640, liquidationPrice: 125,
+    }
     const saved = await request(`/trading-lab/shadow-trades/${created.trade.id}/journal`, { method: 'PUT', data: patch })
     expect(saved.status).toBe(200)
-    expect(saved.json.journal).toMatchObject({ takeProfitPrice: 88, stopLossPrice: 112, reviewedAt: expect.any(String) })
-    expect(saved.json.journal.entryPlanSnapshot).toMatchObject({ takeProfitPrice: 90, stopLossPrice: 110 })
+    expect(saved.json.journal).toMatchObject({ takeProfitPrice: 88, stopLossPrice: 112, leverage: 8, marginMode: 'CROSS', reviewedAt: expect.any(String) })
+    expect(saved.json.journal.entryPlanSnapshot).toMatchObject({ takeProfitPrice: 90, stopLossPrice: 110, leverage: 10, marginMode: 'ISOLATED' })
     expect(saved.json.journal.indicatorSnapshot).toEqual(created.journal.indicatorSnapshot)
     expect((await request(`/trading-lab/shadow-trades/${created.trade.id}/journal`, { method: 'PUT', data: patch })).status).toBe(409)
+    closeDb()
+    const reopened = await request(`/trading-lab/shadow-trades/${created.trade.id}/journal`)
+    expect(reopened.json.journal).toMatchObject({
+      entryPrice: 100, takeProfitPrice: 88, stopLossPrice: 112,
+      leverage: 8, marginMode: 'CROSS', marginAmount: 80, positionSize: 640, liquidationPrice: 125,
+    })
     const listed = await request('/trading-lab/journals?symbol=ETHUSDT&filter=reviewed')
-    expect(listed.json.trades.find((t) => t.id === created.trade.id).journal).toMatchObject({ takeProfitPrice: 88, stopLossPrice: 112 })
+    expect(listed.json.trades.find((t) => t.id === created.trade.id).journal).toMatchObject({
+      takeProfitPrice: 88, stopLossPrice: 112,
+      leverage: 8, marginMode: 'CROSS', marginAmount: 80, positionSize: 640, liquidationPrice: 125,
+    })
   })
   it('uploads and privately retrieves images, rejects spoofing, limits size/count and deletes only selected attachment', async () => {
     const created = (await request('/trading-lab/journals', { method: 'POST', data: body() })).json

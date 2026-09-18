@@ -6,6 +6,8 @@ export const JOURNAL_REASON_TAGS = [
 ]
 export const JOURNAL_EMOTIONS = ['차분함', '망설임', '조급함', '불안', '과신', '아쉬움']
 export const JOURNAL_RECORD_TYPES = { STRATEGY: '기준', IMPULSE: '충동', OBSERVATION: '관찰' }
+/** Futures journal margin plan — virtual notes only, not live positions. */
+export const JOURNAL_MARGIN_MODES = Object.freeze(['ISOLATED', 'CROSS', 'UNKNOWN'])
 export const JOURNAL_IMAGE_TYPES = { 'image/png': ['png'], 'image/jpeg': ['jpg', 'jpeg'], 'image/webp': ['webp'] }
 export const JOURNAL_IMAGE_MAX_BYTES = 5 * 1024 * 1024
 export const JOURNAL_IMAGE_MAX_COUNT = 4

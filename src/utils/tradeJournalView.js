@@ -1,4 +1,4 @@
-import { JOURNAL_HORIZONS, JOURNAL_IMAGE_MAX_BYTES, JOURNAL_IMAGE_TYPES, JOURNAL_REASON_TAGS, JOURNAL_RECORD_TYPES } from '../../shared/tradeJournal.js'
+import { JOURNAL_HORIZONS, JOURNAL_IMAGE_MAX_BYTES, JOURNAL_IMAGE_TYPES, JOURNAL_MARGIN_MODES, JOURNAL_REASON_TAGS, JOURNAL_RECORD_TYPES } from '../../shared/tradeJournal.js'
 
 export const REVIEW_UNFOLD_MARK = '[실제 전개]'
 export const journalNumber = (value, suffix = '') => typeof value === 'number' && Number.isFinite(value) ? `${value.toLocaleString('ko-KR', { maximumFractionDigits: 4 })}${suffix}` : '데이터 없음'
@@ -76,14 +76,16 @@ export function journalMaeSummary(trade) {
   const mae = trade?.outcome?.maxAdverseMovePct
   return typeof mae === 'number' && Number.isFinite(mae) ? `먼저 ${journalReturn(mae)}까지 흔들림` : ''
 }
-/** Reward/risk metrics from Entry · TP · SL. Missing or invalid legs stay null — never invent numbers. */
-export function calculateEntryPlanMetrics({ direction, entryPrice, takeProfitPrice, stopLossPrice }) {
+/** Reward/risk metrics from Entry · TP · SL · leverage. Missing or invalid legs stay null — never invent numbers. */
+export function calculateEntryPlanMetrics({ direction, entryPrice, takeProfitPrice, stopLossPrice, leverage }) {
   const entry = Number(entryPrice)
   const target = Number(takeProfitPrice)
   const stop = Number(stopLossPrice)
+  const lev = Number(leverage)
   const hasEntry = Number.isFinite(entry) && entry > 0
   const hasTarget = Number.isFinite(target) && target > 0
   const hasStop = Number.isFinite(stop) && stop > 0
+  const hasLeverage = Number.isFinite(lev) && lev > 0
   let structureWarning = null
   if (hasEntry && hasTarget) {
     if (direction === 'SHORT' && !(target < entry)) structureWarning = '가격 구조 확인 필요'
@@ -106,12 +108,17 @@ export function calculateEntryPlanMetrics({ direction, entryPrice, takeProfitPri
     if (!(riskPct > 0)) riskPct = null
   }
   const rewardRiskRatio = rewardPct != null && riskPct != null && riskPct > 0 ? rewardPct / riskPct : null
+  const leveragedRewardPct = hasLeverage && rewardPct != null ? rewardPct * lev : null
+  const leveragedRiskPct = hasLeverage && riskPct != null ? riskPct * lev : null
   return {
     entryPrice: hasEntry ? entry : null,
     takeProfitPrice: hasTarget ? target : null,
     stopLossPrice: hasStop ? stop : null,
+    leverage: hasLeverage ? lev : null,
     rewardPct,
     riskPct,
+    leveragedRewardPct,
+    leveragedRiskPct,
     rewardRiskRatio,
     structureWarning,
     hasPlan: hasEntry || hasTarget || hasStop,
@@ -126,6 +133,11 @@ export function formatPlanPct(value, { signed = false, loss = false } = {}) {
   const text = `${value.toFixed(2)}%`
   return signed && value > 0 ? `+${text}` : text
 }
+export function journalMarginModeLabel(mode) {
+  if (mode === 'ISOLATED') return 'Isolated'
+  if (mode === 'CROSS') return 'Cross'
+  return '미입력'
+}
 export function journalPricePlanSummary(trade) {
   const journal = trade?.journal
   const hasJournalPlan = journal?.entryPrice != null || journal?.takeProfitPrice != null || journal?.stopLossPrice != null
@@ -135,6 +147,7 @@ export function journalPricePlanSummary(trade) {
     entryPrice: journal?.entryPrice ?? trade?.entryPrice,
     takeProfitPrice: journal?.takeProfitPrice,
     stopLossPrice: journal?.stopLossPrice,
+    leverage: journal?.leverage,
   })
   const parts = []
   if (plan.entryPrice != null) parts.push(`Entry ${journalNumber(plan.entryPrice)}`)
@@ -143,6 +156,19 @@ export function journalPricePlanSummary(trade) {
   const rr = formatRewardRisk(plan.rewardRiskRatio)
   if (rr) parts.push(`RR ${rr}`)
   return parts.join(' · ') || '가격 계획 미입력'
+}
+/** Compact leverage / margin line for list cards. Empty plan stays blank so the price line is undisturbed. */
+export function journalLeverageSummary(trade) {
+  const journal = trade?.journal
+  if (!journal) return ''
+  const parts = []
+  const lev = Number(journal.leverage)
+  if (Number.isFinite(lev) && lev > 0) parts.push(`${lev % 1 === 0 ? lev : lev.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}x`)
+  if (journal.marginMode === 'ISOLATED' || journal.marginMode === 'CROSS') parts.push(journalMarginModeLabel(journal.marginMode))
+  if (journal.marginAmount != null) parts.push(`증거금 ${journalNumber(journal.marginAmount)} USDT`)
+  if (journal.positionSize != null) parts.push(`포지션 ${journalNumber(journal.positionSize)} USDT`)
+  if (journal.liquidationPrice != null) parts.push(`청산가 ${journalNumber(journal.liquidationPrice)}`)
+  return parts.join(' · ')
 }
 export function journalForm(journal, trade, timeframe = '1h') {
   const notes = splitReviewNotes(journal?.reviewText)
@@ -153,6 +179,11 @@ export function journalForm(journal, trade, timeframe = '1h') {
     invalidationPrice: journal?.invalidationPrice ?? '',
     entryPrice: journal?.entryPrice ?? trade?.entryPrice ?? '',
     takeProfitPrice: journal?.takeProfitPrice ?? '', stopLossPrice: journal?.stopLossPrice ?? '',
+    leverage: journal?.leverage ?? '',
+    marginMode: JOURNAL_MARGIN_MODES.includes(journal?.marginMode) ? journal.marginMode : '',
+    marginAmount: journal?.marginAmount ?? '',
+    positionSize: journal?.positionSize ?? '',
+    liquidationPrice: journal?.liquidationPrice ?? '',
     hasStopPlan: journal?.hasStopPlan ?? null,
     hasTargetPlan: journal?.hasTargetPlan ?? null, fomo: journal?.fomo ?? null,
     riskPlanText: journal?.riskPlanText || '', avoidReasonText: journal?.avoidReasonText || '',
