@@ -280,6 +280,24 @@ export async function saveShadowTradeSettings(payload) {
   })
 }
 
+export function fetchUpbitStatus() {
+  return call(`${BASE}/upbit/status`)
+}
+
+export function syncUpbitTrades() {
+  return call(`${BASE}/upbit/sync`, { method: 'POST' })
+}
+
+export function fetchUpbitTrades(filter = {}) {
+  const params = new URLSearchParams()
+  if (filter.market) params.set('market', filter.market)
+  if (filter.status) params.set('status', filter.status)
+  if (filter.limit) params.set('limit', String(filter.limit))
+  if (filter.offset) params.set('offset', String(filter.offset))
+  const query = params.toString()
+  return call(`${BASE}/upbit/trades${query ? `?${query}` : ''}`)
+}
+
 /**
  * @param {string} id
  * @param {{ userNote?: string | null, userTags?: string[] }} payload

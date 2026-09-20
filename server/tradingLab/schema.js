@@ -315,6 +315,81 @@ export function migrateTradingLab(db) {
 
     CREATE INDEX IF NOT EXISTS idx_chart_annotation_symbol_tf
       ON chart_annotation(symbol, timeframe, createdAt DESC);
+
+    CREATE TABLE IF NOT EXISTS upbit_order (
+      uuid TEXT PRIMARY KEY,
+      market TEXT NOT NULL,
+      side TEXT,
+      orderType TEXT,
+      state TEXT,
+      orderPrice REAL,
+      volume REAL,
+      remainingVolume REAL,
+      executedVolume REAL,
+      executedFunds REAL,
+      paidFee REAL,
+      tradesCount INTEGER,
+      orderedAt TEXT,
+      lastEventAt TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_upbit_order_market_ordered
+      ON upbit_order(market, orderedAt DESC);
+
+    CREATE TABLE IF NOT EXISTS upbit_execution (
+      tradeUuid TEXT PRIMARY KEY,
+      orderUuid TEXT NOT NULL REFERENCES upbit_order(uuid) ON DELETE CASCADE,
+      market TEXT NOT NULL,
+      side TEXT NOT NULL,
+      price REAL NOT NULL,
+      volume REAL NOT NULL,
+      funds REAL,
+      fee REAL,
+      isMaker INTEGER,
+      tradedAt TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_upbit_execution_market_traded
+      ON upbit_execution(market, tradedAt ASC);
+
+    CREATE INDEX IF NOT EXISTS idx_upbit_execution_order
+      ON upbit_execution(orderUuid);
+
+    CREATE TABLE IF NOT EXISTS upbit_trade_episode (
+      id TEXT PRIMARY KEY,
+      market TEXT NOT NULL,
+      status TEXT NOT NULL,
+      openedAt TEXT,
+      closedAt TEXT,
+      boughtQuantity REAL NOT NULL DEFAULT 0,
+      soldQuantity REAL NOT NULL DEFAULT 0,
+      remainingQuantity REAL NOT NULL DEFAULT 0,
+      grossBuyAmount REAL NOT NULL DEFAULT 0,
+      grossSellAmount REAL NOT NULL DEFAULT 0,
+      buyFees REAL NOT NULL DEFAULT 0,
+      sellFees REAL NOT NULL DEFAULT 0,
+      averageEntryPrice REAL,
+      averageExitPrice REAL,
+      realizedPnl REAL,
+      realizedPnlPct REAL,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_upbit_episode_market_opened
+      ON upbit_trade_episode(market, openedAt DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_upbit_episode_status
+      ON upbit_trade_episode(status, openedAt DESC);
+
+    CREATE TABLE IF NOT EXISTS upbit_sync_state (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
   `)
 
   addColumnIfMissing(db, 'shadow_trade', 'recordType', 'TEXT')

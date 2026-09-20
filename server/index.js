@@ -107,6 +107,11 @@ import {
   setShadowTradeRuntime,
 } from './tradingLab/shadowTradeRuntime.js'
 import {
+  createUpbitIntegration,
+  resetUpbitIntegration,
+  setUpbitIntegration,
+} from './tradingLab/upbitIntegration.js'
+import {
   LOCAL_BYPASS_USER,
   assertLocalAuthBypassSafe,
 } from './auth/localBypass.js'
@@ -201,11 +206,14 @@ function safeError(res, status = 500) {
  *   liquidationCollector?: object | false,
  *   tradeFlowCollector?: object | false,
  *   marketStateRecorder?: object | false,
+ *   shadowTradeRuntime?: object | false,
+ *   upbitIntegration?: object | false,
  * }} [options]
  *   marketDataProvider 생략 시 Bybit 공개 API provider 를 등록한다.
  *   null 이면 미설정 상태로 둔다 (테스트용).
  *   liquidationCollector / tradeFlowCollector 생략 시 test 가 아니면 public WS 를 기동한다.
  *   marketStateRecorder 생략 시 test 가 아니면 5분 판정 기록을 기동한다.
+ *   upbitIntegration 생략 시 test 가 아니면 주문조회 전용 동기화를 기동한다.
  */
 export function createApp(options = {}) {
   // 위험한 bypass 설정(외부 bind / 호스팅 / proxy 뒤)이면 여기서 기동을 중단한다.
@@ -298,6 +306,22 @@ export function createApp(options = {}) {
     } catch {
       console.error('[TradingLab] shadow trade runtime failed to start')
     }
+  }
+
+  // Trading Lab — Upbit 실전 거래 READ ONLY 동기화 (주문 기능 없음)
+  if (options.upbitIntegration === false) {
+    resetUpbitIntegration()
+    createUpbitIntegration({ credentials: null, db: getDb(), autoStart: false })
+  } else if (options.upbitIntegration) {
+    setUpbitIntegration(options.upbitIntegration)
+  } else if (process.env.NODE_ENV !== 'test') {
+    try {
+      createUpbitIntegration({ autoStart: true })
+    } catch {
+      console.error('[TradingLab] Upbit read-only integration failed to start')
+    }
+  } else {
+    createUpbitIntegration({ credentials: null, db: getDb(), autoStart: false })
   }
 
   const app = express()

@@ -65,6 +65,26 @@ button.lab-tag { cursor: pointer; }
 .lab-support-tools summary span { display: block; margin: 7px 0 0 17px; color: var(--color-text-muted); font-size: .73rem; }
 .lab-support-tools .trading-lab__section { margin-top: 16px; padding: 0; border: none; }
 .lab-section-head { display: flex; gap: 12px; justify-content: space-between; align-items: center; }
+.lab-record-source-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--lab-line); }
+.lab-record-source-tabs button { border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-text-muted); font: inherit; font-size: .82rem; padding: 9px 14px; cursor: pointer; }
+.lab-record-source-tabs button[aria-selected="true"] { color: var(--color-text); border-bottom-color: var(--lab-accent); }
+.lab-upbit-real { display: flex; flex-direction: column; gap: 14px; }
+.lab-upbit-real h2 { margin: 4px 0 0; }
+.lab-upbit-status { padding: 4px 9px; border: 1px solid var(--lab-line); border-radius: 999px; font-size: .7rem; color: var(--color-text-muted); }
+.lab-upbit-status--connected { color: var(--lab-accent); border-color: var(--lab-accent); }
+.lab-upbit-sync { display: flex; justify-content: space-between; gap: 16px; align-items: center; border: 1px solid var(--lab-line); border-radius: 8px; padding: 13px 15px; background: var(--lab-panel); }
+.lab-upbit-sync strong, .lab-upbit-sync span { display: block; }
+.lab-upbit-sync strong { font-size: .84rem; }
+.lab-upbit-sync span { margin-top: 5px; font-size: .7rem; color: var(--color-text-muted); }
+.lab-upbit-cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.lab-upbit-card { border: 1px solid var(--lab-line); border-radius: 10px; padding: 15px; background: var(--lab-panel); }
+.lab-upbit-card__head { display: flex; gap: 9px; align-items: center; font-size: .76rem; color: var(--color-text-muted); }
+.lab-upbit-card__head strong { color: var(--color-text); font-size: .98rem; }
+.lab-upbit-card dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; margin: 12px 0; }
+.lab-upbit-card dl > div { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--lab-line); padding: 8px 0; }
+.lab-upbit-card dt { color: var(--color-text-muted); font-size: .68rem; }
+.lab-upbit-card dd { margin: 0; text-align: right; font-size: .74rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.lab-upbit-card__result { margin: 0; font-size: .78rem; color: var(--lab-accent); }
 .lab-filters { display: flex; gap: 6px; margin: 12px 0 14px; }
 .lab-filter { padding: 5px 10px; font: inherit; font-size: .72rem; border-radius: 16px; border: 1px solid var(--lab-line); background: none; color: var(--color-text-muted); cursor: pointer; }
 .lab-filter.is-selected { color: var(--color-text); border-color: var(--lab-accent); background: #8abda70d; }

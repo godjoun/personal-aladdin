@@ -6,7 +6,7 @@ import fs from 'fs'
 import http from 'http'
 import os from 'os'
 import path from 'path'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hashPassword } from './auth/password.js'
 import { resetLoginRateLimit } from './auth/rateLimit.js'
 import { resetAccountLoginLockouts } from './auth/loginLockout.js'
@@ -27,6 +27,11 @@ import {
 } from './tradingLab/tradeFlowCollector.js'
 import { resetMarketStateRecorder } from './tradingLab/marketStateRecorder.js'
 import { resetShadowTradeRuntime } from './tradingLab/shadowTradeRuntime.js'
+import {
+  createUpbitIntegration,
+  resetUpbitIntegration,
+  setUpbitIntegration,
+} from './tradingLab/upbitIntegration.js'
 import {
   insertShadowTrade,
   upsertShadowTradeOutcome,
@@ -175,6 +180,7 @@ describe('Trading Lab API', () => {
     resetTradeFlowCollector()
     resetMarketStateRecorder()
     resetShadowTradeRuntime()
+    resetUpbitIntegration()
   })
 
   beforeEach(() => {
@@ -184,6 +190,8 @@ describe('Trading Lab API', () => {
     resetMarketDataProvider()
     resetLiquidationCollector()
     resetTradeFlowCollector()
+    resetUpbitIntegration()
+    createUpbitIntegration({ credentials: null, db: getDb(), autoStart: false })
     registerMarketDataProvider(
       createBybitMarketDataProvider({
         fetchImpl: createMockBybitFetch(),
@@ -279,6 +287,8 @@ describe('Trading Lab API', () => {
       '/api/trading-lab/shadow-trades/stats',
       '/api/trading-lab/shadow-trades/settings',
       '/api/trading-lab/strategy-checks',
+      '/api/trading-lab/upbit/status',
+      '/api/trading-lab/upbit/trades',
       '/api/trading-lab/stats',
     ]) {
       const res = await request('GET', urlPath)
@@ -309,6 +319,51 @@ describe('Trading Lab API', () => {
       origin: ORIGIN,
     })
     expect(strategyPost.status).toBe(401)
+
+    const upbitSync = await request('POST', '/api/trading-lab/upbit/sync', {
+      origin: ORIGIN,
+    })
+    expect(upbitSync.status).toBe(401)
+  })
+
+  it('Upbit 미설정 상태는 secret 없이 정상 응답한다', async () => {
+    await login()
+    const status = await request('GET', '/api/trading-lab/upbit/status')
+    expect(status.status).toBe(200)
+    expect(status.json.status).toMatchObject({ configured: false, connected: false })
+    expect(JSON.stringify(status.json)).not.toMatch(/ACCESS|SECRET|Bearer/i)
+
+    const trades = await request('GET', '/api/trading-lab/upbit/trades?limit=20&offset=0')
+    expect(trades.status).toBe(200)
+    expect(trades.json).toMatchObject({ trades: [], total: 0 })
+
+    const sync = await request('POST', '/api/trading-lab/upbit/sync', authed({}))
+    expect(sync.status).toBe(409)
+    expect(sync.json.code).toBe('NOT_CONFIGURED')
+  })
+
+  it('Upbit configured integration은 sync와 episode 목록을 제공한다', async () => {
+    const sync = vi.fn(async () => ({ orderCount: 2, executionCount: 2, episodeCount: 1, lastSyncAt: '2026-09-20T00:00:00Z' }))
+    setUpbitIntegration({
+      configured: true,
+      sync,
+      getStatus: () => ({
+        configured: true, connected: true, lastMessageAt: null,
+        lastExecutionAt: null, lastSyncAt: '2026-09-20T00:00:00Z',
+        reconnectCount: 0, lastError: null,
+      }),
+      listTrades: () => ({
+        total: 1,
+        trades: [{ id: 'ep1', market: 'KRW-BTC', status: 'CLOSED' }],
+      }),
+    })
+    await login()
+    const result = await request('POST', '/api/trading-lab/upbit/sync', authed({}))
+    expect(result.status).toBe(200)
+    expect(sync).toHaveBeenCalledTimes(1)
+    const trades = await request('GET', '/api/trading-lab/upbit/trades?market=KRW-BTC&status=CLOSED')
+    expect(trades.status).toBe(200)
+    expect(trades.json.trades[0].id).toBe('ep1')
   })
 
   it('CSRF 토큰 없는 쓰기 요청은 403', async () => {

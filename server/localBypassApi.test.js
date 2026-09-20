@@ -250,6 +250,15 @@ describe('로컬 bypass 활성 서버', () => {
     expect(shadowList.status).toBe(200)
     expect(Array.isArray(shadowList.json.trades)).toBe(true)
 
+    const upbitStatus = await request('GET', '/api/trading-lab/upbit/status')
+    expect(upbitStatus.status).toBe(200)
+    expect(upbitStatus.json.status.configured).toBe(false)
+    expect(JSON.stringify(upbitStatus.json)).not.toMatch(/secret|Bearer/i)
+
+    const upbitTrades = await request('GET', '/api/trading-lab/upbit/trades')
+    expect(upbitTrades.status).toBe(200)
+    expect(Array.isArray(upbitTrades.json.trades)).toBe(true)
+
     const annotations = await request(
       'GET',
       '/api/trading-lab/chart-annotations?symbol=BTCUSDT&timeframe=1h',
