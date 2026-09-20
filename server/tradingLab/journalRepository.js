@@ -78,6 +78,7 @@ export function updateJournal(shadowTradeId, input, db = getDb()) {
 export function listJournalTrades({ symbol, filter = 'all', offset = 0, limit = 30 }, db = getDb()) {
   const extra = filter === 'review' ? 'AND j.reviewedAt IS NULL AND (o.price1h IS NOT NULL OR o.price4h IS NOT NULL OR o.price12h IS NOT NULL OR o.price24h IS NOT NULL)' : filter === 'reviewed' ? 'AND j.reviewedAt IS NOT NULL' : ''
   const rows = db.prepare(`SELECT t.*, j.id AS journalId, j.journalTitle, j.scenarioText, j.entryReasonText,
+    j.chartLocationText, j.supportResistanceText, j.marketStructureText, j.trendText, j.volumeText, j.conclusionText,
     j.reasonTagsJson, j.invalidationPrice, j.entryPrice AS journalEntryPrice, j.takeProfitPrice, j.stopLossPrice,
     j.leverage, j.marginMode, j.marginAmount, j.positionSize, j.liquidationPrice,
     j.hasStopPlan, j.hasTargetPlan, j.fomo, j.riskPlanText,
@@ -100,6 +101,9 @@ export function listJournalTrades({ symbol, filter = 'all', offset = 0, limit = 
       ...mapShadowTrade(row), outcome: mapShadowTradeOutcome({ ...row, shadowTradeId: row.id }),
       journal: row.journalId ? {
         id: row.journalId, journalTitle: row.journalTitle, scenarioText: row.scenarioText, entryReasonText: row.entryReasonText,
+        chartLocationText: row.chartLocationText, supportResistanceText: row.supportResistanceText,
+        marketStructureText: row.marketStructureText, trendText: row.trendText, volumeText: row.volumeText,
+        conclusionText: row.conclusionText,
         reasonTags: parse(row.reasonTagsJson, []), invalidationPrice: row.invalidationPrice,
         entryPrice: row.journalEntryPrice ?? row.entryPrice, takeProfitPrice: row.takeProfitPrice, stopLossPrice: row.stopLossPrice,
         leverage: row.leverage, marginMode: row.marginMode, marginAmount: row.marginAmount,

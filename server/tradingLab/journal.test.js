@@ -99,6 +99,47 @@ describe('Trade Journal persistence', () => {
       leverage: 8, marginMode: 'CROSS', marginAmount: 100, positionSize: 1000, liquidationPrice: 69800,
     })
   })
+  it('persists thinking-process text fields as nullable notes without inventing values', async () => {
+    const empty = await createTradeJournal(input(), { db, capture: async () => snapshot })
+    expect(empty.journal).toMatchObject({
+      chartLocationText: null, supportResistanceText: null, marketStructureText: null,
+      trendText: null, volumeText: null, conclusionText: null,
+    })
+    const form = input({
+      chartLocationText: '4H 박스권 하단 근처',
+      supportResistanceText: '76,000 지지 / 79,000 저항',
+      marketStructureText: '고점은 낮아지고 있지만 저점은 아직 유지',
+      trendText: '큰 흐름 상승 채널, 단기 조정',
+      volumeText: '하단 반응 시 거래량 증가 확인 필요',
+      conclusionText: '하단 재터치 후 15m 회복 확인 시 LONG 관찰',
+      reasonTags: ['FVG', 'support'],
+    })
+    const created = await createTradeJournal(form, { db, capture: async () => snapshot })
+    expect(created.journal).toMatchObject({
+      chartLocationText: '4H 박스권 하단 근처',
+      supportResistanceText: '76,000 지지 / 79,000 저항',
+      marketStructureText: '고점은 낮아지고 있지만 저점은 아직 유지',
+      trendText: '큰 흐름 상승 채널, 단기 조정',
+      volumeText: '하단 반응 시 거래량 증가 확인 필요',
+      conclusionText: '하단 재터치 후 15m 회복 확인 시 LONG 관찰',
+      reasonTags: ['FVG', 'support'],
+    })
+    expect(created.journal.entryPlanSnapshot).toMatchObject({
+      chartLocationText: '4H 박스권 하단 근처',
+      conclusionText: '하단 재터치 후 15m 회복 확인 시 LONG 관찰',
+      reasonTags: ['FVG', 'support'],
+    })
+    const listed = listJournalTrades({ symbol: 'BTCUSDT' }, db).trades.find((trade) => trade.id === created.trade.id)
+    expect(listed.journal).toMatchObject({
+      conclusionText: '하단 재터치 후 15m 회복 확인 시 LONG 관찰',
+      marketStructureText: '고점은 낮아지고 있지만 저점은 아직 유지',
+    })
+    const saved = saveTradeJournal(created.trade.id, {
+      ...form, conclusionText: '아직 대기', volumeText: null, revision: 1,
+    }, { db })
+    expect(saved.journal).toMatchObject({ conclusionText: '아직 대기', volumeText: null, chartLocationText: '4H 박스권 하단 근처' })
+    expect(saved.journal.entryPlanSnapshot.conclusionText).toBe('하단 재터치 후 15m 회복 확인 시 LONG 관찰')
+  })
   it('retries and concurrent double submissions create one record', async () => {
     const form = input()
     const results = await Promise.all([1, 2].map(() => createTradeJournal(form, { db, capture: async () => snapshot })))

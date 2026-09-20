@@ -1,5 +1,6 @@
 import React from 'react'
 import {
+  journalConclusionSummary,
   journalDate,
   journalDirectionLabel,
   journalHorizonResult,
@@ -12,6 +13,7 @@ import {
   journalRiskSummary,
   journalSnippet,
   journalStatusLabel,
+  journalStructureSummary,
   journalTitle,
 } from '../../utils/tradeJournalView.js'
 
@@ -19,6 +21,8 @@ function JournalCard({ trade, onSelect }) {
   const journal = trade.journal
   const ready = journalLatestReadyHorizon(trade)
   const leverageLine = journalLeverageSummary(trade)
+  const conclusion = journalConclusionSummary(journal)
+  const structure = journalStructureSummary(journal)
   return (
     <article className="lab-journal-card">
       <button type="button" className="lab-journal-card__hit" onClick={() => onSelect(trade.id)} aria-label={`${journalTitle(trade)} 일지 열기`}>
@@ -26,6 +30,22 @@ function JournalCard({ trade, onSelect }) {
           {journal?.coverImageUrl
             ? <img src={journal.coverImageUrl} alt="" className="lab-journal-card__thumb" />
             : <div className="lab-journal-card__placeholder" aria-hidden="true">캡처 없음</div>}
+          {(conclusion || structure) ? (
+            <div className="lab-journal-card__thinking">
+              {conclusion ? (
+                <p className="lab-journal-card__conclusion">
+                  <span>내 결론</span>
+                  {conclusion}
+                </p>
+              ) : null}
+              {structure ? (
+                <p className="lab-journal-card__structure">
+                  <span>구조</span>
+                  {structure}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="lab-journal-card__body">
           <div className="lab-journal-card__top">

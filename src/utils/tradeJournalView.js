@@ -176,6 +176,12 @@ export function journalForm(journal, trade, timeframe = '1h') {
     journalTitle: journal?.journalTitle || '', scenarioText: journal?.scenarioText || trade?.userNote || '',
     entryReasonText: journal?.entryReasonText || trade?.entryReason || '', timeframe: journal?.timeframe || timeframe,
     reasonTags: journal?.reasonTags || (trade?.userTags || []).filter((tag) => JOURNAL_REASON_TAGS.includes(tag)),
+    chartLocationText: journal?.chartLocationText || '',
+    supportResistanceText: journal?.supportResistanceText || '',
+    marketStructureText: journal?.marketStructureText || '',
+    trendText: journal?.trendText || '',
+    volumeText: journal?.volumeText || '',
+    conclusionText: journal?.conclusionText || '',
     invalidationPrice: journal?.invalidationPrice ?? '',
     entryPrice: journal?.entryPrice ?? trade?.entryPrice ?? '',
     takeProfitPrice: journal?.takeProfitPrice ?? '', stopLossPrice: journal?.stopLossPrice ?? '',
@@ -190,6 +196,13 @@ export function journalForm(journal, trade, timeframe = '1h') {
     reviewText: notes.judgment, unfoldText: notes.unfold, mistakeText: journal?.mistakeText || '', lessonText: journal?.lessonText || '',
     emotionTag: journal?.emotionTag || null, reviewed: Boolean(journal?.reviewedAt), revision: journal?.revision || 0,
   }
+}
+/** List-card conclusion line — empty journals stay blank. */
+export function journalConclusionSummary(journal) {
+  return journalSnippet(journal?.conclusionText, '')
+}
+export function journalStructureSummary(journal) {
+  return journalSnippet(journal?.marketStructureText, '')
 }
 export function validateImageFile(file) {
   const ext = file.name.split('.').at(-1)?.toLowerCase()

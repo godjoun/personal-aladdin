@@ -4,6 +4,8 @@ import {
   formatPlanPct,
   formatRewardRisk,
   joinReviewNotes,
+  journalConclusionSummary,
+  journalForm,
   journalLeverageSummary,
   journalMaeSummary,
   journalMarginModeLabel,
@@ -12,6 +14,7 @@ import {
   journalReviewSummary,
   journalRiskSummary,
   journalStatusLabel,
+  journalStructureSummary,
   splitReviewNotes,
 } from './tradeJournalView.js'
 
@@ -58,5 +61,14 @@ describe('journal review presentation', () => {
     expect(journalLeverageSummary({ journal: {} })).toBe('')
     expect(journalMarginModeLabel('CROSS')).toBe('Cross')
     expect(journalMarginModeLabel(null)).toBe('미입력')
+  })
+  it('exposes conclusion and structure snippets for list cards without inventing text', () => {
+    expect(journalConclusionSummary({})).toBe('')
+    expect(journalStructureSummary({})).toBe('')
+    expect(journalConclusionSummary({ conclusionText: '  하단 재터치 후 LONG 관찰  ' })).toBe('하단 재터치 후 LONG 관찰')
+    expect(journalStructureSummary({ marketStructureText: '고점은 낮아지고 저점은 유지' })).toBe('고점은 낮아지고 저점은 유지')
+    expect(journalForm({ conclusionText: '아직 대기', chartLocationText: '4H 하단' }, null)).toMatchObject({
+      conclusionText: '아직 대기', chartLocationText: '4H 하단', volumeText: '',
+    })
   })
 })

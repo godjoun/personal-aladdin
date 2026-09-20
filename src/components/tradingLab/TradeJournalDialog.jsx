@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { JOURNAL_EMOTIONS, JOURNAL_IMAGE_MAX_COUNT, JOURNAL_REASON_TAGS, JOURNAL_RECORD_TYPES, JOURNAL_TIMEFRAMES } from '../../../shared/tradeJournal.js'
+import { JOURNAL_EMOTIONS, JOURNAL_IMAGE_MAX_COUNT, JOURNAL_RECORD_TYPES, JOURNAL_TIMEFRAMES } from '../../../shared/tradeJournal.js'
 import { createTradeJournal, fetchTradeJournal, removeJournalImage, saveTradeJournal, uploadJournalImage } from '../../services/tradingLabApi.js'
 import { journalDate, journalDirectionLabel, journalForm, journalNumber, journalRecordTypeLabel, journalStatusLabel, joinReviewNotes, validateImageFile } from '../../utils/tradeJournalView.js'
 import { JournalOutcome, JournalSnapshot } from './JournalOutcome.jsx'
 import JournalEntrySummary from './JournalEntrySummary.jsx'
+import JournalThinkingProcess from './JournalThinkingProcess.jsx'
 
 const TEXT_FIELDS = { journalTitle: 120, scenarioText: 4000, entryReasonText: 4000, riskPlanText: 2000, avoidReasonText: 2000, reviewText: 4000, unfoldText: 4000, mistakeText: 2000, lessonText: 2000 }
 const FIELD_ERRORS = { entryPrice: '현재 기준 가격이 없습니다. 차트에서 본 가상 기준 가격을 직접 입력해주세요.', scenarioText: '남기고 싶은 시나리오를 한 줄 이상 적어주세요.', reviewText: '복기를 완료하려면 메모나 다음에 고칠 점을 남겨주세요.', image: '이미지 형식이나 크기를 확인해주세요.' }
@@ -206,12 +207,6 @@ export default function TradeJournalDialog({ tradeId, symbol, timeframe = '1h', 
                   <small>PNG · JPG · WebP / 장당 5MB / 로컬 저장</small>
                   <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(e) => { void addFiles(e.target.files); e.target.value = '' }} />
                 </div>
-                <JournalEntrySummary
-                  direction={currentDirection}
-                  recordType={currentRecordType}
-                  form={form}
-                  onChange={change}
-                />
               </section>
               <div className="journal-read">
                 {!detail?.trade && <div className="journal-entry-fields">
@@ -223,13 +218,20 @@ export default function TradeJournalDialog({ tradeId, symbol, timeframe = '1h', 
                   <label className="journal-field">일지 제목 · 선택<input maxLength={120} value={form.journalTitle} onChange={(e) => change('journalTitle', e.target.value)} placeholder="예: 저항 구간 재확인" /></label>
                   <label className="journal-field">관찰 시간봉<select value={form.timeframe} onChange={(e) => change('timeframe', e.target.value)}>{JOURNAL_TIMEFRAMES.map((tf) => <option value={tf} key={tf}>{tf}</option>)}</select></label>
                 </div>
+                <JournalThinkingProcess form={form} onChange={change} />
+                <JournalEntrySummary
+                  direction={currentDirection}
+                  recordType={currentRecordType}
+                  form={form}
+                  onChange={change}
+                />
                 <section className="journal-section"><div className="lab-eyebrow">01 / SCENARIO</div><h3>진입 시나리오</h3>
                   {textField('scenarioText', 'Scenario · 진입 시나리오', '예: 4H 저항 구간에서 1H FVG를 다시 확인. 유동성 스윕 이후 반응을 관찰한다.')}
                   {textField('entryReasonText', '진입 근거', '어떤 반응을 확인하면 내 시나리오에 힘이 실릴까요?', 2)}
-                  <fieldset className="journal-tag-group"><legend>Reasons · 근거 태그</legend><div>{JOURNAL_REASON_TAGS.map((tag) => <button type="button" key={tag} aria-pressed={form.reasonTags.includes(tag)} className={`lab-tag${form.reasonTags.includes(tag) ? ' is-selected' : ''}`} onClick={() => change('reasonTags', form.reasonTags.includes(tag) ? form.reasonTags.filter((v) => v !== tag) : [...form.reasonTags, tag])}>{tag}</button>)}</div></fieldset>
+                  <p className="lab-muted">추가 근거 태그는 위 사고 과정에서 선택합니다.</p>
                 </section>
                 <section className="journal-section"><div className="lab-eyebrow">02 / RISK PLAN</div><h3>리스크 계획</h3>
-                  <p className="lab-muted">Entry · TP · SL 과 RR은 왼쪽 진입 요약에서 바로 확인합니다.</p>
+                  <p className="lab-muted">Entry · TP · SL 과 RR은 위 진입 요약에서 바로 확인합니다.</p>
                   <label className="journal-field">무효화 가격 · 선택<input type="number" min="0.00000001" step="any" max="1000000000000" value={form.invalidationPrice} onChange={(e) => change('invalidationPrice', e.target.value)} placeholder="이 가격을 지나면 시나리오 재검토" /></label>
                   <div className="journal-entry-fields">{[['hasStopPlan', '손절 기준'], ['hasTargetPlan', '목표 기준'], ['fomo', 'FOMO 여부']].map(([key, label]) => <label className="journal-field" key={key}>{label}<select value={form[key] == null ? '' : String(form[key])} onChange={(e) => change(key, e.target.value === '' ? null : e.target.value === 'true')}><option value="">아직 기록 안 함</option><option value="true">있음</option><option value="false">없음</option></select></label>)}</div>
                   {textField('riskPlanText', 'Risk Plan', '가격 이탈, 봉 마감, 목표 구간 등 내가 확인할 기준', 2)}

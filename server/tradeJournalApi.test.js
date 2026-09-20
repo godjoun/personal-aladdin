@@ -114,6 +114,39 @@ describe('Trade Journal API', () => {
       leverage: 8, marginMode: 'CROSS', marginAmount: 80, positionSize: 640, liquidationPrice: 125,
     })
   })
+  it('saves thinking-process notes and keeps empty fields nullable', async () => {
+    const created = (await request('/trading-lab/journals', { method: 'POST', data: body({
+      chartLocationText: '4H 박스권 하단 근처',
+      supportResistanceText: '76,000 지지 / 79,000 저항',
+      marketStructureText: '고점은 낮아지고 있지만 저점은 아직 유지',
+      trendText: '큰 흐름 상승 채널, 단기 조정',
+      volumeText: '하단 반응 시 거래량 증가 확인 필요',
+      conclusionText: '하단 재터치 후 15m 회복 확인 시 LONG 관찰',
+      reasonTags: ['support', 'FVG'],
+    }) })).json
+    expect(created.journal).toMatchObject({
+      chartLocationText: '4H 박스권 하단 근처',
+      supportResistanceText: '76,000 지지 / 79,000 저항',
+      marketStructureText: '고점은 낮아지고 있지만 저점은 아직 유지',
+      trendText: '큰 흐름 상승 채널, 단기 조정',
+      volumeText: '하단 반응 시 거래량 증가 확인 필요',
+      conclusionText: '하단 재터치 후 15m 회복 확인 시 LONG 관찰',
+      reasonTags: ['support', 'FVG'],
+    })
+    const blank = (await request('/trading-lab/journals', { method: 'POST', data: body({ requestId: randomUUID() }) })).json
+    expect(blank.journal).toMatchObject({
+      chartLocationText: null, supportResistanceText: null, marketStructureText: null,
+      trendText: null, volumeText: null, conclusionText: null,
+    })
+    closeDb()
+    const listed = await request('/trading-lab/journals?symbol=BTCUSDT')
+    const row = listed.json.trades.find((t) => t.id === created.trade.id)
+    expect(row.journal).toMatchObject({
+      conclusionText: '하단 재터치 후 15m 회복 확인 시 LONG 관찰',
+      marketStructureText: '고점은 낮아지고 있지만 저점은 아직 유지',
+      reasonTags: ['support', 'FVG'],
+    })
+  })
   it('uploads and privately retrieves images, rejects spoofing, limits size/count and deletes only selected attachment', async () => {
     const created = (await request('/trading-lab/journals', { method: 'POST', data: body() })).json
     const url = `/trading-lab/journals/${created.journal.id}/images`

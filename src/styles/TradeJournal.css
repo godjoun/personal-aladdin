@@ -77,8 +77,15 @@ button.lab-tag { cursor: pointer; }
 .lab-journal-card { background: var(--lab-panel); border: 1px solid var(--lab-line); border-radius: 10px; }
 .lab-journal-card:hover { border-color: var(--lab-accent); }
 .lab-journal-card__hit { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 16px; width: 100%; padding: 14px; color: var(--color-text); text-align: left; cursor: pointer; font: inherit; background: none; border: 0; }
-.lab-journal-card__media { min-width: 0; min-height: 148px; border-radius: 8px; overflow: hidden; background: var(--color-bg); border: 1px solid var(--lab-line); }
-.lab-journal-card__thumb { display: block; width: 100%; height: 148px; object-fit: contain; background: var(--color-bg); }
+.lab-journal-card__media { min-width: 0; min-height: 148px; border-radius: 8px; overflow: hidden; background: var(--color-bg); border: 1px solid var(--lab-line); display: flex; flex-direction: column; }
+.lab-journal-card__thumb { display: block; width: 100%; height: 148px; object-fit: contain; background: var(--color-bg); flex: 0 0 auto; }
+.lab-journal-card__thinking { padding: 10px 12px 12px; border-top: 1px solid var(--lab-line); background: var(--lab-panel); display: flex; flex-direction: column; gap: 8px; }
+.lab-journal-card__conclusion,
+.lab-journal-card__structure { margin: 0; font-size: .74rem; line-height: 1.4; color: var(--color-text); display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.lab-journal-card__conclusion { -webkit-line-clamp: 2; }
+.lab-journal-card__structure { -webkit-line-clamp: 1; font-size: .68rem; color: var(--color-text-muted); }
+.lab-journal-card__conclusion span,
+.lab-journal-card__structure span { display: block; margin-bottom: 2px; font-size: .62rem; color: var(--color-text-muted); letter-spacing: .02em; }
 .lab-journal-card__placeholder { display: flex; align-items: center; justify-content: center; height: 148px; color: var(--color-text-muted); font-size: .78rem; }
 .lab-journal-card__body { min-width: 0; }
 .lab-journal-card__top { display: flex; align-items: center; gap: 9px; font-size: .7rem; color: var(--color-text-muted); flex-wrap: wrap; }
@@ -122,6 +129,19 @@ button.lab-tag { cursor: pointer; }
 .journal-gallery__thumbs button { padding: 0; border: 1px solid var(--lab-line); border-radius: 5px; overflow: hidden; background: var(--color-bg); cursor: pointer; }
 .journal-gallery__thumbs button.is-selected { border-color: var(--lab-accent); }
 .journal-gallery__thumbs img { display: block; width: 100%; height: 48px; object-fit: contain; }
+.journal-thinking { border: 1px solid var(--lab-line); border-radius: 8px; background: var(--color-bg); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.journal-thinking__head h3 { margin: 0; font-size: .92rem; }
+.journal-thinking__head .lab-muted { margin: 6px 0 0; font-size: .72rem; line-height: 1.45; }
+.journal-thinking__steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.journal-thinking__step { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--lab-line); }
+.journal-thinking__step:first-child { padding-top: 0; border-top: 0; }
+.journal-thinking__step-label { display: flex; align-items: baseline; gap: 8px; }
+.journal-thinking__step-label span { font-size: .68rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.journal-thinking__step-label strong { font-size: .82rem; }
+.journal-thinking__question { margin: 0; font-size: .72rem; color: var(--color-text-muted); line-height: 1.45; }
+.journal-thinking .journal-field textarea { min-height: 0; }
+.journal-thinking .journal-tag-group { margin-top: 2px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .journal-entry-summary { border: 1px solid var(--lab-line); border-radius: 8px; background: var(--color-bg); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .journal-entry-summary__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .journal-entry-summary__head h3 { font-size: .86rem; }

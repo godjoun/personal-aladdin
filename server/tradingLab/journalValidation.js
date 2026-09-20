@@ -2,6 +2,8 @@ import { JOURNAL_EMOTIONS, JOURNAL_MARGIN_MODES, JOURNAL_REASON_TAGS, JOURNAL_RE
 
 export const JOURNAL_TEXT_LIMITS = {
   journalTitle: 120, scenarioText: 4000, entryReasonText: 4000,
+  chartLocationText: 500, supportResistanceText: 500, marketStructureText: 500,
+  trendText: 500, volumeText: 500, conclusionText: 1000,
   riskPlanText: 2000, avoidReasonText: 2000, reviewText: 4000,
   mistakeText: 2000, lessonText: 2000,
 }
