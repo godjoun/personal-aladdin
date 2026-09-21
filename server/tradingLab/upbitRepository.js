@@ -123,6 +123,27 @@ export function getUpbitEpisodeCount(filter = {}, db = getDb()) {
   return Number(db.prepare(`SELECT COUNT(*) AS n FROM upbit_trade_episode ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`).get(...params)?.n) || 0
 }
 
+export function getUpbitEpisodeSummary(filter = {}, db = getDb()) {
+  const where = []
+  const params = []
+  if (filter.market) { where.push('market = ?'); params.push(filter.market) }
+  const row = db.prepare(`
+    SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN status IN ('OPEN', 'PARTIAL') THEN 1 ELSE 0 END) AS openCount,
+      SUM(CASE WHEN status NOT IN ('OPEN', 'PARTIAL') THEN 1 ELSE 0 END) AS closedCount,
+      SUM(CASE WHEN realizedPnl IS NOT NULL THEN realizedPnl ELSE 0 END) AS totalRealizedPnl
+    FROM upbit_trade_episode
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+  `).get(...params)
+  return {
+    total: Number(row?.total) || 0,
+    openCount: Number(row?.openCount) || 0,
+    closedCount: Number(row?.closedCount) || 0,
+    totalRealizedPnl: Number(row?.totalRealizedPnl) || 0,
+  }
+}
+
 export function getUpbitSyncState(key, db = getDb()) {
   return db.prepare('SELECT value FROM upbit_sync_state WHERE key = ?').get(key)?.value ?? null
 }

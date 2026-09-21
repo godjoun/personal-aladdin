@@ -4,7 +4,13 @@ import { getDb } from '../db.js'
 import { readUpbitCredentials } from './upbitAuth.js'
 import { createUpbitRestClient } from './upbitClient.js'
 import { createUpbitCollector } from './upbitCollector.js'
-import { getUpbitSyncState, listUpbitEpisodes, getUpbitEpisodeCount } from './upbitRepository.js'
+import { createUpbitPublicMarketClient } from './upbitPublicMarketClient.js'
+import {
+  getUpbitEpisodeCount,
+  getUpbitEpisodeSummary,
+  getUpbitSyncState,
+  listUpbitEpisodes,
+} from './upbitRepository.js'
 import { reconcileUpbitOrders } from './upbitSyncService.js'
 
 let activeIntegration = null
@@ -27,6 +33,9 @@ export function createUpbitIntegration(options = {}) {
     ? options.credentials
     : readUpbitCredentials(options.env)
   const db = options.db || getDb()
+  const marketClient = options.marketClient || createUpbitPublicMarketClient({
+    fetchImpl: options.publicFetchImpl || options.fetchImpl,
+  })
   if (!credentials) {
     const integration = {
       configured: false,
@@ -49,8 +58,13 @@ export function createUpbitIntegration(options = {}) {
         }
       },
       listTrades(filter) {
-        return { trades: listUpbitEpisodes(filter, db), total: getUpbitEpisodeCount(filter, db) }
+        return {
+          trades: listUpbitEpisodes(filter, db),
+          total: getUpbitEpisodeCount(filter, db),
+          summary: getUpbitEpisodeSummary(filter, db),
+        }
       },
+      getQuotes(markets) { return marketClient.getTickers(markets) },
     }
     activeIntegration = integration
     return integration
@@ -108,8 +122,13 @@ export function createUpbitIntegration(options = {}) {
       }
     },
     listTrades(filter) {
-      return { trades: listUpbitEpisodes(filter, db), total: getUpbitEpisodeCount(filter, db) }
+      return {
+        trades: listUpbitEpisodes(filter, db),
+        total: getUpbitEpisodeCount(filter, db),
+        summary: getUpbitEpisodeSummary(filter, db),
+      }
     },
+    getQuotes(markets) { return marketClient.getTickers(markets) },
   }
   activeIntegration = integration
   if (options.autoStart !== false) integration.start()

@@ -78,5 +78,22 @@ export function createUpbitRouter() {
     res.status(200).json({ ok: true, ...result })
   })
 
+  router.get('/quotes', async (req, res) => {
+    const markets = String(req.query.markets || '')
+      .split(',')
+      .map((value) => market(value))
+    if (markets.length === 0 || markets.length > 50 || markets.some((value) => !value)) {
+      res.status(400).json({ ok: false, message: 'Invalid request', field: 'markets' })
+      return
+    }
+    const integration = getUpbitIntegration()
+    try {
+      const quotes = await integration?.getQuotes?.([...new Set(markets)]) || []
+      res.status(200).json({ ok: true, quotes })
+    } catch {
+      res.status(502).json({ ok: false, code: 'UPBIT_TICKER_UNAVAILABLE', message: 'Upbit ticker is temporarily unavailable' })
+    }
+  })
+
   return router
 }

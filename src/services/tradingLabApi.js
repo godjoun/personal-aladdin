@@ -298,6 +298,11 @@ export function fetchUpbitTrades(filter = {}) {
   return call(`${BASE}/upbit/trades${query ? `?${query}` : ''}`)
 }
 
+export function fetchUpbitQuotes(markets = []) {
+  const params = new URLSearchParams({ markets: markets.join(',') })
+  return call(`${BASE}/upbit/quotes?${params}`)
+}
+
 /**
  * @param {string} id
  * @param {{ userNote?: string | null, userTags?: string[] }} payload

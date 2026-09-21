@@ -289,6 +289,7 @@ describe('Trading Lab API', () => {
       '/api/trading-lab/strategy-checks',
       '/api/trading-lab/upbit/status',
       '/api/trading-lab/upbit/trades',
+      '/api/trading-lab/upbit/quotes?markets=KRW-BTC',
       '/api/trading-lab/stats',
     ]) {
       const res = await request('GET', urlPath)
@@ -355,7 +356,9 @@ describe('Trading Lab API', () => {
       listTrades: () => ({
         total: 1,
         trades: [{ id: 'ep1', market: 'KRW-BTC', status: 'CLOSED' }],
+        summary: { total: 1, openCount: 0, closedCount: 1, totalRealizedPnl: 10 },
       }),
+      getQuotes: async () => [{ market: 'KRW-BTC', tradePrice: 100_000_000, updatedAt: '2026-09-20T00:00:00Z' }],
     })
     await login()
     const result = await request('POST', '/api/trading-lab/upbit/sync', authed({}))
@@ -364,6 +367,10 @@ describe('Trading Lab API', () => {
     const trades = await request('GET', '/api/trading-lab/upbit/trades?market=KRW-BTC&status=CLOSED')
     expect(trades.status).toBe(200)
     expect(trades.json.trades[0].id).toBe('ep1')
+    expect(trades.json.summary.closedCount).toBe(1)
+    const quotes = await request('GET', '/api/trading-lab/upbit/quotes?markets=KRW-BTC')
+    expect(quotes.status).toBe(200)
+    expect(quotes.json.quotes[0].tradePrice).toBe(100_000_000)
   })
 
   it('CSRF 토큰 없는 쓰기 요청은 403', async () => {
