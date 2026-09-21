@@ -390,9 +390,31 @@ export function migrateTradingLab(db) {
       value TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
+
+    -- Side table: episode rows are wiped on rebuild; review notes must survive.
+    -- episodeId matches the stable hash id of upbit_trade_episode (no ON DELETE CASCADE).
+    CREATE TABLE IF NOT EXISTS upbit_trade_review (
+      id TEXT PRIMARY KEY,
+      episodeId TEXT NOT NULL UNIQUE,
+      entryReasonText TEXT,
+      reasonTagsJson TEXT NOT NULL DEFAULT '[]',
+      exitReason TEXT,
+      reviewText TEXT,
+      reminderState TEXT NOT NULL CHECK(reminderState IN ('PENDING', 'LATER', 'COMPLETED')),
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_upbit_trade_review_reminder
+      ON upbit_trade_review(reminderState, updatedAt DESC);
   `)
 
   addColumnIfMissing(db, 'shadow_trade', 'recordType', 'TEXT')
+  addColumnIfMissing(db, 'upbit_trade_review', 'entryReasonText', 'TEXT')
+  addColumnIfMissing(db, 'upbit_trade_review', 'reasonTagsJson', 'TEXT')
+  addColumnIfMissing(db, 'upbit_trade_review', 'exitReason', 'TEXT')
+  addColumnIfMissing(db, 'upbit_trade_review', 'reviewText', 'TEXT')
+  addColumnIfMissing(db, 'upbit_trade_review', 'reminderState', 'TEXT')
   migrateTradeJournal(db)
 }
 

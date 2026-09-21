@@ -336,7 +336,7 @@ describe('Trading Lab API', () => {
 
     const trades = await request('GET', '/api/trading-lab/upbit/trades?limit=20&offset=0')
     expect(trades.status).toBe(200)
-    expect(trades.json).toMatchObject({ trades: [], total: 0 })
+    expect(trades.json).toMatchObject({ trades: [], total: 0, pendingReminders: [] })
 
     const sync = await request('POST', '/api/trading-lab/upbit/sync', authed({}))
     expect(sync.status).toBe(409)

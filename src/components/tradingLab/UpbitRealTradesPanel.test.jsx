@@ -77,6 +77,20 @@ describe('UpbitRealTradesPanel cards', () => {
     expect(html).toContain('lab-upbit-pnl--loss')
   })
 
+  it('CLOSED 카드에 복기 미작성 / 복기 완료 배지를 표시한다', () => {
+    const pending = renderToStaticMarkup(
+      <UpbitTradeCard trade={{ ...closedTrade, review: { reminderState: 'LATER', reasonTags: [] } }} />,
+    )
+    const done = renderToStaticMarkup(
+      <UpbitTradeCard trade={{ ...closedTrade, review: { reminderState: 'COMPLETED', reasonTags: ['FVG'] } }} />,
+    )
+    const open = renderToStaticMarkup(<UpbitTradeCard trade={openTrade} />)
+    expect(pending).toContain('복기 미작성')
+    expect(done).toContain('복기 완료')
+    expect(open).not.toContain('복기 미작성')
+    expect(open).not.toContain('복기 완료')
+  })
+
   it('상세 정보는 기본 접힘이며 요청 시 펼친 상태로 렌더링한다', () => {
     const collapsed = renderToStaticMarkup(<UpbitTradeCard trade={closedTrade} />)
     const expanded = renderToStaticMarkup(<UpbitTradeCard trade={closedTrade} detailsOpen />)

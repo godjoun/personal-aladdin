@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
+  deferUpbitTradeReview,
   fetchUpbitQuotes,
   fetchUpbitStatus,
   fetchUpbitTrades,
+  saveUpbitTradeReview,
   syncUpbitTrades,
 } from '../../services/tradingLabApi.js'
 import {
   isOpenUpbitTrade,
   sortUpbitTrades,
   summarizeUpbitTrades,
+  upbitReviewBadge,
   upbitTradePnl,
 } from '../../utils/upbitTradeView.js'
+import UpbitTradeReviewDialog from './UpbitTradeReviewDialog.jsx'
 
 function finite(value) {
   if (value == null || value === '') return null
@@ -76,10 +80,18 @@ function QuoteValue({ quote, quoteUnavailable }) {
   return quoteUnavailable ? '현재가 지연' : '—'
 }
 
-export function UpbitTradeCard({ trade, quote, lastSyncAt, quoteUnavailable = false, detailsOpen = false }) {
+export function UpbitTradeCard({
+  trade,
+  quote,
+  lastSyncAt,
+  quoteUnavailable = false,
+  detailsOpen = false,
+  onOpenReview,
+}) {
   const open = isOpenUpbitTrade(trade)
   const pnl = upbitTradePnl(trade, quote)
   const unknownBasis = trade.status === 'UNKNOWN_BASIS'
+  const badge = !open ? upbitReviewBadge(trade.review) : null
   return <li className={`lab-upbit-card lab-upbit-card--${open ? 'open' : 'closed'}`}>
     <div className="lab-upbit-card__head">
       <div><strong>{marketLabel(trade.market)}</strong><span className="lab-tag">실전</span></div>
@@ -96,6 +108,15 @@ export function UpbitTradeCard({ trade, quote, lastSyncAt, quoteUnavailable = fa
         ? <><div><dt>매수금액</dt><dd>{won(trade.grossBuyAmount)}</dd></div><div><dt>남은 수량</dt><dd>{number(trade.remainingQuantity)}</dd></div><div><dt>보유시간</dt><dd>{duration(trade.openedAt, trade.closedAt)}</dd></div></>
         : <><div><dt>평균 청산가</dt><dd>{won(trade.averageExitPrice)}</dd></div><div><dt>매수금액</dt><dd>{won(trade.grossBuyAmount)}</dd></div><div><dt>보유시간</dt><dd>{duration(trade.openedAt, trade.closedAt)}</dd></div></>}
     </dl>
+    {badge ? (
+      <button
+        type="button"
+        className={`lab-upbit-review-badge lab-upbit-review-badge--${badge.kind}`}
+        onClick={() => onOpenReview?.(trade)}
+      >
+        {badge.label}
+      </button>
+    ) : null}
     <details className="lab-upbit-card__details" open={detailsOpen || undefined}>
       <summary><span className="lab-upbit-detail-label--closed">상세 보기 <i>›</i></span><span className="lab-upbit-detail-label--open">상세 닫기</span></summary>
       <dl>
@@ -117,11 +138,14 @@ export default function UpbitRealTradesPanel() {
   const [status, setStatus] = useState(null)
   const [trades, setTrades] = useState([])
   const [summary, setSummary] = useState(null)
+  const [pendingReminders, setPendingReminders] = useState([])
   const [quotes, setQuotes] = useState({})
   const [quoteUnavailable, setQuoteUnavailable] = useState(false)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState('')
+  const [reviewTrade, setReviewTrade] = useState(null)
+  const [reviewBusy, setReviewBusy] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -133,6 +157,7 @@ export default function UpbitRealTradesPanel() {
       const nextTrades = sortUpbitTrades(tradesResult.value.trades || [])
       setTrades(nextTrades)
       setSummary(tradesResult.value.summary || summarizeUpbitTrades(nextTrades))
+      setPendingReminders(tradesResult.value.pendingReminders || [])
       const markets = [...new Set(nextTrades.filter(isOpenUpbitTrade).map((trade) => trade.market))]
       if (markets.length > 0) {
         try {
@@ -170,6 +195,42 @@ export default function UpbitRealTradesPanel() {
     }
   }
 
+  const activeReminder = pendingReminders[0] || null
+  const reminderTrade = activeReminder
+    ? trades.find((trade) => trade.id === activeReminder.episodeId) || {
+      id: activeReminder.episodeId,
+      market: activeReminder.market,
+      status: 'CLOSED',
+      review: activeReminder,
+    }
+    : null
+
+  async function laterReminder() {
+    if (!activeReminder || reviewBusy) return
+    setReviewBusy(true)
+    setError('')
+    try {
+      await deferUpbitTradeReview(activeReminder.episodeId)
+      await load()
+    } catch {
+      setError('나중에 알림을 처리하지 못했습니다.')
+    } finally {
+      setReviewBusy(false)
+    }
+  }
+
+  async function saveReview(payload) {
+    if (!reviewTrade) return
+    setReviewBusy(true)
+    try {
+      await saveUpbitTradeReview(reviewTrade.id, payload)
+      setReviewTrade(null)
+      await load()
+    } finally {
+      setReviewBusy(false)
+    }
+  }
+
   const connection = !status?.configured
     ? '미설정'
     : status.connected ? '연결됨' : '연결 끊김'
@@ -186,6 +247,18 @@ export default function UpbitRealTradesPanel() {
       <div><span>총 실현손익</span><strong className={overview.totalRealizedPnl > 0 ? 'is-profit' : overview.totalRealizedPnl < 0 ? 'is-loss' : ''}>{won(overview.totalRealizedPnl)}</strong></div>
       <div><span>최근 동기화</span><strong>{syncTime(status?.lastSyncAt)}</strong></div>
     </div>
+    {activeReminder ? (
+      <div className="lab-upbit-review-banner" role="status">
+        <div>
+          <strong>{marketLabel(activeReminder.market)} 거래가 종료됐습니다.</strong>
+          <span>이번 매매의 근거를 기록할까요?</span>
+        </div>
+        <div className="lab-upbit-review-banner__actions">
+          <button type="button" className="lab-button lab-button--primary" disabled={reviewBusy} onClick={() => setReviewTrade(reminderTrade)}>지금 작성</button>
+          <button type="button" className="lab-button" disabled={reviewBusy} onClick={() => void laterReminder()}>나중에</button>
+        </div>
+      </div>
+    ) : null}
     <div className="lab-upbit-sync">
       <div><strong>{status?.connected ? '실시간 감지 중' : status?.configured ? '재연결 대기 중' : '주문조회 키 미설정'}</strong><span>조회·동기화 전용 · 실제 주문 기능 없음</span></div>
       <button type="button" className="lab-button" disabled={syncing || !status?.configured} onClick={synchronize}>{syncing ? '동기화 중…' : '지금 동기화'}</button>
@@ -199,7 +272,17 @@ export default function UpbitRealTradesPanel() {
         quote={quotes[trade.market]}
         quoteUnavailable={quoteUnavailable}
         lastSyncAt={status?.lastSyncAt}
+        onOpenReview={setReviewTrade}
       />)}</ul>}
     <p className="lab-journal-footnote">업비트에서 직접 실행한 체결을 읽어온 기록입니다. ALADDIN은 주문을 생성하거나 취소하지 않습니다.</p>
+    {reviewTrade ? (
+      <UpbitTradeReviewDialog
+        trade={reviewTrade}
+        review={reviewTrade.review}
+        busy={reviewBusy}
+        onClose={() => { if (!reviewBusy) setReviewTrade(null) }}
+        onSave={saveReview}
+      />
+    ) : null}
   </section>
 }

@@ -120,6 +120,20 @@ button.lab-tag { cursor: pointer; }
 .lab-upbit-card__details dl > div { border-top: 1px solid var(--lab-line); }
 .lab-upbit-card__details dl > div:nth-child(-n + 2) { border-top: 0; }
 .lab-upbit-card__details p { margin: 7px 0 0; color: var(--color-text-muted); font-size: .65rem; line-height: 1.5; }
+.lab-upbit-review-badge { margin-top: 8px; padding: 3px 8px; border-radius: 999px; font-size: .62rem; font-weight: 650; cursor: pointer; background: none; font: inherit; }
+.lab-upbit-review-badge--pending { color: #c48a3a; border: 1px solid #d6b27a66; }
+.lab-upbit-review-badge--done { color: var(--lab-accent); border: 1px solid #8abda766; }
+.lab-upbit-review-banner { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; border: 1px solid #8abda766; border-radius: 8px; padding: 10px 12px; background: #8abda710; }
+.lab-upbit-review-banner strong { display: block; font-size: .82rem; }
+.lab-upbit-review-banner span { display: block; margin-top: 3px; font-size: .72rem; color: var(--color-text-muted); }
+.lab-upbit-review-banner__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lab-upbit-review-dialog { width: min(520px, calc(100vw - 24px)); max-height: min(88dvh, 760px); border: 1px solid var(--lab-line); border-radius: 10px; padding: 0; background: var(--lab-panel); color: var(--color-text); }
+.lab-upbit-review-dialog::backdrop { background: #05080d99; }
+.lab-upbit-review-dialog__head { display: flex; justify-content: space-between; gap: 12px; align-items: start; padding: 16px 18px 10px; border-bottom: 1px solid var(--lab-line); }
+.lab-upbit-review-dialog__head h3 { margin: 4px 0 0; font-size: 1rem; }
+.lab-upbit-review-dialog__head .lab-muted { margin: 6px 0 0; font-size: .72rem; }
+.lab-upbit-review-dialog__body { display: flex; flex-direction: column; gap: 14px; padding: 14px 18px 18px; overflow: auto; }
+.lab-upbit-review-dialog__footer { display: flex; justify-content: flex-end; gap: 8px; }
 .lab-filters { display: flex; gap: 6px; margin: 12px 0 14px; }
 .lab-filter { padding: 5px 10px; font: inherit; font-size: .72rem; border-radius: 16px; border: 1px solid var(--lab-line); background: none; color: var(--color-text-muted); cursor: pointer; }
 .lab-filter.is-selected { color: var(--color-text); border-color: var(--lab-accent); background: #8abda70d; }

@@ -1,8 +1,16 @@
 /** Trading Lab Upbit real trade read-only API. */
 
 import express from 'express'
+import { getDb } from '../db.js'
 import { asListLimit } from './validate.js'
 import { getUpbitIntegration } from './upbitIntegration.js'
+import {
+  deferUpbitReview,
+  getUpbitReviewByEpisodeId,
+  listPendingUpbitReviewReminders,
+  saveUpbitReview,
+  validateUpbitReviewBody,
+} from './upbitReviewRepository.js'
 
 const STATUS_SET = new Set(['OPEN', 'CLOSED', 'PARTIAL', 'UNKNOWN_BASIS'])
 
@@ -10,6 +18,11 @@ function market(value) {
   if (value == null || value === '') return null
   const normalized = String(value).trim().toUpperCase()
   return /^[A-Z]{2,10}-[A-Z0-9]{2,20}$/.test(normalized) ? normalized : undefined
+}
+
+function episodeIdParam(value) {
+  const id = String(value || '').trim()
+  return id.length >= 8 && id.length <= 80 && /^[a-zA-Z0-9_-]+$/.test(id) ? id : null
 }
 
 export function createUpbitRouter() {
@@ -75,7 +88,8 @@ export function createUpbitRouter() {
       limit,
       offset,
     }) || { trades: [], total: 0 }
-    res.status(200).json({ ok: true, ...result })
+    const pendingReminders = listPendingUpbitReviewReminders(getDb())
+    res.status(200).json({ ok: true, ...result, pendingReminders })
   })
 
   router.get('/quotes', async (req, res) => {
@@ -93,6 +107,53 @@ export function createUpbitRouter() {
     } catch {
       res.status(502).json({ ok: false, code: 'UPBIT_TICKER_UNAVAILABLE', message: 'Upbit ticker is temporarily unavailable' })
     }
+  })
+
+  router.get('/trades/:episodeId/review', (req, res) => {
+    const episodeId = episodeIdParam(req.params.episodeId)
+    if (!episodeId) {
+      res.status(400).json({ ok: false, message: 'Invalid request', field: 'episodeId' })
+      return
+    }
+    const review = getUpbitReviewByEpisodeId(episodeId)
+    if (!review) {
+      res.status(404).json({ ok: false, message: 'Not found' })
+      return
+    }
+    res.status(200).json({ ok: true, review })
+  })
+
+  router.put('/trades/:episodeId/review', (req, res) => {
+    const episodeId = episodeIdParam(req.params.episodeId)
+    if (!episodeId) {
+      res.status(400).json({ ok: false, message: 'Invalid request', field: 'episodeId' })
+      return
+    }
+    const parsed = validateUpbitReviewBody(req.body)
+    if (!parsed.ok) {
+      res.status(400).json({ ok: false, message: 'Invalid request', field: parsed.field })
+      return
+    }
+    const saved = saveUpbitReview(episodeId, parsed.value)
+    if (!saved.ok) {
+      res.status(404).json({ ok: false, message: 'Not found' })
+      return
+    }
+    res.status(200).json({ ok: true, review: saved.review })
+  })
+
+  router.post('/trades/:episodeId/review/later', (req, res) => {
+    const episodeId = episodeIdParam(req.params.episodeId)
+    if (!episodeId) {
+      res.status(400).json({ ok: false, message: 'Invalid request', field: 'episodeId' })
+      return
+    }
+    const deferred = deferUpbitReview(episodeId)
+    if (!deferred.ok) {
+      res.status(404).json({ ok: false, message: 'Not found' })
+      return
+    }
+    res.status(200).json({ ok: true, review: deferred.review })
   })
 
   return router

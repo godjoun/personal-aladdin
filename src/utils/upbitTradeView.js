@@ -28,6 +28,15 @@ export function summarizeUpbitTrades(trades = []) {
   }, { total: trades.length, openCount: 0, closedCount: 0, totalRealizedPnl: 0 })
 }
 
+export function upbitReviewBadge(review) {
+  if (!review) return null
+  if (review.reminderState === 'COMPLETED') return { kind: 'done', label: '복기 완료' }
+  if (review.reminderState === 'LATER' || review.reminderState === 'PENDING') {
+    return { kind: 'pending', label: '복기 미작성' }
+  }
+  return null
+}
+
 export function upbitTradePnl(trade, quote) {
   if (isOpenUpbitTrade(trade)) {
     const currentPrice = finite(quote?.tradePrice)

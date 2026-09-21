@@ -1,6 +1,10 @@
 /** Upbit read-only sync persistence. */
 
 import { getDb } from '../db.js'
+import {
+  ensureUpbitReviewReminders,
+  listUpbitReviewsByEpisodeIds,
+} from './upbitReviewRepository.js'
 
 function mapEpisode(row) {
   if (!row) return null
@@ -97,9 +101,12 @@ export function replaceUpbitEpisodes(episodes, db = getDb()) {
     }
   })
   run()
+  // After rebuild: seed PENDING reviews for newly CLOSED episodes (idempotent).
+  ensureUpbitReviewReminders(db)
 }
 
 export function listUpbitEpisodes(filter = {}, db = getDb()) {
+  ensureUpbitReviewReminders(db)
   const where = []
   const params = []
   if (filter.market) { where.push('market = ?'); params.push(filter.market) }
@@ -112,7 +119,8 @@ export function listUpbitEpisodes(filter = {}, db = getDb()) {
     ORDER BY COALESCE(closedAt, openedAt) DESC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset)
-  return rows.map(mapEpisode)
+  const reviews = listUpbitReviewsByEpisodeIds(rows.map((row) => row.id), db)
+  return rows.map((row) => ({ ...mapEpisode(row), review: reviews.get(row.id) || null }))
 }
 
 export function getUpbitEpisodeCount(filter = {}, db = getDb()) {

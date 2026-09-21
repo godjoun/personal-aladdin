@@ -303,6 +303,17 @@ export function fetchUpbitQuotes(markets = []) {
   return call(`${BASE}/upbit/quotes?${params}`)
 }
 
+export function saveUpbitTradeReview(episodeId, payload) {
+  return call(`${BASE}/upbit/trades/${encodeURIComponent(episodeId)}/review`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deferUpbitTradeReview(episodeId) {
+  return call(`${BASE}/upbit/trades/${encodeURIComponent(episodeId)}/review/later`, { method: 'POST' })
+}
+
 /**
  * @param {string} id
  * @param {{ userNote?: string | null, userTags?: string[] }} payload
