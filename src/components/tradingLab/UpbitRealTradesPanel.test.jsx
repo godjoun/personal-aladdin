@@ -2,6 +2,7 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import {
+  UpbitClosedTable,
   UpbitTradeCard,
 } from './UpbitRealTradesPanel.jsx'
 import {
@@ -115,6 +116,23 @@ describe('UpbitRealTradesPanel cards', () => {
     expect(html).toContain('lab-upbit-pnl--unknown')
     expect(html).not.toContain('999원')
     expect(html).not.toContain('+9.99%')
+  })
+
+  it('종료 포지션은 데스크톱용 compact table로 종목·손익·복기·상세를 보여 준다', () => {
+    const html = renderToStaticMarkup(
+      <UpbitClosedTable
+        trades={[
+          { ...closedTrade, review: { reminderState: 'LATER', reasonTags: [] } },
+          { ...closedTrade, id: 'closed-2', market: 'KRW-XRP', realizedPnl: 50, realizedPnlPct: 2.5, review: { reminderState: 'COMPLETED', reasonTags: [] } },
+        ]}
+      />,
+    )
+    for (const label of ['종목', '실현손익', '수익률', '평균 매수가', '평균 매도가', '보유시간', '종료일시', '복기 상태', '상세', '복기 미작성', '복기 완료', 'ETH/KRW', 'XRP/KRW', '상세 보기']) {
+      expect(html).toContain(label)
+    }
+    expect(html).toContain('lab-upbit-closed-table')
+    expect(html).toContain('lab-upbit-pnl--loss')
+    expect(html).toContain('lab-upbit-pnl--profit')
   })
 
   it('OPEN을 먼저, CLOSED는 최근 종료 순으로 정렬하고 요약한다', () => {
